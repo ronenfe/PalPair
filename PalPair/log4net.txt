@@ -1,0 +1,492 @@
+iisexpress.exe Warning: 0 : SignalR exception thrown by Task: System.AggregateException: One or more errors occurred. ---> System.Reflection.TargetInvocationException: Exception has been thrown by the target of an invocation. ---> System.TypeInitializationException: The type initializer for 'PalPair.Hubs.PalPairHub' threw an exception. ---> System.Threading.ThreadAbortException: Exception of type 'System.Threading.ThreadAbortException' was thrown.
+   --- End of inner exception stack trace ---
+   at PalPair.Hubs.PalPairHub..ctor()
+   at PalPair.Hubs.PalPairHub..ctor()
+   --- End of inner exception stack trace ---
+   at System.RuntimeTypeHandle.CreateInstance(RuntimeType type, Boolean publicOnly, Boolean noCheck, Boolean& canBeCached, RuntimeMethodHandleInternal& ctor, Boolean& bNeedSecurityCheck)
+   at System.RuntimeType.CreateInstanceSlow(Boolean publicOnly, Boolean skipCheckThis, Boolean fillCache, StackCrawlMark& stackMark)
+   at System.RuntimeType.CreateInstanceDefaultCtor(Boolean publicOnly, Boolean skipCheckThis, Boolean fillCache, StackCrawlMark& stackMark)
+   at System.Activator.CreateInstance(Type type, Boolean nonPublic)
+   at System.Activator.CreateInstance(Type type)
+   at Microsoft.AspNet.SignalR.Hubs.DefaultHubActivator.Create(HubDescriptor descriptor)
+   at Microsoft.AspNet.SignalR.Hubs.DefaultHubManager.ResolveHub(String hubName)
+   at Microsoft.AspNet.SignalR.Hubs.HubDispatcher.CreateHub(IRequest request, HubDescriptor descriptor, String connectionId, StateChangeTracker tracker, Boolean throwIfFailedToCreate)
+   at Microsoft.AspNet.SignalR.Hubs.HubDispatcher.OnReceived(IRequest request, String connectionId, String data)
+   at Microsoft.AspNet.SignalR.PersistentConnection.<>c__DisplayClass8.<>c__DisplayClassa.<ProcessRequest>b__5()
+   at Microsoft.AspNet.SignalR.TaskAsyncHelper.FromMethod(Func`1 func)
+--- End of stack trace from previous location where exception was thrown ---
+   at System.Runtime.CompilerServices.TaskAwaiter.ThrowForNonSuccess(Task task)
+   at System.Runtime.CompilerServices.TaskAwaiter.HandleNonSuccessAndDebuggerNotification(Task task)
+   at System.Runtime.CompilerServices.TaskAwaiter.GetResult()
+   at Microsoft.AspNet.SignalR.Transports.ForeverTransport.<ProcessSendRequest>d__e.MoveNext()
+   --- End of inner exception stack trace ---
+---> (Inner Exception #0) System.Reflection.TargetInvocationException: Exception has been thrown by the target of an invocation. ---> System.TypeInitializationException: The type initializer for 'PalPair.Hubs.PalPairHub' threw an exception. ---> System.Threading.ThreadAbortException: Exception of type 'System.Threading.ThreadAbortException' was thrown.
+   --- End of inner exception stack trace ---
+   at PalPair.Hubs.PalPairHub..ctor()
+   at PalPair.Hubs.PalPairHub..ctor()
+   --- End of inner exception stack trace ---
+   at System.RuntimeTypeHandle.CreateInstance(RuntimeType type, Boolean publicOnly, Boolean noCheck, Boolean& canBeCached, RuntimeMethodHandleInternal& ctor, Boolean& bNeedSecurityCheck)
+   at System.RuntimeType.CreateInstanceSlow(Boolean publicOnly, Boolean skipCheckThis, Boolean fillCache, StackCrawlMark& stackMark)
+   at System.RuntimeType.CreateInstanceDefaultCtor(Boolean publicOnly, Boolean skipCheckThis, Boolean fillCache, StackCrawlMark& stackMark)
+   at System.Activator.CreateInstance(Type type, Boolean nonPublic)
+   at System.Activator.CreateInstance(Type type)
+   at Microsoft.AspNet.SignalR.Hubs.DefaultHubActivator.Create(HubDescriptor descriptor)
+   at Microsoft.AspNet.SignalR.Hubs.DefaultHubManager.ResolveHub(String hubName)
+   at Microsoft.AspNet.SignalR.Hubs.HubDispatcher.CreateHub(IRequest request, HubDescriptor descriptor, String connectionId, StateChangeTracker tracker, Boolean throwIfFailedToCreate)
+   at Microsoft.AspNet.SignalR.Hubs.HubDispatcher.OnReceived(IRequest request, String connectionId, String data)
+   at Microsoft.AspNet.SignalR.PersistentConnection.<>c__DisplayClass8.<>c__DisplayClassa.<ProcessRequest>b__5()
+   at Microsoft.AspNet.SignalR.TaskAsyncHelper.FromMethod(Func`1 func)
+--- End of stack trace from previous location where exception was thrown ---
+   at System.Runtime.CompilerServices.TaskAwaiter.ThrowForNonSuccess(Task task)
+   at System.Runtime.CompilerServices.TaskAwaiter.HandleNonSuccessAndDebuggerNotification(Task task)
+   at System.Runtime.CompilerServices.TaskAwaiter.GetResult()
+   at Microsoft.AspNet.SignalR.Transports.ForeverTransport.<ProcessSendRequest>d__e.MoveNext()<---
+
+iisexpress.exe Warning: 0 : SignalR exception thrown by Task: System.AggregateException: One or more errors occurred. ---> System.Reflection.TargetInvocationException: Exception has been thrown by the target of an invocation. ---> System.TypeInitializationException: The type initializer for 'PalPair.Hubs.PalPairHub' threw an exception. ---> System.Threading.ThreadAbortException: Exception of type 'System.Threading.ThreadAbortException' was thrown.
+   --- End of inner exception stack trace ---
+   at PalPair.Hubs.PalPairHub..ctor()
+   at PalPair.Hubs.PalPairHub..ctor()
+   --- End of inner exception stack trace ---
+   at System.RuntimeTypeHandle.CreateInstance(RuntimeType type, Boolean publicOnly, Boolean noCheck, Boolean& canBeCached, RuntimeMethodHandleInternal& ctor, Boolean& bNeedSecurityCheck)
+   at System.RuntimeType.CreateInstanceSlow(Boolean publicOnly, Boolean skipCheckThis, Boolean fillCache, StackCrawlMark& stackMark)
+   at System.RuntimeType.CreateInstanceDefaultCtor(Boolean publicOnly, Boolean skipCheckThis, Boolean fillCache, StackCrawlMark& stackMark)
+   at System.Activator.CreateInstance(Type type, Boolean nonPublic)
+   at System.Activator.CreateInstance(Type type)
+   at Microsoft.AspNet.SignalR.Hubs.DefaultHubActivator.Create(HubDescriptor descriptor)
+   at Microsoft.AspNet.SignalR.Hubs.DefaultHubManager.ResolveHub(String hubName)
+   at Microsoft.AspNet.SignalR.Hubs.HubDispatcher.CreateHub(IRequest request, HubDescriptor descriptor, String connectionId, StateChangeTracker tracker, Boolean throwIfFailedToCreate)
+   at Microsoft.AspNet.SignalR.Hubs.HubDispatcher.OnReceived(IRequest request, String connectionId, String data)
+   at Microsoft.AspNet.SignalR.PersistentConnection.<>c__DisplayClass8.<>c__DisplayClassa.<ProcessRequest>b__5()
+   at Microsoft.AspNet.SignalR.TaskAsyncHelper.FromMethod(Func`1 func)
+--- End of stack trace from previous location where exception was thrown ---
+   at System.Runtime.CompilerServices.TaskAwaiter.ThrowForNonSuccess(Task task)
+   at System.Runtime.CompilerServices.TaskAwaiter.HandleNonSuccessAndDebuggerNotification(Task task)
+   at System.Runtime.CompilerServices.TaskAwaiter.GetResult()
+   at Microsoft.AspNet.SignalR.Transports.ForeverTransport.<ProcessSendRequest>d__e.MoveNext()
+   --- End of inner exception stack trace ---
+---> (Inner Exception #0) System.Reflection.TargetInvocationException: Exception has been thrown by the target of an invocation. ---> System.TypeInitializationException: The type initializer for 'PalPair.Hubs.PalPairHub' threw an exception. ---> System.Threading.ThreadAbortException: Exception of type 'System.Threading.ThreadAbortException' was thrown.
+   --- End of inner exception stack trace ---
+   at PalPair.Hubs.PalPairHub..ctor()
+   at PalPair.Hubs.PalPairHub..ctor()
+   --- End of inner exception stack trace ---
+   at System.RuntimeTypeHandle.CreateInstance(RuntimeType type, Boolean publicOnly, Boolean noCheck, Boolean& canBeCached, RuntimeMethodHandleInternal& ctor, Boolean& bNeedSecurityCheck)
+   at System.RuntimeType.CreateInstanceSlow(Boolean publicOnly, Boolean skipCheckThis, Boolean fillCache, StackCrawlMark& stackMark)
+   at System.RuntimeType.CreateInstanceDefaultCtor(Boolean publicOnly, Boolean skipCheckThis, Boolean fillCache, StackCrawlMark& stackMark)
+   at System.Activator.CreateInstance(Type type, Boolean nonPublic)
+   at System.Activator.CreateInstance(Type type)
+   at Microsoft.AspNet.SignalR.Hubs.DefaultHubActivator.Create(HubDescriptor descriptor)
+   at Microsoft.AspNet.SignalR.Hubs.DefaultHubManager.ResolveHub(String hubName)
+   at Microsoft.AspNet.SignalR.Hubs.HubDispatcher.CreateHub(IRequest request, HubDescriptor descriptor, String connectionId, StateChangeTracker tracker, Boolean throwIfFailedToCreate)
+   at Microsoft.AspNet.SignalR.Hubs.HubDispatcher.OnReceived(IRequest request, String connectionId, String data)
+   at Microsoft.AspNet.SignalR.PersistentConnection.<>c__DisplayClass8.<>c__DisplayClassa.<ProcessRequest>b__5()
+   at Microsoft.AspNet.SignalR.TaskAsyncHelper.FromMethod(Func`1 func)
+--- End of stack trace from previous location where exception was thrown ---
+   at System.Runtime.CompilerServices.TaskAwaiter.ThrowForNonSuccess(Task task)
+   at System.Runtime.CompilerServices.TaskAwaiter.HandleNonSuccessAndDebuggerNotification(Task task)
+   at System.Runtime.CompilerServices.TaskAwaiter.GetResult()
+   at Microsoft.AspNet.SignalR.Transports.ForeverTransport.<ProcessSendRequest>d__e.MoveNext()<---
+
+iisexpress.exe Warning: 0 : SignalR exception thrown by Task: System.AggregateException: One or more errors occurred. ---> System.Reflection.TargetInvocationException: Exception has been thrown by the target of an invocation. ---> System.TypeInitializationException: The type initializer for 'PalPair.Hubs.PalPairHub' threw an exception. ---> System.NullReferenceException: Object reference not set to an instance of an object.
+   at PalPair.Hubs.PalPairHub.InitializeBots() in c:\Users\Ronen\Documents\Visual Studio 2013\Projects\PalPair\PalPair\Hubs\PalPairHub.cs:line 35
+   at PalPair.Hubs.PalPairHub..cctor() in c:\Users\Ronen\Documents\Visual Studio 2013\Projects\PalPair\PalPair\Hubs\PalPairHub.cs:line 29
+   --- End of inner exception stack trace ---
+   at PalPair.Hubs.PalPairHub..ctor()
+   --- End of inner exception stack trace ---
+   at System.RuntimeTypeHandle.CreateInstance(RuntimeType type, Boolean publicOnly, Boolean noCheck, Boolean& canBeCached, RuntimeMethodHandleInternal& ctor, Boolean& bNeedSecurityCheck)
+   at System.RuntimeType.CreateInstanceSlow(Boolean publicOnly, Boolean skipCheckThis, Boolean fillCache, StackCrawlMark& stackMark)
+   at System.RuntimeType.CreateInstanceDefaultCtor(Boolean publicOnly, Boolean skipCheckThis, Boolean fillCache, StackCrawlMark& stackMark)
+   at System.Activator.CreateInstance(Type type, Boolean nonPublic)
+   at System.Activator.CreateInstance(Type type)
+   at Microsoft.AspNet.SignalR.Hubs.DefaultHubActivator.Create(HubDescriptor descriptor)
+   at Microsoft.AspNet.SignalR.Hubs.DefaultHubManager.ResolveHub(String hubName)
+   at Microsoft.AspNet.SignalR.Hubs.HubDispatcher.CreateHub(IRequest request, HubDescriptor descriptor, String connectionId, StateChangeTracker tracker, Boolean throwIfFailedToCreate)
+   at Microsoft.AspNet.SignalR.Hubs.HubDispatcher.OnReceived(IRequest request, String connectionId, String data)
+   at Microsoft.AspNet.SignalR.PersistentConnection.<>c__DisplayClass8.<>c__DisplayClassa.<ProcessRequest>b__5()
+   at Microsoft.AspNet.SignalR.TaskAsyncHelper.FromMethod(Func`1 func)
+--- End of stack trace from previous location where exception was thrown ---
+   at System.Runtime.CompilerServices.TaskAwaiter.ThrowForNonSuccess(Task task)
+   at System.Runtime.CompilerServices.TaskAwaiter.HandleNonSuccessAndDebuggerNotification(Task task)
+   at System.Runtime.CompilerServices.TaskAwaiter.GetResult()
+   at Microsoft.AspNet.SignalR.Transports.ForeverTransport.<ProcessSendRequest>d__e.MoveNext()
+   --- End of inner exception stack trace ---
+---> (Inner Exception #0) System.Reflection.TargetInvocationException: Exception has been thrown by the target of an invocation. ---> System.TypeInitializationException: The type initializer for 'PalPair.Hubs.PalPairHub' threw an exception. ---> System.NullReferenceException: Object reference not set to an instance of an object.
+   at PalPair.Hubs.PalPairHub.InitializeBots() in c:\Users\Ronen\Documents\Visual Studio 2013\Projects\PalPair\PalPair\Hubs\PalPairHub.cs:line 35
+   at PalPair.Hubs.PalPairHub..cctor() in c:\Users\Ronen\Documents\Visual Studio 2013\Projects\PalPair\PalPair\Hubs\PalPairHub.cs:line 29
+   --- End of inner exception stack trace ---
+   at PalPair.Hubs.PalPairHub..ctor()
+   --- End of inner exception stack trace ---
+   at System.RuntimeTypeHandle.CreateInstance(RuntimeType type, Boolean publicOnly, Boolean noCheck, Boolean& canBeCached, RuntimeMethodHandleInternal& ctor, Boolean& bNeedSecurityCheck)
+   at System.RuntimeType.CreateInstanceSlow(Boolean publicOnly, Boolean skipCheckThis, Boolean fillCache, StackCrawlMark& stackMark)
+   at System.RuntimeType.CreateInstanceDefaultCtor(Boolean publicOnly, Boolean skipCheckThis, Boolean fillCache, StackCrawlMark& stackMark)
+   at System.Activator.CreateInstance(Type type, Boolean nonPublic)
+   at System.Activator.CreateInstance(Type type)
+   at Microsoft.AspNet.SignalR.Hubs.DefaultHubActivator.Create(HubDescriptor descriptor)
+   at Microsoft.AspNet.SignalR.Hubs.DefaultHubManager.ResolveHub(String hubName)
+   at Microsoft.AspNet.SignalR.Hubs.HubDispatcher.CreateHub(IRequest request, HubDescriptor descriptor, String connectionId, StateChangeTracker tracker, Boolean throwIfFailedToCreate)
+   at Microsoft.AspNet.SignalR.Hubs.HubDispatcher.OnReceived(IRequest request, String connectionId, String data)
+   at Microsoft.AspNet.SignalR.PersistentConnection.<>c__DisplayClass8.<>c__DisplayClassa.<ProcessRequest>b__5()
+   at Microsoft.AspNet.SignalR.TaskAsyncHelper.FromMethod(Func`1 func)
+--- End of stack trace from previous location where exception was thrown ---
+   at System.Runtime.CompilerServices.TaskAwaiter.ThrowForNonSuccess(Task task)
+   at System.Runtime.CompilerServices.TaskAwaiter.HandleNonSuccessAndDebuggerNotification(Task task)
+   at System.Runtime.CompilerServices.TaskAwaiter.GetResult()
+   at Microsoft.AspNet.SignalR.Transports.ForeverTransport.<ProcessSendRequest>d__e.MoveNext()<---
+
+iisexpress.exe Warning: 0 : SignalR exception thrown by Task: System.AggregateException: One or more errors occurred. ---> System.Reflection.TargetInvocationException: Exception has been thrown by the target of an invocation. ---> System.TypeInitializationException: The type initializer for 'PalPair.Hubs.PalPairHub' threw an exception. ---> System.NullReferenceException: Object reference not set to an instance of an object.
+   at PalPair.Hubs.PalPairHub.InitializeBots() in c:\Users\Ronen\Documents\Visual Studio 2013\Projects\PalPair\PalPair\Hubs\PalPairHub.cs:line 35
+   at PalPair.Hubs.PalPairHub..cctor() in c:\Users\Ronen\Documents\Visual Studio 2013\Projects\PalPair\PalPair\Hubs\PalPairHub.cs:line 29
+   --- End of inner exception stack trace ---
+   at PalPair.Hubs.PalPairHub..ctor()
+   --- End of inner exception stack trace ---
+   at System.RuntimeTypeHandle.CreateInstance(RuntimeType type, Boolean publicOnly, Boolean noCheck, Boolean& canBeCached, RuntimeMethodHandleInternal& ctor, Boolean& bNeedSecurityCheck)
+   at System.RuntimeType.CreateInstanceSlow(Boolean publicOnly, Boolean skipCheckThis, Boolean fillCache, StackCrawlMark& stackMark)
+   at System.RuntimeType.CreateInstanceDefaultCtor(Boolean publicOnly, Boolean skipCheckThis, Boolean fillCache, StackCrawlMark& stackMark)
+   at System.Activator.CreateInstance(Type type, Boolean nonPublic)
+   at System.Activator.CreateInstance(Type type)
+   at Microsoft.AspNet.SignalR.Hubs.DefaultHubActivator.Create(HubDescriptor descriptor)
+   at Microsoft.AspNet.SignalR.Hubs.DefaultHubManager.ResolveHub(String hubName)
+   at Microsoft.AspNet.SignalR.Hubs.HubDispatcher.CreateHub(IRequest request, HubDescriptor descriptor, String connectionId, StateChangeTracker tracker, Boolean throwIfFailedToCreate)
+   at Microsoft.AspNet.SignalR.Hubs.HubDispatcher.OnReceived(IRequest request, String connectionId, String data)
+   at Microsoft.AspNet.SignalR.PersistentConnection.<>c__DisplayClass8.<>c__DisplayClassa.<ProcessRequest>b__5()
+   at Microsoft.AspNet.SignalR.TaskAsyncHelper.FromMethod(Func`1 func)
+--- End of stack trace from previous location where exception was thrown ---
+   at System.Runtime.CompilerServices.TaskAwaiter.ThrowForNonSuccess(Task task)
+   at System.Runtime.CompilerServices.TaskAwaiter.HandleNonSuccessAndDebuggerNotification(Task task)
+   at System.Runtime.CompilerServices.TaskAwaiter.GetResult()
+   at Microsoft.AspNet.SignalR.Transports.ForeverTransport.<ProcessSendRequest>d__e.MoveNext()
+   --- End of inner exception stack trace ---
+---> (Inner Exception #0) System.Reflection.TargetInvocationException: Exception has been thrown by the target of an invocation. ---> System.TypeInitializationException: The type initializer for 'PalPair.Hubs.PalPairHub' threw an exception. ---> System.NullReferenceException: Object reference not set to an instance of an object.
+   at PalPair.Hubs.PalPairHub.InitializeBots() in c:\Users\Ronen\Documents\Visual Studio 2013\Projects\PalPair\PalPair\Hubs\PalPairHub.cs:line 35
+   at PalPair.Hubs.PalPairHub..cctor() in c:\Users\Ronen\Documents\Visual Studio 2013\Projects\PalPair\PalPair\Hubs\PalPairHub.cs:line 29
+   --- End of inner exception stack trace ---
+   at PalPair.Hubs.PalPairHub..ctor()
+   --- End of inner exception stack trace ---
+   at System.RuntimeTypeHandle.CreateInstance(RuntimeType type, Boolean publicOnly, Boolean noCheck, Boolean& canBeCached, RuntimeMethodHandleInternal& ctor, Boolean& bNeedSecurityCheck)
+   at System.RuntimeType.CreateInstanceSlow(Boolean publicOnly, Boolean skipCheckThis, Boolean fillCache, StackCrawlMark& stackMark)
+   at System.RuntimeType.CreateInstanceDefaultCtor(Boolean publicOnly, Boolean skipCheckThis, Boolean fillCache, StackCrawlMark& stackMark)
+   at System.Activator.CreateInstance(Type type, Boolean nonPublic)
+   at System.Activator.CreateInstance(Type type)
+   at Microsoft.AspNet.SignalR.Hubs.DefaultHubActivator.Create(HubDescriptor descriptor)
+   at Microsoft.AspNet.SignalR.Hubs.DefaultHubManager.ResolveHub(String hubName)
+   at Microsoft.AspNet.SignalR.Hubs.HubDispatcher.CreateHub(IRequest request, HubDescriptor descriptor, String connectionId, StateChangeTracker tracker, Boolean throwIfFailedToCreate)
+   at Microsoft.AspNet.SignalR.Hubs.HubDispatcher.OnReceived(IRequest request, String connectionId, String data)
+   at Microsoft.AspNet.SignalR.PersistentConnection.<>c__DisplayClass8.<>c__DisplayClassa.<ProcessRequest>b__5()
+   at Microsoft.AspNet.SignalR.TaskAsyncHelper.FromMethod(Func`1 func)
+--- End of stack trace from previous location where exception was thrown ---
+   at System.Runtime.CompilerServices.TaskAwaiter.ThrowForNonSuccess(Task task)
+   at System.Runtime.CompilerServices.TaskAwaiter.HandleNonSuccessAndDebuggerNotification(Task task)
+   at System.Runtime.CompilerServices.TaskAwaiter.GetResult()
+   at Microsoft.AspNet.SignalR.Transports.ForeverTransport.<ProcessSendRequest>d__e.MoveNext()<---
+
+iisexpress.exe Warning: 0 : SignalR exception thrown by Task: System.AggregateException: One or more errors occurred. ---> System.Reflection.TargetInvocationException: Exception has been thrown by the target of an invocation. ---> System.TypeInitializationException: The type initializer for 'PalPair.Hubs.PalPairHub' threw an exception. ---> System.NullReferenceException: Object reference not set to an instance of an object.
+   at PalPair.Hubs.PalPairHub.InitializeBots() in c:\Users\Ronen\Documents\Visual Studio 2013\Projects\PalPair\PalPair\Hubs\PalPairHub.cs:line 35
+   at PalPair.Hubs.PalPairHub..cctor() in c:\Users\Ronen\Documents\Visual Studio 2013\Projects\PalPair\PalPair\Hubs\PalPairHub.cs:line 29
+   --- End of inner exception stack trace ---
+   at PalPair.Hubs.PalPairHub..ctor()
+   --- End of inner exception stack trace ---
+   at System.RuntimeTypeHandle.CreateInstance(RuntimeType type, Boolean publicOnly, Boolean noCheck, Boolean& canBeCached, RuntimeMethodHandleInternal& ctor, Boolean& bNeedSecurityCheck)
+   at System.RuntimeType.CreateInstanceSlow(Boolean publicOnly, Boolean skipCheckThis, Boolean fillCache, StackCrawlMark& stackMark)
+   at System.RuntimeType.CreateInstanceDefaultCtor(Boolean publicOnly, Boolean skipCheckThis, Boolean fillCache, StackCrawlMark& stackMark)
+   at System.Activator.CreateInstance(Type type, Boolean nonPublic)
+   at System.Activator.CreateInstance(Type type)
+   at Microsoft.AspNet.SignalR.Hubs.DefaultHubActivator.Create(HubDescriptor descriptor)
+   at Microsoft.AspNet.SignalR.Hubs.DefaultHubManager.ResolveHub(String hubName)
+   at Microsoft.AspNet.SignalR.Hubs.HubDispatcher.CreateHub(IRequest request, HubDescriptor descriptor, String connectionId, StateChangeTracker tracker, Boolean throwIfFailedToCreate)
+   at Microsoft.AspNet.SignalR.Hubs.HubDispatcher.OnReceived(IRequest request, String connectionId, String data)
+   at Microsoft.AspNet.SignalR.PersistentConnection.<>c__DisplayClass8.<>c__DisplayClassa.<ProcessRequest>b__5()
+   at Microsoft.AspNet.SignalR.TaskAsyncHelper.FromMethod(Func`1 func)
+--- End of stack trace from previous location where exception was thrown ---
+   at System.Runtime.CompilerServices.TaskAwaiter.ThrowForNonSuccess(Task task)
+   at System.Runtime.CompilerServices.TaskAwaiter.HandleNonSuccessAndDebuggerNotification(Task task)
+   at System.Runtime.CompilerServices.TaskAwaiter.GetResult()
+   at Microsoft.AspNet.SignalR.Transports.ForeverTransport.<ProcessSendRequest>d__e.MoveNext()
+   --- End of inner exception stack trace ---
+---> (Inner Exception #0) System.Reflection.TargetInvocationException: Exception has been thrown by the target of an invocation. ---> System.TypeInitializationException: The type initializer for 'PalPair.Hubs.PalPairHub' threw an exception. ---> System.NullReferenceException: Object reference not set to an instance of an object.
+   at PalPair.Hubs.PalPairHub.InitializeBots() in c:\Users\Ronen\Documents\Visual Studio 2013\Projects\PalPair\PalPair\Hubs\PalPairHub.cs:line 35
+   at PalPair.Hubs.PalPairHub..cctor() in c:\Users\Ronen\Documents\Visual Studio 2013\Projects\PalPair\PalPair\Hubs\PalPairHub.cs:line 29
+   --- End of inner exception stack trace ---
+   at PalPair.Hubs.PalPairHub..ctor()
+   --- End of inner exception stack trace ---
+   at System.RuntimeTypeHandle.CreateInstance(RuntimeType type, Boolean publicOnly, Boolean noCheck, Boolean& canBeCached, RuntimeMethodHandleInternal& ctor, Boolean& bNeedSecurityCheck)
+   at System.RuntimeType.CreateInstanceSlow(Boolean publicOnly, Boolean skipCheckThis, Boolean fillCache, StackCrawlMark& stackMark)
+   at System.RuntimeType.CreateInstanceDefaultCtor(Boolean publicOnly, Boolean skipCheckThis, Boolean fillCache, StackCrawlMark& stackMark)
+   at System.Activator.CreateInstance(Type type, Boolean nonPublic)
+   at System.Activator.CreateInstance(Type type)
+   at Microsoft.AspNet.SignalR.Hubs.DefaultHubActivator.Create(HubDescriptor descriptor)
+   at Microsoft.AspNet.SignalR.Hubs.DefaultHubManager.ResolveHub(String hubName)
+   at Microsoft.AspNet.SignalR.Hubs.HubDispatcher.CreateHub(IRequest request, HubDescriptor descriptor, String connectionId, StateChangeTracker tracker, Boolean throwIfFailedToCreate)
+   at Microsoft.AspNet.SignalR.Hubs.HubDispatcher.OnReceived(IRequest request, String connectionId, String data)
+   at Microsoft.AspNet.SignalR.PersistentConnection.<>c__DisplayClass8.<>c__DisplayClassa.<ProcessRequest>b__5()
+   at Microsoft.AspNet.SignalR.TaskAsyncHelper.FromMethod(Func`1 func)
+--- End of stack trace from previous location where exception was thrown ---
+   at System.Runtime.CompilerServices.TaskAwaiter.ThrowForNonSuccess(Task task)
+   at System.Runtime.CompilerServices.TaskAwaiter.HandleNonSuccessAndDebuggerNotification(Task task)
+   at System.Runtime.CompilerServices.TaskAwaiter.GetResult()
+   at Microsoft.AspNet.SignalR.Transports.ForeverTransport.<ProcessSendRequest>d__e.MoveNext()<---
+
+iisexpress.exe Warning: 0 : SignalR exception thrown by Task: System.AggregateException: One or more errors occurred. ---> System.Web.HttpException: The remote host closed the connection. The error code is 0x800704CD.
+   at System.Web.Hosting.IIS7WorkerRequest.RaiseCommunicationError(Int32 result, Boolean throwOnDisconnect)
+   at System.Web.Hosting.IIS7WorkerRequest.ExplicitFlush()
+   at System.Web.HttpResponse.Flush(Boolean finalFlush, Boolean async)
+   at System.Web.HttpResponse.Flush()
+   at System.Web.HttpWriter.WriteFromStream(Byte[] data, Int32 offset, Int32 size)
+   at System.Web.HttpResponseStream.Write(Byte[] buffer, Int32 offset, Int32 count)
+   at Microsoft.Owin.Host.SystemWeb.CallStreams.DelegatingStream.Write(Byte[] buffer, Int32 offset, Int32 count)
+   at Microsoft.Owin.Host.SystemWeb.CallStreams.OutputStream.Write(Byte[] buffer, Int32 offset, Int32 count)
+   at Microsoft.AspNet.SignalR.Owin.ServerResponse.Write(ArraySegment`1 data)
+   at Microsoft.AspNet.SignalR.Infrastructure.BinaryTextWriter.<.ctor>b__4(ArraySegment`1 data, Object state)
+   at Microsoft.AspNet.SignalR.Infrastructure.BufferTextWriter.ChunkedWriter.Flush(Byte[] byteBuffer, Boolean flushEncoder)
+   at Microsoft.AspNet.SignalR.Infrastructure.BufferTextWriter.ChunkedWriter.Flush(Boolean flushEncoder)
+   at Microsoft.AspNet.SignalR.Infrastructure.BufferTextWriter.ChunkedWriter.Flush()
+   at Microsoft.AspNet.SignalR.Infrastructure.BufferTextWriter.Flush()
+   at Microsoft.AspNet.SignalR.Transports.ServerSentEventsTransport.PerformSend(Object state)
+   at Microsoft.AspNet.SignalR.Transports.ServerSentEventsTransport.<Send>b__2(Object state)
+   at Microsoft.AspNet.SignalR.Infrastructure.TaskQueue.InvokeNext(Func`2 next, Object nextState, Object queueState)
+   at Microsoft.AspNet.SignalR.Infrastructure.TaskQueue.<Enqueue>b__1(Func`2 n, Object ns, TaskQueue q)
+   at Microsoft.AspNet.SignalR.TaskAsyncHelper.FromMethod[T1,T2,T3](Func`4 func, T1 arg1, T2 arg2, T3 arg3)
+--- End of stack trace from previous location where exception was thrown ---
+   at System.Runtime.CompilerServices.TaskAwaiter.ThrowForNonSuccess(Task task)
+   at System.Runtime.CompilerServices.TaskAwaiter.HandleNonSuccessAndDebuggerNotification(Task task)
+   at System.Runtime.CompilerServices.TaskAwaiter`1.GetResult()
+   at Microsoft.AspNet.SignalR.Messaging.Subscription.<Invoke>d__2.MoveNext()
+--- End of stack trace from previous location where exception was thrown ---
+   at System.Runtime.CompilerServices.TaskAwaiter.ThrowForNonSuccess(Task task)
+   --- End of inner exception stack trace ---
+---> (Inner Exception #0) System.Web.HttpException (0x800704CD): The remote host closed the connection. The error code is 0x800704CD.
+   at System.Web.Hosting.IIS7WorkerRequest.RaiseCommunicationError(Int32 result, Boolean throwOnDisconnect)
+   at System.Web.Hosting.IIS7WorkerRequest.ExplicitFlush()
+   at System.Web.HttpResponse.Flush(Boolean finalFlush, Boolean async)
+   at System.Web.HttpResponse.Flush()
+   at System.Web.HttpWriter.WriteFromStream(Byte[] data, Int32 offset, Int32 size)
+   at System.Web.HttpResponseStream.Write(Byte[] buffer, Int32 offset, Int32 count)
+   at Microsoft.Owin.Host.SystemWeb.CallStreams.DelegatingStream.Write(Byte[] buffer, Int32 offset, Int32 count)
+   at Microsoft.Owin.Host.SystemWeb.CallStreams.OutputStream.Write(Byte[] buffer, Int32 offset, Int32 count)
+   at Microsoft.AspNet.SignalR.Owin.ServerResponse.Write(ArraySegment`1 data)
+   at Microsoft.AspNet.SignalR.Infrastructure.BinaryTextWriter.<.ctor>b__4(ArraySegment`1 data, Object state)
+   at Microsoft.AspNet.SignalR.Infrastructure.BufferTextWriter.ChunkedWriter.Flush(Byte[] byteBuffer, Boolean flushEncoder)
+   at Microsoft.AspNet.SignalR.Infrastructure.BufferTextWriter.ChunkedWriter.Flush(Boolean flushEncoder)
+   at Microsoft.AspNet.SignalR.Infrastructure.BufferTextWriter.ChunkedWriter.Flush()
+   at Microsoft.AspNet.SignalR.Infrastructure.BufferTextWriter.Flush()
+   at Microsoft.AspNet.SignalR.Transports.ServerSentEventsTransport.PerformSend(Object state)
+   at Microsoft.AspNet.SignalR.Transports.ServerSentEventsTransport.<Send>b__2(Object state)
+   at Microsoft.AspNet.SignalR.Infrastructure.TaskQueue.InvokeNext(Func`2 next, Object nextState, Object queueState)
+   at Microsoft.AspNet.SignalR.Infrastructure.TaskQueue.<Enqueue>b__1(Func`2 n, Object ns, TaskQueue q)
+   at Microsoft.AspNet.SignalR.TaskAsyncHelper.FromMethod[T1,T2,T3](Func`4 func, T1 arg1, T2 arg2, T3 arg3)
+--- End of stack trace from previous location where exception was thrown ---
+   at System.Runtime.CompilerServices.TaskAwaiter.ThrowForNonSuccess(Task task)
+   at System.Runtime.CompilerServices.TaskAwaiter.HandleNonSuccessAndDebuggerNotification(Task task)
+   at System.Runtime.CompilerServices.TaskAwaiter`1.GetResult()
+   at Microsoft.AspNet.SignalR.Messaging.Subscription.<Invoke>d__2.MoveNext()
+--- End of stack trace from previous location where exception was thrown ---
+   at System.Runtime.CompilerServices.TaskAwaiter.ThrowForNonSuccess(Task task)<---
+
+iisexpress.exe Warning: 0 : SignalR exception thrown by Task: System.AggregateException: One or more errors occurred. ---> System.Web.HttpException: The remote host closed the connection. The error code is 0x800704CD.
+   at System.Web.Hosting.IIS7WorkerRequest.RaiseCommunicationError(Int32 result, Boolean throwOnDisconnect)
+   at System.Web.Hosting.IIS7WorkerRequest.ExplicitFlush()
+   at System.Web.HttpResponse.Flush(Boolean finalFlush, Boolean async)
+   at System.Web.HttpResponse.Flush()
+   at System.Web.HttpWriter.WriteFromStream(Byte[] data, Int32 offset, Int32 size)
+   at System.Web.HttpResponseStream.Write(Byte[] buffer, Int32 offset, Int32 count)
+   at Microsoft.Owin.Host.SystemWeb.CallStreams.DelegatingStream.Write(Byte[] buffer, Int32 offset, Int32 count)
+   at Microsoft.Owin.Host.SystemWeb.CallStreams.OutputStream.Write(Byte[] buffer, Int32 offset, Int32 count)
+   at Microsoft.AspNet.SignalR.Owin.ServerResponse.Write(ArraySegment`1 data)
+   at Microsoft.AspNet.SignalR.Infrastructure.BinaryTextWriter.<.ctor>b__4(ArraySegment`1 data, Object state)
+   at Microsoft.AspNet.SignalR.Infrastructure.BufferTextWriter.ChunkedWriter.Flush(Byte[] byteBuffer, Boolean flushEncoder)
+   at Microsoft.AspNet.SignalR.Infrastructure.BufferTextWriter.ChunkedWriter.Flush(Boolean flushEncoder)
+   at Microsoft.AspNet.SignalR.Infrastructure.BufferTextWriter.ChunkedWriter.Flush()
+   at Microsoft.AspNet.SignalR.Infrastructure.BufferTextWriter.Flush()
+   at Microsoft.AspNet.SignalR.Transports.ServerSentEventsTransport.PerformSend(Object state)
+   at Microsoft.AspNet.SignalR.Transports.ServerSentEventsTransport.<Send>b__2(Object state)
+   at Microsoft.AspNet.SignalR.Infrastructure.TaskQueue.InvokeNext(Func`2 next, Object nextState, Object queueState)
+   at Microsoft.AspNet.SignalR.Infrastructure.TaskQueue.<Enqueue>b__1(Func`2 n, Object ns, TaskQueue q)
+   at Microsoft.AspNet.SignalR.TaskAsyncHelper.FromMethod[T1,T2,T3](Func`4 func, T1 arg1, T2 arg2, T3 arg3)
+--- End of stack trace from previous location where exception was thrown ---
+   at System.Runtime.CompilerServices.TaskAwaiter.ThrowForNonSuccess(Task task)
+   at System.Runtime.CompilerServices.TaskAwaiter.HandleNonSuccessAndDebuggerNotification(Task task)
+   at System.Runtime.CompilerServices.TaskAwaiter`1.GetResult()
+   at Microsoft.AspNet.SignalR.Messaging.Subscription.<Invoke>d__2.MoveNext()
+--- End of stack trace from previous location where exception was thrown ---
+   at System.Runtime.CompilerServices.TaskAwaiter.ThrowForNonSuccess(Task task)
+   at System.Runtime.CompilerServices.TaskAwaiter.HandleNonSuccessAndDebuggerNotification(Task task)
+   at System.Runtime.CompilerServices.TaskAwaiter`1.GetResult()
+   at Microsoft.AspNet.SignalR.Messaging.Subscription.<Work>d__8.MoveNext()
+--- End of stack trace from previous location where exception was thrown ---
+   at System.Runtime.CompilerServices.TaskAwaiter.ThrowForNonSuccess(Task task)
+   at System.Runtime.CompilerServices.TaskAwaiter.HandleNonSuccessAndDebuggerNotification(Task task)
+   at System.Runtime.CompilerServices.TaskAwaiter.GetResult()
+   at Microsoft.AspNet.SignalR.Messaging.MessageBroker.<DoWork>d__2.MoveNext()
+   --- End of inner exception stack trace ---
+---> (Inner Exception #0) System.Web.HttpException (0x800704CD): The remote host closed the connection. The error code is 0x800704CD.
+   at System.Web.Hosting.IIS7WorkerRequest.RaiseCommunicationError(Int32 result, Boolean throwOnDisconnect)
+   at System.Web.Hosting.IIS7WorkerRequest.ExplicitFlush()
+   at System.Web.HttpResponse.Flush(Boolean finalFlush, Boolean async)
+   at System.Web.HttpResponse.Flush()
+   at System.Web.HttpWriter.WriteFromStream(Byte[] data, Int32 offset, Int32 size)
+   at System.Web.HttpResponseStream.Write(Byte[] buffer, Int32 offset, Int32 count)
+   at Microsoft.Owin.Host.SystemWeb.CallStreams.DelegatingStream.Write(Byte[] buffer, Int32 offset, Int32 count)
+   at Microsoft.Owin.Host.SystemWeb.CallStreams.OutputStream.Write(Byte[] buffer, Int32 offset, Int32 count)
+   at Microsoft.AspNet.SignalR.Owin.ServerResponse.Write(ArraySegment`1 data)
+   at Microsoft.AspNet.SignalR.Infrastructure.BinaryTextWriter.<.ctor>b__4(ArraySegment`1 data, Object state)
+   at Microsoft.AspNet.SignalR.Infrastructure.BufferTextWriter.ChunkedWriter.Flush(Byte[] byteBuffer, Boolean flushEncoder)
+   at Microsoft.AspNet.SignalR.Infrastructure.BufferTextWriter.ChunkedWriter.Flush(Boolean flushEncoder)
+   at Microsoft.AspNet.SignalR.Infrastructure.BufferTextWriter.ChunkedWriter.Flush()
+   at Microsoft.AspNet.SignalR.Infrastructure.BufferTextWriter.Flush()
+   at Microsoft.AspNet.SignalR.Transports.ServerSentEventsTransport.PerformSend(Object state)
+   at Microsoft.AspNet.SignalR.Transports.ServerSentEventsTransport.<Send>b__2(Object state)
+   at Microsoft.AspNet.SignalR.Infrastructure.TaskQueue.InvokeNext(Func`2 next, Object nextState, Object queueState)
+   at Microsoft.AspNet.SignalR.Infrastructure.TaskQueue.<Enqueue>b__1(Func`2 n, Object ns, TaskQueue q)
+   at Microsoft.AspNet.SignalR.TaskAsyncHelper.FromMethod[T1,T2,T3](Func`4 func, T1 arg1, T2 arg2, T3 arg3)
+--- End of stack trace from previous location where exception was thrown ---
+   at System.Runtime.CompilerServices.TaskAwaiter.ThrowForNonSuccess(Task task)
+   at System.Runtime.CompilerServices.TaskAwaiter.HandleNonSuccessAndDebuggerNotification(Task task)
+   at System.Runtime.CompilerServices.TaskAwaiter`1.GetResult()
+   at Microsoft.AspNet.SignalR.Messaging.Subscription.<Invoke>d__2.MoveNext()
+--- End of stack trace from previous location where exception was thrown ---
+   at System.Runtime.CompilerServices.TaskAwaiter.ThrowForNonSuccess(Task task)
+   at System.Runtime.CompilerServices.TaskAwaiter.HandleNonSuccessAndDebuggerNotification(Task task)
+   at System.Runtime.CompilerServices.TaskAwaiter`1.GetResult()
+   at Microsoft.AspNet.SignalR.Messaging.Subscription.<Work>d__8.MoveNext()
+--- End of stack trace from previous location where exception was thrown ---
+   at System.Runtime.CompilerServices.TaskAwaiter.ThrowForNonSuccess(Task task)
+   at System.Runtime.CompilerServices.TaskAwaiter.HandleNonSuccessAndDebuggerNotification(Task task)
+   at System.Runtime.CompilerServices.TaskAwaiter.GetResult()
+   at Microsoft.AspNet.SignalR.Messaging.MessageBroker.<DoWork>d__2.MoveNext()<---
+
+iisexpress.exe Warning: 0 : SignalR exception thrown by Task: System.AggregateException: One or more errors occurred. ---> System.Web.HttpException: The remote host closed the connection. The error code is 0x800704CD.
+   at System.Web.Hosting.IIS7WorkerRequest.RaiseCommunicationError(Int32 result, Boolean throwOnDisconnect)
+   at System.Web.Hosting.IIS7WorkerRequest.ExplicitFlush()
+   at System.Web.HttpResponse.Flush(Boolean finalFlush, Boolean async)
+   at System.Web.HttpResponse.Flush()
+   at System.Web.HttpWriter.WriteFromStream(Byte[] data, Int32 offset, Int32 size)
+   at System.Web.HttpResponseStream.Write(Byte[] buffer, Int32 offset, Int32 count)
+   at Microsoft.Owin.Host.SystemWeb.CallStreams.DelegatingStream.Write(Byte[] buffer, Int32 offset, Int32 count)
+   at Microsoft.Owin.Host.SystemWeb.CallStreams.OutputStream.Write(Byte[] buffer, Int32 offset, Int32 count)
+   at Microsoft.AspNet.SignalR.Owin.ServerResponse.Write(ArraySegment`1 data)
+   at Microsoft.AspNet.SignalR.Infrastructure.BinaryTextWriter.<.ctor>b__4(ArraySegment`1 data, Object state)
+   at Microsoft.AspNet.SignalR.Infrastructure.BufferTextWriter.ChunkedWriter.Write(ArraySegment`1 data)
+   at Microsoft.AspNet.SignalR.Infrastructure.BinaryTextWriter.Write(ArraySegment`1 data)
+   at Microsoft.AspNet.SignalR.Transports.PersistentResponse.WriteMessages(TextWriter writer, JsonTextWriter jsonWriter)
+   at Microsoft.AspNet.SignalR.Transports.PersistentResponse.Microsoft.AspNet.SignalR.Json.IJsonWritable.WriteJson(TextWriter writer)
+   at Microsoft.AspNet.SignalR.Json.JsonSerializerExtensions.Serialize(JsonSerializer serializer, Object value, TextWriter writer)
+   at Microsoft.AspNet.SignalR.Transports.ServerSentEventsTransport.PerformSend(Object state)
+   at Microsoft.AspNet.SignalR.Transports.ServerSentEventsTransport.<Send>b__2(Object state)
+   at Microsoft.AspNet.SignalR.Infrastructure.TaskQueue.InvokeNext(Func`2 next, Object nextState, Object queueState)
+   at Microsoft.AspNet.SignalR.Infrastructure.TaskQueue.<Enqueue>b__1(Func`2 n, Object ns, TaskQueue q)
+   at Microsoft.AspNet.SignalR.TaskAsyncHelper.FromMethod[T1,T2,T3](Func`4 func, T1 arg1, T2 arg2, T3 arg3)
+--- End of stack trace from previous location where exception was thrown ---
+   at System.Runtime.CompilerServices.TaskAwaiter.ThrowForNonSuccess(Task task)
+   at System.Runtime.CompilerServices.TaskAwaiter.HandleNonSuccessAndDebuggerNotification(Task task)
+   at System.Runtime.CompilerServices.TaskAwaiter`1.GetResult()
+   at Microsoft.AspNet.SignalR.Messaging.Subscription.<Invoke>d__2.MoveNext()
+--- End of stack trace from previous location where exception was thrown ---
+   at System.Runtime.CompilerServices.TaskAwaiter.ThrowForNonSuccess(Task task)
+   at System.Runtime.CompilerServices.TaskAwaiter.HandleNonSuccessAndDebuggerNotification(Task task)
+   at System.Runtime.CompilerServices.TaskAwaiter`1.GetResult()
+   at Microsoft.AspNet.SignalR.Messaging.Subscription.<Work>d__8.MoveNext()
+   --- End of inner exception stack trace ---
+---> (Inner Exception #0) System.Web.HttpException (0x800704CD): The remote host closed the connection. The error code is 0x800704CD.
+   at System.Web.Hosting.IIS7WorkerRequest.RaiseCommunicationError(Int32 result, Boolean throwOnDisconnect)
+   at System.Web.Hosting.IIS7WorkerRequest.ExplicitFlush()
+   at System.Web.HttpResponse.Flush(Boolean finalFlush, Boolean async)
+   at System.Web.HttpResponse.Flush()
+   at System.Web.HttpWriter.WriteFromStream(Byte[] data, Int32 offset, Int32 size)
+   at System.Web.HttpResponseStream.Write(Byte[] buffer, Int32 offset, Int32 count)
+   at Microsoft.Owin.Host.SystemWeb.CallStreams.DelegatingStream.Write(Byte[] buffer, Int32 offset, Int32 count)
+   at Microsoft.Owin.Host.SystemWeb.CallStreams.OutputStream.Write(Byte[] buffer, Int32 offset, Int32 count)
+   at Microsoft.AspNet.SignalR.Owin.ServerResponse.Write(ArraySegment`1 data)
+   at Microsoft.AspNet.SignalR.Infrastructure.BinaryTextWriter.<.ctor>b__4(ArraySegment`1 data, Object state)
+   at Microsoft.AspNet.SignalR.Infrastructure.BufferTextWriter.ChunkedWriter.Write(ArraySegment`1 data)
+   at Microsoft.AspNet.SignalR.Infrastructure.BinaryTextWriter.Write(ArraySegment`1 data)
+   at Microsoft.AspNet.SignalR.Transports.PersistentResponse.WriteMessages(TextWriter writer, JsonTextWriter jsonWriter)
+   at Microsoft.AspNet.SignalR.Transports.PersistentResponse.Microsoft.AspNet.SignalR.Json.IJsonWritable.WriteJson(TextWriter writer)
+   at Microsoft.AspNet.SignalR.Json.JsonSerializerExtensions.Serialize(JsonSerializer serializer, Object value, TextWriter writer)
+   at Microsoft.AspNet.SignalR.Transports.ServerSentEventsTransport.PerformSend(Object state)
+   at Microsoft.AspNet.SignalR.Transports.ServerSentEventsTransport.<Send>b__2(Object state)
+   at Microsoft.AspNet.SignalR.Infrastructure.TaskQueue.InvokeNext(Func`2 next, Object nextState, Object queueState)
+   at Microsoft.AspNet.SignalR.Infrastructure.TaskQueue.<Enqueue>b__1(Func`2 n, Object ns, TaskQueue q)
+   at Microsoft.AspNet.SignalR.TaskAsyncHelper.FromMethod[T1,T2,T3](Func`4 func, T1 arg1, T2 arg2, T3 arg3)
+--- End of stack trace from previous location where exception was thrown ---
+   at System.Runtime.CompilerServices.TaskAwaiter.ThrowForNonSuccess(Task task)
+   at System.Runtime.CompilerServices.TaskAwaiter.HandleNonSuccessAndDebuggerNotification(Task task)
+   at System.Runtime.CompilerServices.TaskAwaiter`1.GetResult()
+   at Microsoft.AspNet.SignalR.Messaging.Subscription.<Invoke>d__2.MoveNext()
+--- End of stack trace from previous location where exception was thrown ---
+   at System.Runtime.CompilerServices.TaskAwaiter.ThrowForNonSuccess(Task task)
+   at System.Runtime.CompilerServices.TaskAwaiter.HandleNonSuccessAndDebuggerNotification(Task task)
+   at System.Runtime.CompilerServices.TaskAwaiter`1.GetResult()
+   at Microsoft.AspNet.SignalR.Messaging.Subscription.<Work>d__8.MoveNext()<---
+
+iisexpress.exe Warning: 0 : SignalR exception thrown by Task: System.AggregateException: One or more errors occurred. ---> System.Web.HttpException: The remote host closed the connection. The error code is 0x800704CD.
+   at System.Web.Hosting.IIS7WorkerRequest.RaiseCommunicationError(Int32 result, Boolean throwOnDisconnect)
+   at System.Web.Hosting.IIS7WorkerRequest.ExplicitFlush()
+   at System.Web.HttpResponse.Flush(Boolean finalFlush, Boolean async)
+   at System.Web.HttpResponse.Flush()
+   at System.Web.HttpWriter.WriteFromStream(Byte[] data, Int32 offset, Int32 size)
+   at System.Web.HttpResponseStream.Write(Byte[] buffer, Int32 offset, Int32 count)
+   at Microsoft.Owin.Host.SystemWeb.CallStreams.DelegatingStream.Write(Byte[] buffer, Int32 offset, Int32 count)
+   at Microsoft.Owin.Host.SystemWeb.CallStreams.OutputStream.Write(Byte[] buffer, Int32 offset, Int32 count)
+   at Microsoft.AspNet.SignalR.Owin.ServerResponse.Write(ArraySegment`1 data)
+   at Microsoft.AspNet.SignalR.Infrastructure.BinaryTextWriter.<.ctor>b__4(ArraySegment`1 data, Object state)
+   at Microsoft.AspNet.SignalR.Infrastructure.BufferTextWriter.ChunkedWriter.Write(ArraySegment`1 data)
+   at Microsoft.AspNet.SignalR.Infrastructure.BinaryTextWriter.Write(ArraySegment`1 data)
+   at Microsoft.AspNet.SignalR.Transports.PersistentResponse.WriteMessages(TextWriter writer, JsonTextWriter jsonWriter)
+   at Microsoft.AspNet.SignalR.Transports.PersistentResponse.Microsoft.AspNet.SignalR.Json.IJsonWritable.WriteJson(TextWriter writer)
+   at Microsoft.AspNet.SignalR.Json.JsonSerializerExtensions.Serialize(JsonSerializer serializer, Object value, TextWriter writer)
+   at Microsoft.AspNet.SignalR.Transports.ServerSentEventsTransport.PerformSend(Object state)
+   at Microsoft.AspNet.SignalR.Transports.ServerSentEventsTransport.<Send>b__2(Object state)
+   at Microsoft.AspNet.SignalR.Infrastructure.TaskQueue.InvokeNext(Func`2 next, Object nextState, Object queueState)
+   at Microsoft.AspNet.SignalR.Infrastructure.TaskQueue.<Enqueue>b__1(Func`2 n, Object ns, TaskQueue q)
+   at Microsoft.AspNet.SignalR.TaskAsyncHelper.FromMethod[T1,T2,T3](Func`4 func, T1 arg1, T2 arg2, T3 arg3)
+--- End of stack trace from previous location where exception was thrown ---
+   at System.Runtime.CompilerServices.TaskAwaiter.ThrowForNonSuccess(Task task)
+   at System.Runtime.CompilerServices.TaskAwaiter.HandleNonSuccessAndDebuggerNotification(Task task)
+   at System.Runtime.CompilerServices.TaskAwaiter`1.GetResult()
+   at Microsoft.AspNet.SignalR.Messaging.Subscription.<Invoke>d__2.MoveNext()
+--- End of stack trace from previous location where exception was thrown ---
+   at System.Runtime.CompilerServices.TaskAwaiter.ThrowForNonSuccess(Task task)
+   at System.Runtime.CompilerServices.TaskAwaiter.HandleNonSuccessAndDebuggerNotification(Task task)
+   at System.Runtime.CompilerServices.TaskAwaiter`1.GetResult()
+   at Microsoft.AspNet.SignalR.Messaging.Subscription.<Work>d__8.MoveNext()
+--- End of stack trace from previous location where exception was thrown ---
+   at System.Runtime.CompilerServices.TaskAwaiter.ThrowForNonSuccess(Task task)
+   at System.Runtime.CompilerServices.TaskAwaiter.HandleNonSuccessAndDebuggerNotification(Task task)
+   at System.Runtime.CompilerServices.TaskAwaiter.GetResult()
+   at Microsoft.AspNet.SignalR.Messaging.MessageBroker.<DoWork>d__2.MoveNext()
+   --- End of inner exception stack trace ---
+---> (Inner Exception #0) System.Web.HttpException (0x800704CD): The remote host closed the connection. The error code is 0x800704CD.
+   at System.Web.Hosting.IIS7WorkerRequest.RaiseCommunicationError(Int32 result, Boolean throwOnDisconnect)
+   at System.Web.Hosting.IIS7WorkerRequest.ExplicitFlush()
+   at System.Web.HttpResponse.Flush(Boolean finalFlush, Boolean async)
+   at System.Web.HttpResponse.Flush()
+   at System.Web.HttpWriter.WriteFromStream(Byte[] data, Int32 offset, Int32 size)
+   at System.Web.HttpResponseStream.Write(Byte[] buffer, Int32 offset, Int32 count)
+   at Microsoft.Owin.Host.SystemWeb.CallStreams.DelegatingStream.Write(Byte[] buffer, Int32 offset, Int32 count)
+   at Microsoft.Owin.Host.SystemWeb.CallStreams.OutputStream.Write(Byte[] buffer, Int32 offset, Int32 count)
+   at Microsoft.AspNet.SignalR.Owin.ServerResponse.Write(ArraySegment`1 data)
+   at Microsoft.AspNet.SignalR.Infrastructure.BinaryTextWriter.<.ctor>b__4(ArraySegment`1 data, Object state)
+   at Microsoft.AspNet.SignalR.Infrastructure.BufferTextWriter.ChunkedWriter.Write(ArraySegment`1 data)
+   at Microsoft.AspNet.SignalR.Infrastructure.BinaryTextWriter.Write(ArraySegment`1 data)
+   at Microsoft.AspNet.SignalR.Transports.PersistentResponse.WriteMessages(TextWriter writer, JsonTextWriter jsonWriter)
+   at Microsoft.AspNet.SignalR.Transports.PersistentResponse.Microsoft.AspNet.SignalR.Json.IJsonWritable.WriteJson(TextWriter writer)
+   at Microsoft.AspNet.SignalR.Json.JsonSerializerExtensions.Serialize(JsonSerializer serializer, Object value, TextWriter writer)
+   at Microsoft.AspNet.SignalR.Transports.ServerSentEventsTransport.PerformSend(Object state)
+   at Microsoft.AspNet.SignalR.Transports.ServerSentEventsTransport.<Send>b__2(Object state)
+   at Microsoft.AspNet.SignalR.Infrastructure.TaskQueue.InvokeNext(Func`2 next, Object nextState, Object queueState)
+   at Microsoft.AspNet.SignalR.Infrastructure.TaskQueue.<Enqueue>b__1(Func`2 n, Object ns, TaskQueue q)
+   at Microsoft.AspNet.SignalR.TaskAsyncHelper.FromMethod[T1,T2,T3](Func`4 func, T1 arg1, T2 arg2, T3 arg3)
+--- End of stack trace from previous location where exception was thrown ---
+   at System.Runtime.CompilerServices.TaskAwaiter.ThrowForNonSuccess(Task task)
+   at System.Runtime.CompilerServices.TaskAwaiter.HandleNonSuccessAndDebuggerNotification(Task task)
+   at System.Runtime.CompilerServices.TaskAwaiter`1.GetResult()
+   at Microsoft.AspNet.SignalR.Messaging.Subscription.<Invoke>d__2.MoveNext()
+--- End of stack trace from previous location where exception was thrown ---
+   at System.Runtime.CompilerServices.TaskAwaiter.ThrowForNonSuccess(Task task)
+   at System.Runtime.CompilerServices.TaskAwaiter.HandleNonSuccessAndDebuggerNotification(Task task)
+   at System.Runtime.CompilerServices.TaskAwaiter`1.GetResult()
+   at Microsoft.AspNet.SignalR.Messaging.Subscription.<Work>d__8.MoveNext()
+--- End of stack trace from previous location where exception was thrown ---
+   at System.Runtime.CompilerServices.TaskAwaiter.ThrowForNonSuccess(Task task)
+   at System.Runtime.CompilerServices.TaskAwaiter.HandleNonSuccessAndDebuggerNotification(Task task)
+   at System.Runtime.CompilerServices.TaskAwaiter.GetResult()
+   at Microsoft.AspNet.SignalR.Messaging.MessageBroker.<DoWork>d__2.MoveNext()<---
+

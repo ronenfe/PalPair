@@ -1,0 +1,102 @@
+﻿@using PalPair.Models
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>PalPair</title>
+    <link href="~/favicon.ico" rel="shortcut icon" type="image/x-icon" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    @Styles.Render("~/Content/css")
+    @Scripts.Render("~/bundles/modernizr")
+    @RenderSection("Styles", required: false)
+</head>
+<body>
+    <div class="navbar navbar-inverse navbar-static-top">
+        <div class="container">
+            <div class="navbar-header">
+                <button type="button" class="navbar-toggle" data-toggle="collapse" data-target=".navbar-collapse">
+                    <span class="icon-bar"></span>
+                    <span class="icon-bar"></span>
+                    <span class="icon-bar"></span>
+                </button>
+                @Html.ActionLink("PalPair - Random Video Chat", "Index", "Home", new { area = "" }, new { @class = "navbar-brand" })
+            </div>
+            <div class="navbar-collapse collapse">
+                @Html.Partial("_LoginPartial")
+                <p class="navbar-text">Total Registered Users: @Html.Raw(Html.Action("GetTotalRegisteredUsers", "Account")),&nbsp;
+                 Males: @Html.Raw(Html.Action("GetGenderPercentage", "Account",new { gender = Gender.Male }))%,&nbsp;
+                 Females: @Html.Raw(Html.Action("GetGenderPercentage", "Account", new { gender = Gender.Female }))% ,&nbsp;
+                 Top Countries : @Html.Raw(Html.Action("GetTopCountries", "Account")) &nbsp;
+                 Top Online Users: @Html.Raw(Html.Action("GetTopOnlineUsers", "Account")) At: @Html.Raw(Html.Action("GetTopOnlineUsersDate", "Account"))
+            </div>
+        </div>
+    </div>
+    <div class="container-fluid body-content">
+        @Scripts.Render("~/bundles/jquery")
+        @Scripts.Render("~/bundles/bootstrap")
+        @Scripts.Render("~/Scripts/jquery-ui-1.11.2/jquery-ui.min.js")
+        @Styles.Render("~/Scripts/jquery-ui-1.11.2/jquery-ui.min.css")
+        @Scripts.Render("//cdnjs.cloudflare.com/ajax/libs/jqueryui-touch-punch/0.2.3/jquery.ui.touch-punch.min.js")
+        @RenderSection("Scripts", required: false)
+        @RenderBody()
+        @RenderSection("SPAViews", required: false)
+        <footer class="row-fluid">
+            <div id="fb-root"></div>
+            <span class="fb-like"
+                  data-send="true"
+                  data-width="330"
+                  data-show-faces="true">
+            </span>
+            <span class="text-info top">
+                For feedback and support, visit our Facebook page:
+                <!-- Facebook Badge START --><a href="https://www.facebook.com/palpairchat" title="PalPair" target="_TOP"><img class="img" src="https://badge.facebook.com/badge/595055157262068.1106.758849235.png" style="border: 0px;" alt="" /></a><!-- Facebook Badge END -->
+            </span>
+            <a href="https://play.google.com/store/apps/details?id=com.palpair&utm_source=global_co&utm_medium=prtnr&utm_content=Mar2515&utm_campaign=PartBadge&pcampaignid=MKT-Other-global-all-co-prtnr-py-PartBadge-Mar2515-1"><img alt="Get it on Google Play" src="https://play.google.com/intl/en_us/badges/images/generic/en-play-badge.png"   style="height: auto; width: auto; max-width: 127px;"/></a>
+            <div class="span12">
+                <hr />
+                <p>&copy; @DateTime.Now.Year - PalPair</p>
+            </div>
+        </footer>
+    </div>
+    <!-- Start of StatCounter Code for Default Guide -->
+    <script type="text/javascript">
+var sc_project=11050405;
+var sc_invisible=1;
+var sc_security="87ad9174";
+var scJsHost = (("https:" == document.location.protocol) ?
+"https://secure." : "http://www.");
+document.write("<sc"+"ript type='text/javascript' src='" +
+scJsHost+
+"statcounter.com/counter/counter.js'></"+"script>");
+    </script>
+    <noscript>
+        <div class="statcounter">
+            <a title="free hit
+counter" href="http://statcounter.com/free-hit-counter/"
+               target="_blank">
+                <img class="statcounter"
+                     src="//c.statcounter.com/11050405/0/87ad9174/1/" alt="free
+hit counter">
+            </a>
+        </div>
+    </noscript>
+    <!-- End of StatCounter Code for Default Guide -->
+</body>
+</html>
+<script>
+    window.fbAsyncInit = function () {
+        FB.init({
+            appId: '1405609326361887',
+            xfbml: true,
+            version: 'v2.6'
+        });
+    };
+    (function (d, s, id) {
+        var js, fjs = d.getElementsByTagName(s)[0];
+        if (d.getElementById(id)) { return; }
+        js = d.createElement(s); js.id = id;
+        js.src = "//connect.facebook.net/en_US/sdk.js";
+        fjs.parentNode.insertBefore(js, fjs);
+    }(document, 'script', 'facebook-jssdk'));
+</script>
