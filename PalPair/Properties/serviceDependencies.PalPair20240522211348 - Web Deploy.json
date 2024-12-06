@@ -1,0 +1,24 @@
+{
+  "dependencies": {
+    "mssql1": {
+      "serviceConnectorResourceId": "/subscriptions/[parameters('subscriptionId')]/resourcegroups/[parameters('resourceGroupName')]/providers/Microsoft.Web/sites/PalPair20240522211348/providers/Microsoft.ServiceLinker/linkers/ConnectionString_EF744289A0",
+      "secretStore": "AzureAppSettings",
+      "resourceId": "/subscriptions/[parameters('subscriptionId')]/resourcegroups/[parameters('resourceGroupName')]/providers/Microsoft.Sql/servers/palpairdbserver/databases/PalPair_db",
+      "type": "mssql.azure",
+      "connectionId": "ConnectionString",
+      "dynamicId": null
+    },
+    "identityapp1": {
+      "connectionInfo": "App registration: PalPair, Tenant: Default Directory (ronenfenetvisionnet.onmicrosoft.com - Microsoft Entra ID)",
+      "type": "identityapp.default"
+    },
+    "signalr1": {
+      "serviceConnectorResourceId": "/subscriptions/[parameters('subscriptionId')]/resourcegroups/[parameters('resourceGroupName')]/providers/Microsoft.Web/sites/PalPair20240522211348/providers/Microsoft.ServiceLinker/linkers/AzureSignalRConnectionString_68A913BAB0",
+      "secretStore": "AzureAppSettings",
+      "resourceId": "/subscriptions/[parameters('subscriptionId')]/resourceGroups/[parameters('resourceGroupName')]/providers/Microsoft.SignalRService/SignalR/PalPair",
+      "type": "signalr.azure",
+      "connectionId": "Azure:SignalR:ConnectionString",
+      "dynamicId": null
+    }
+  }
+}
