@@ -15,6 +15,7 @@ using NLog;
 using System.Net.Http;
 using System.Net.Http.Headers;
 using Newtonsoft.Json;
+using System.Threading.Tasks;
 
 namespace PalPair.Hubs
 {
@@ -225,9 +226,9 @@ namespace PalPair.Hubs
             }
             return chattingUser == null ? null : new ChatUser(chattingUser);
         }
-        public ApplicationUser Connect()
+        public async Task<ApplicationUser> Connect()
         {
-            var user = GetCurrentUser();
+            var user = await GetCurrentUserAsync();
             if (connectedUsers.Exists(u => u.Email == user.Email))
                 return null;
             user.ConnectionId = Context.ConnectionId;
@@ -236,6 +237,7 @@ namespace PalPair.Hubs
             logger.Info("Connecting User: " + user.Id);
             return user;
         }
+
         public void GetNumberOfConnectedUsers()
         {
             logger.Info("GetNumberOfConnectedUsers" + connectedUsers.Count);
@@ -258,9 +260,9 @@ namespace PalPair.Hubs
             }
 
         }
-        public ChatUser GetMyUserDetails()
+        public async Task<ChatUser> GetMyUserDetails()
         {
-            var user = GetCurrentUser();
+            var user = await GetCurrentUserAsync();
             return new ChatUser(user);
         }
         public void Test()
@@ -376,15 +378,25 @@ namespace PalPair.Hubs
         {
             return connectedUsers.SingleOrDefault(cu => cu.ConnectionId == Context.ConnectionId);
         }
-        private ApplicationUser GetCurrentUser()
+        private async Task<ApplicationUser> GetCurrentUserAsync()
         {
+            // Use HttpContext.Current.GetOwinContext() to get the OWIN context in ASP.NET 4.8
+            var userManager = HttpContext.Current.GetOwinContext().GetUserManager<ApplicationUserManager>();
+
+            // Get the current user's username from the authenticated identity
             var userName = Context.User.Identity.GetUserName();
-            var user = _userManager.FindByName<ApplicationUser, string>(userName);
-            if (user.Filter != null)
+
+            // Use FindByNameAsync to find the user by username asynchronously
+            var user = await userManager.FindByNameAsync(userName);
+
+            // Log the user's filter if available
+            if (user?.Filter != null)
+            {
                 logger.Info("Filter of user: " + user.Name + " is " + user.Filter.IsFilterOn);
+            }
+
             return user;
         }
-
         #endregion
     }
 }
