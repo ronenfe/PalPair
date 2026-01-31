@@ -100,6 +100,12 @@ io.on('connection', (socket) => {
     if (dest) dest.emit('signal', { from: socket.id, data });
   });
 
+  socket.on('chat-message', ({ to, text }) => {
+    if (!to || !text) return;
+    const dest = io.sockets.sockets.get(to);
+    if (dest) dest.emit('chat-message', { from: socket.id, text });
+  });
+
   socket.on('next', () => {
     console.log('>>> next event received from', socket.id);
     const partner = pairs.get(socket.id);

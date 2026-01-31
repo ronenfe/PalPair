@@ -23,6 +23,20 @@
       </div>
 
       <p id="status">Idle</p>
+
+      <!-- Chat Interface -->
+      <div class="chat-container">
+        <div id="chatMessages" class="chat-messages"></div>
+        <div class="chat-input-wrap">
+          <input 
+            id="chatInput" 
+            type="text" 
+            placeholder="Type a message..." 
+            disabled
+          />
+          <button id="sendBtn" disabled>Send</button>
+        </div>
+      </div>
     </div>
 
     <script src="/socket.io/socket.io.js"></script>

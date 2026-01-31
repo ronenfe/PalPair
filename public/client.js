@@ -11,6 +11,11 @@ const localVideo = document.getElementById('localVideo');
 const remoteVideo = document.getElementById('remoteVideo');
 const remotePlaceholder = document.getElementById('remotePlaceholder');
 
+// Chat elements
+const chatInput = document.getElementById('chatInput');
+const sendBtn = document.getElementById('sendBtn');
+const chatMessages = document.getElementById('chatMessages');
+
 let localStream = null;
 let pc = null;
 let otherId = null;
@@ -92,6 +97,8 @@ socket.on('matched', async ({ otherId: id, initiator, isBot }) => {
   
   otherId = id;
   nextBtn.disabled = false;
+  chatInput.disabled = false;
+  sendBtn.disabled = false;
   console.log('>>> Setting status to Connected');
   status(isBot ? 'Connected to AI Bot' : 'Connected');
   // stop any pending auto-reconnect attempts
@@ -124,6 +131,7 @@ socket.on('peer-disconnected', ({ id }) => {
   clearRemoteVideo();
   otherId = null;
   nextBtn.disabled = true;
+  clearChat();
   // automatically find next partner
   socket.emit('find');
 });
@@ -137,9 +145,30 @@ socket.on('peer-left', ({ id, reason }) => {
   clearRemoteVideo();
   otherId = null;
   nextBtn.disabled = true;
+  clearChat();
   // automatically find next partner
   socket.emit('find');
 });
+
+// Chat events
+socket.on('chat-message', ({ from, text }) => {
+  addChatMessage(text, 'remote');
+});
+
+sendBtn.onclick = () => {
+  const text = chatInput.value.trim();
+  if (text && otherId) {
+    socket.emit('chat-message', { to: otherId, text });
+    addChatMessage(text, 'local');
+    chatInput.value = '';
+  }
+};
+
+chatInput.onkeypress = (e) => {
+  if (e.key === 'Enter') {
+    sendBtn.onclick();
+  }
+};
 
 
 function cancelAutoReconnect() {
@@ -209,4 +238,17 @@ async function createPeerConnection(targetId, initiator) {
 function status(s) {
   console.log('>>> STATUS:', s);
   statusEl.textContent = s;
+}
+
+function addChatMessage(text, sender) {
+  const div = document.createElement('div');
+  div.className = `chat-message ${sender}`;
+  div.textContent = text;
+  chatMessages.appendChild(div);
+  chatMessages.scrollTop = chatMessages.scrollHeight;
+}
+
+function clearChat() {
+  chatMessages.innerHTML = '';
+  chatInput.value = '';
 }

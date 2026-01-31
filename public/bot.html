@@ -6,6 +6,7 @@
 <body>
   <video id="botVideo" autoplay loop muted playsinline style="display:none"></video>
   <script src="/socket.io/socket.io.js"></script>
+  <script src="/ai-responses.js"></script>
   <script>
     const botId = new URLSearchParams(window.location.search).get('id') || '1';
     const botNames = ['Alice', 'Bob', 'Charlie', 'Diana', 'Eve'];
@@ -78,6 +79,16 @@
         pc = null;
         otherId = null;
         // Don't actively search - just wait to be matched
+      });
+      
+      socket.on('chat-message', ({ from, text }) => {
+        console.log(`[${botName}] Received message from ${from}: "${text}"`);
+        // Generate AI response after a small delay (looks more natural)
+        setTimeout(() => {
+          const response = generateBotResponse(text);
+          console.log(`[${botName}] Sending response: "${response}"`);
+          socket.emit('chat-message', { to: from, text: response });
+        }, 500 + Math.random() * 1500);
       });
     }
     
