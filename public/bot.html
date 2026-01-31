@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Bot Video Stream</title>
+</head>
+<body>
+  <video id="botVideo" autoplay loop muted playsinline style="display:none"></video>
+  <script src="/socket.io/socket.io.js"></script>
+  <script>
+    const botId = new URLSearchParams(window.location.search).get('id') || '1';
+    const botNames = ['Alice', 'Bob', 'Charlie', 'Diana', 'Eve'];
+    const botName = `Bot-${botNames[parseInt(botId) - 1]}`;
+    
+    const video = document.getElementById('botVideo');
+    
+    // Load video file for this bot
+    video.src = `/videos/bot${botId}.mp4`;
+    video.play();
+    
+    // Get video stream from video element
+    let stream = null;
+    video.onloadedmetadata = () => {
+      stream = video.captureStream();
+      console.log(`[${botName}] Video stream captured`);
+      initSocketAndWebRTC();
+    };
+    
+    // Socket.IO connection
+    let socket = null;
+    let pc = null;
+    let otherId = null;
+    
+    function initSocketAndWebRTC() {
+      socket = io();
+      
+      console.log(`[${botName}] Initializing...`);
+      
+      socket.on('connect', () => {
+        console.log(`[${botName}] Connected (${socket.id}) - Available for chat`);
+        socket.emit('register-bot');
+      });
+      
+      socket.on('matched', async ({ otherId: id, initiator }) => {
+        console.log(`[${botName}] Matched with ${id}, initiator: ${initiator}`);
+        otherId = id;
+        await createPeerConnection(id, initiator);
+      });
+      
+      socket.on('signal', async ({ from, data }) => {
+        if (!pc) return;
+        try {
+          if (data.type === 'offer') {
+            await pc.setRemoteDescription(new RTCSessionDescription(data.sdp));
+            const answer = await pc.createAnswer();
+            await pc.setLocalDescription(answer);
+            socket.emit('signal', { to: from, data: { type: 'answer', sdp: pc.localDescription } });
+          } else if (data.type === 'answer') {
+            await pc.setRemoteDescription(new RTCSessionDescription(data.sdp));
+          } else if (data.type === 'candidate') {
+            await pc.addIceCandidate(new RTCIceCandidate(data.candidate));
+          }
+        } catch (e) {
+          console.error(`[${botName}] Signal error:`, e);
+        }
+      });
+      
+      socket.on('peer-disconnected', ({ id }) => {
+        console.log(`[${botName}] Partner disconnected - Now available for new match`);
+        if (pc) pc.close();
+        pc = null;
+        otherId = null;
+        // Don't actively search - just wait to be matched
+      });
+      
+      socket.on('peer-left', ({ id }) => {
+        console.log(`[${botName}] Partner left - Now available for new match`);
+        if (pc) pc.close();
+        pc = null;
+        otherId = null;
+        // Don't actively search - just wait to be matched
+      });
+    }
+    
+    async function createPeerConnection(targetId, initiator) {
+      pc = new RTCPeerConnection({
+        iceServers: [{ urls: 'stun:stun.l.google.com:19302' }]
+      });
+      
+      pc.onicecandidate = (e) => {
+        if (e.candidate) {
+          socket.emit('signal', { to: targetId, data: { type: 'candidate', candidate: e.candidate } });
+        }
+      };
+      
+      // Add video stream to peer connection
+      stream.getTracks().forEach(track => {
+        pc.addTrack(track, stream);
+        console.log(`[${botName}] Added track:`, track.kind);
+      });
+      
+      if (initiator) {
+        const offer = await pc.createOffer();
+        await pc.setLocalDescription(offer);
+        socket.emit('signal', { to: targetId, data: { type: 'offer', sdp: pc.localDescription } });
+      }
+    }
+  </script>
+</body>
+</html>

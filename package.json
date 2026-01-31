@@ -3,10 +3,14 @@
   "version": "0.1.0",
   "main": "server.js",
   "scripts": {
-    "start": "node server.js"
+    "start": "node server.js",
+    "bots": "node bots.js",
+    "dev": "concurrently \"npm start\" \"npm run bots\""
   },
   "dependencies": {
     "express": "^4.18.2",
-    "socket.io": "^4.7.1"
+    "puppeteer": "^24.36.1",
+    "socket.io": "^4.7.1",
+    "socket.io-client": "^4.8.3"
   }
 }

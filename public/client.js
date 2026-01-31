@@ -80,8 +80,8 @@ socket.on('waiting', () => {
   status('Waiting for a partner...');
 });
 
-socket.on('matched', async ({ otherId: id, initiator }) => {
-  console.log('>>> Matched event received, otherId:', id, 'initiator:', initiator);
+socket.on('matched', async ({ otherId: id, initiator, isBot }) => {
+  console.log('>>> Matched event received, otherId:', id, 'initiator:', initiator, 'isBot:', isBot);
   
   // Close old peer connection if exists
   if (pc) {
@@ -93,9 +93,11 @@ socket.on('matched', async ({ otherId: id, initiator }) => {
   otherId = id;
   nextBtn.disabled = false;
   console.log('>>> Setting status to Connected');
-  status('Connected');
+  status(isBot ? 'Connected to AI Bot' : 'Connected');
   // stop any pending auto-reconnect attempts
   cancelAutoReconnect();
+  
+  // Create peer connection for both real users and bots
   await createPeerConnection(id, initiator);
 });
 
