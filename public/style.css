@@ -1,0 +1,10 @@
+body { font-family: Arial, Helvetica, sans-serif; background:#f7f7f8; color:#222; margin:0; }
+.container { max-width:900px; margin:24px auto; padding:16px; }
+.videos { display:flex; gap:10px; }
+video { width:48%; background:#000; border-radius:6px; }
+.video-wrap { position:relative; width:48%; }
+.video-wrap video { width:100%; display:block; }
+.video-placeholder { position:absolute; left:0; right:0; top:0; bottom:0; background:#000; border-radius:6px; display:none; }
+.controls { margin-top:12px; }
+button { padding:8px 12px; margin-right:8px; }
+#status { margin-top:10px; color:#555 }
