@@ -6,6 +6,13 @@ const { Server } = require('socket.io');
 const { spawn } = require('child_process');
 const https = require('https');
 
+// Environment variables
+const PORT = process.env.PORT || 3000;
+const OLLAMA_URL = process.env.OLLAMA_URL || 'http://localhost:11434';
+const OLLAMA_TIMEOUT = parseInt(process.env.OLLAMA_TIMEOUT || '5000'); // 5 seconds
+const NUM_BOTS = parseInt(process.env.NUM_BOTS || '5');
+const CLEANUP_INTERVAL = parseInt(process.env.CLEANUP_INTERVAL || '60000'); // 1 minute
+
 const app = express();
 const server = http.createServer(app);
 const io = new Server(server);
@@ -169,7 +176,25 @@ function getPersonaByBotId(botId) {
   return botPersonas[0];
 }
 
-// Ollama helper function
+// Fallback responses when Ollama is unavailable
+const fallbackResponses = [
+  "That's interesting! Tell me more about that.",
+  "Oh really? I've never thought about it that way.",
+  "Haha, I like that! What else?",
+  "That's cool! How did that happen?",
+  "Wow, I didn't know that. You seem interesting!",
+  "Ha, that made me laugh. You're funny!",
+  "I totally agree with you on that.",
+  "That's a good point. Never looked at it like that before.",
+  "You seem cool! Where are you from?",
+  "I like chatting with you. You're fun to talk to!"
+];
+
+function getFallbackResponse() {
+  return fallbackResponses[Math.floor(Math.random() * fallbackResponses.length)];
+}
+
+// Ollama helper function with timeout and fallback
 async function getOllamaResponse(userMessage, profile) {
   try {
     const personaName = profile?.name || 'Sarah';
@@ -177,25 +202,30 @@ async function getOllamaResponse(userMessage, profile) {
     const personaLocation = profile?.countryName || 'United States';
     const personaStyle = profile?.style || 'Warm and friendly.';
     
-    const response = await fetch('http://localhost:11434/api/generate', {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), OLLAMA_TIMEOUT);
+    
+    const response = await fetch(`${OLLAMA_URL}/api/generate`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         model: 'dolphin-mistral',
         prompt: `You are a woman named ${personaName}, ${personaAge} years old, from ${personaLocation}. You are chatting with a stranger in a random video chat. Style: ${personaStyle} Keep responses short (1-2 sentences max), friendly, and natural. NEVER mention you are an AI, a bot, or artificial unless directly asked "are you real?" or "are you AI?" Then tell the truth. Act completely like a real person. User said: "${userMessage}". Reply as ${personaName}:`,
         stream: false,
-      })
+      }),
+      signal: controller.signal
     });
     
+    clearTimeout(timeoutId);
     const data = await response.json();
     if (!data.response) {
-      console.error('Empty response from Ollama:', data);
-      return null;
+      console.warn('Empty response from Ollama, using fallback');
+      return getFallbackResponse();
     }
     return data.response.trim();
   } catch (err) {
-    console.error('Ollama error:', err.message);
-    return null; // fallback to pattern-based if Ollama fails
+    console.warn('Ollama error:', err.message, '- using fallback response');
+    return getFallbackResponse();
   }
 }
 
@@ -237,6 +267,54 @@ const lastPartner = new Map(); // socket -> last partner (to avoid immediate re-
 const bots = new Set(); // track which sockets are bots
 const userProfiles = new Map(); // socket -> {profile: {name, age, gender, country}, filters: {...}}
 const searching = new Set(); // track which sockets are actively searching for a match
+
+// Cleanup old entries periodically to prevent memory leaks
+function cleanupStaleEntries() {
+  const connectedSockets = new Set();
+  for (const socket of io.sockets.sockets.values()) {
+    connectedSockets.add(socket.id);
+  }
+  
+  let cleaned = 0;
+  // Clean up pairs for disconnected users
+  for (const [key, value] of pairs.entries()) {
+    if (!connectedSockets.has(key) || !connectedSockets.has(value)) {
+      pairs.delete(key);
+      cleaned++;
+    }
+  }
+  
+  // Clean up lastPartner for disconnected users
+  for (const key of lastPartner.keys()) {
+    if (!connectedSockets.has(key)) {
+      lastPartner.delete(key);
+      cleaned++;
+    }
+  }
+  
+  // Clean up userProfiles for disconnected users
+  for (const key of userProfiles.keys()) {
+    if (!connectedSockets.has(key)) {
+      userProfiles.delete(key);
+      cleaned++;
+    }
+  }
+  
+  // Clean up searching for disconnected users
+  for (const key of searching.keys()) {
+    if (!connectedSockets.has(key)) {
+      searching.delete(key);
+      cleaned++;
+    }
+  }
+  
+  if (cleaned > 0) {
+    console.log(`[CLEANUP] Removed ${cleaned} stale entries from memory`);
+  }
+}
+
+// Start periodic cleanup
+const cleanupInterval = setInterval(cleanupStaleEntries, CLEANUP_INTERVAL);
 
 io.on('connection', (socket) => {
   console.log('connected', socket.id);
@@ -478,22 +556,36 @@ io.on('connection', (socket) => {
         console.log(`>>> re-added bot ${partner} to searching pool after disconnect`);
       }
     }
+    
+    // Clean up all traces of this user
     bots.delete(socket.id);
-    botProfiles.delete(socket.id); // Clean up bot profile
-    userProfiles.delete(socket.id); // Clean up user profile
-    searching.delete(socket.id); // Clean up searching state
+    botProfiles.delete(socket.id);
+    userProfiles.delete(socket.id);
+    searching.delete(socket.id);
+    lastPartner.delete(socket.id);
+    
+    // Also remove this user from anyone's lastPartner
+    for (const [key, value] of lastPartner.entries()) {
+      if (value === socket.id) {
+        lastPartner.delete(key);
+      }
+    }
   });
 });
 
-const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => {
   console.log(`Server listening on http://localhost:${PORT}`);
+  console.log(`Ollama URL: ${OLLAMA_URL}`);
+  console.log(`Ollama timeout: ${OLLAMA_TIMEOUT}ms`);
+  console.log(`Number of bots: ${NUM_BOTS}`);
+  console.log(`Cleanup interval: ${CLEANUP_INTERVAL}ms`);
   
   // Start bots automatically
   console.log('Starting AI bots...');
   const botsProcess = spawn('node', ['bots.js'], {
     stdio: 'inherit',
-    cwd: __dirname
+    cwd: __dirname,
+    env: { ...process.env, NUM_BOTS: NUM_BOTS.toString() }
   });
   
   botsProcess.on('error', (err) => {
@@ -504,6 +596,7 @@ server.listen(PORT, () => {
   process.on('SIGINT', () => {
     console.log('\nShutting down server and bots...');
     botsProcess.kill();
+    clearInterval(cleanupInterval);
     process.exit(0);
   });
 });
