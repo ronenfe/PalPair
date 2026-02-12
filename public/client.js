@@ -4,6 +4,11 @@ console.log('Socket.IO client initialized');
 socket.on('connect', () => console.log('Connected to server'));
 socket.on('disconnect', (reason) => console.log('Disconnected from server:', reason));
 
+// Profile form elements
+const profileForm = document.getElementById('profileForm');
+const chatInterface = document.getElementById('chatInterface');
+const saveProfileBtn = document.getElementById('saveProfileBtn');
+
 const toggleBtn = document.getElementById('toggleBtn');
 const nextBtn = document.getElementById('nextBtn');
 const statusEl = document.getElementById('status');
@@ -16,8 +21,98 @@ const chatInput = document.getElementById('chatInput');
 const sendBtn = document.getElementById('sendBtn');
 const chatMessages = document.getElementById('chatMessages');
 
+// Initialize video display state
+remoteVideo.style.display = 'none';
+if (remotePlaceholder) {
+  remotePlaceholder.style.display = 'block';
+}
+
 let localStream = null;
 let pc = null;
+let isActive = false;
+
+// User profile and filters
+let userProfile = null;
+let userFilters = null;
+
+// Load saved form values from localStorage
+function loadSavedFormValues() {
+  const saved = localStorage.getItem('videochatProfile');
+  if (saved) {
+    try {
+      const data = JSON.parse(saved);
+      if (data.name) document.getElementById('userName').value = data.name;
+      if (data.age) document.getElementById('userAge').value = data.age;
+      if (data.gender) document.getElementById('userGender').value = data.gender;
+      if (data.country) document.getElementById('userCountry').value = data.country;
+      if (data.minAge) document.getElementById('minAge').value = data.minAge;
+      if (data.maxAge) document.getElementById('maxAge').value = data.maxAge;
+      if (data.filterGender) document.getElementById('filterGender').value = data.filterGender;
+      if (data.filterCountry) document.getElementById('filterCountry').value = data.filterCountry;
+    } catch (e) {
+      console.error('Error loading saved profile:', e);
+    }
+  }
+}
+
+// Load saved values when page loads
+loadSavedFormValues();
+
+// Profile form handler
+saveProfileBtn.addEventListener('click', () => {
+  const name = document.getElementById('userName').value.trim();
+  const age = parseInt(document.getElementById('userAge').value);
+  const gender = document.getElementById('userGender').value;
+  const country = document.getElementById('userCountry').value;
+  const minAge = parseInt(document.getElementById('minAge').value);
+  const maxAge = parseInt(document.getElementById('maxAge').value);
+  const filterGender = document.getElementById('filterGender').value;
+  const filterCountry = document.getElementById('filterCountry').value;
+
+  // Validation
+  if (!name || !age || !gender || !country) {
+    alert('Please fill in all profile fields');
+    return;
+  }
+
+  if (age < 18 || age > 100) {
+    alert('Age must be between 18 and 100');
+    return;
+  }
+
+  if (minAge > maxAge) {
+    alert('Minimum age cannot be greater than maximum age');
+    return;
+  }
+
+  // Save to localStorage
+  localStorage.setItem('videochatProfile', JSON.stringify({
+    name,
+    age,
+    gender,
+    country,
+    minAge,
+    maxAge,
+    filterGender,
+    filterCountry
+  }));
+
+  // Save profile
+  userProfile = { name, age, gender, country };
+  userFilters = {
+    minAge,
+    maxAge,
+    gender: filterGender,
+    country: filterCountry
+  };
+
+  // Send profile to server
+  socket.emit('set-profile', { profile: userProfile, filters: userFilters });
+
+  // Show chat interface
+  profileForm.style.display = 'none';
+  chatInterface.style.display = 'block';
+});
 let otherId = null;
 let isRunning = false;
 
@@ -27,6 +122,13 @@ toggleBtn.onclick = async () => {
     try {
       localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
       localVideo.srcObject = localStream;
+      
+      // Ensure remote video is hidden when starting
+      remoteVideo.style.display = 'none';
+      if (remotePlaceholder) {
+        remotePlaceholder.style.display = 'block';
+      }
+      
       isRunning = true;
       toggleBtn.textContent = 'Stop';
       status('Finding partner...');
@@ -41,6 +143,9 @@ toggleBtn.onclick = async () => {
     isRunning = false;
     toggleBtn.textContent = 'Start';
     nextBtn.disabled = true;
+    
+    // Remove from searching pool
+    socket.emit('stop-searching');
     
     // Notify remote partner if connected
     if (otherId) {
@@ -85,7 +190,7 @@ socket.on('waiting', () => {
   status('Waiting for a partner...');
 });
 
-socket.on('matched', async ({ otherId: id, initiator, isBot }) => {
+socket.on('matched', async ({ otherId: id, initiator, isBot, botProfile }) => {
   console.log('>>> Matched event received, otherId:', id, 'initiator:', initiator, 'isBot:', isBot);
   
   // Close old peer connection if exists
@@ -95,12 +200,24 @@ socket.on('matched', async ({ otherId: id, initiator, isBot }) => {
   }
   clearRemoteVideo();
   
+  // Ensure remote video is hidden until track arrives
+  remoteVideo.style.display = 'none';
+  if (remotePlaceholder) {
+    remotePlaceholder.style.display = 'block';
+  }
+  
   otherId = id;
   nextBtn.disabled = false;
   chatInput.disabled = false;
   sendBtn.disabled = false;
   console.log('>>> Setting status to Connected');
-  status(isBot ? 'Connected to AI Bot' : 'Connected');
+  
+  if (isBot && botProfile) {
+    status(`Connected to ${botProfile.name}, ${botProfile.age}, from ${botProfile.country}`);
+  } else {
+    status('Connected');
+  }
+  
   // stop any pending auto-reconnect attempts
   cancelAutoReconnect();
   
@@ -109,16 +226,24 @@ socket.on('matched', async ({ otherId: id, initiator, isBot }) => {
 });
 
 socket.on('signal', async ({ from, data }) => {
+  console.log('>>> signal received from', from, 'type:', data.type);
   if (data.type === 'offer') {
     if (!pc) await createPeerConnection(from, false);
+    console.log('>>> setting remote description (offer)');
     await pc.setRemoteDescription(new RTCSessionDescription(data.sdp));
+    console.log('>>> creating answer');
     const answer = await pc.createAnswer();
     await pc.setLocalDescription(answer);
+    console.log('>>> sending answer');
     socket.emit('signal', { to: from, data: { type: 'answer', sdp: pc.localDescription } });
   } else if (data.type === 'answer') {
+    console.log('>>> setting remote description (answer)');
     await pc.setRemoteDescription(new RTCSessionDescription(data.sdp));
   } else if (data.type === 'candidate') {
-    try { await pc.addIceCandidate(new RTCIceCandidate(data.candidate)); } catch (e) { console.warn(e); }
+    try { 
+      console.log('>>> adding ice candidate');
+      await pc.addIceCandidate(new RTCIceCandidate(data.candidate)); 
+    } catch (e) { console.warn(e); }
   }
 });
 
@@ -219,16 +344,23 @@ async function createPeerConnection(targetId, initiator) {
   };
 
   pc.ontrack = (e) => {
+    console.log('>>> ontrack event received');
     remoteVideo.style.display = 'block';
     if (remotePlaceholder) remotePlaceholder.style.display = 'none';
     remoteVideo.srcObject = e.streams[0];
   };
 
+  // Add local tracks FIRST
   if (localStream) {
-    localStream.getTracks().forEach((t) => pc.addTrack(t, localStream));
+    localStream.getTracks().forEach((t) => {
+      console.log('>>> adding track:', t.kind);
+      pc.addTrack(t, localStream);
+    });
   }
 
+  // Then create offer if initiator
   if (initiator) {
+    console.log('>>> creating offer as initiator');
     const offer = await pc.createOffer();
     await pc.setLocalDescription(offer);
     socket.emit('signal', { to: targetId, data: { type: 'offer', sdp: pc.localDescription } });

@@ -1,18 +1,98 @@
-body { font-family: Arial, Helvetica, sans-serif; background:#f7f7f8; color:#222; margin:0; }
+body { font-family: Arial, Helvetica, sans-serif; background:#2b2b2b; color:#fff; margin:0; }
 .container { max-width:900px; margin:24px auto; padding:16px; }
+h1 { text-align: center; margin-top: 20px; margin-bottom: 30px; }
+
+/* Profile Form Styles */
+.profile-form {
+  background: #333;
+  padding: 30px;
+  border-radius: 10px;
+  max-width: 400px;
+  margin: 20px auto;
+}
+
+.profile-form h3 {
+  margin-top: 20px;
+  margin-bottom: 15px;
+  color: #4CAF50;
+}
+
+.profile-form h3:first-child {
+  margin-top: 0;
+}
+
+.profile-form input,
+.profile-form select {
+  width: 100%;
+  padding: 12px;
+  margin-bottom: 15px;
+  border: 1px solid #555;
+  border-radius: 5px;
+  background: #444;
+  color: white;
+  font-size: 16px;
+  box-sizing: border-box;
+}
+
+.profile-form input:focus,
+.profile-form select:focus {
+  outline: none;
+  border-color: #4CAF50;
+}
+
+.profile-form label {
+  display: block;
+  margin-bottom: 8px;
+  color: #ccc;
+  font-size: 14px;
+}
+
+.range-inputs {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 15px;
+}
+
+.range-inputs input {
+  flex: 1;
+  margin-bottom: 0;
+}
+
+.range-inputs span {
+  color: #ccc;
+}
+
+#saveProfileBtn {
+  width: 100%;
+  padding: 15px;
+  background: #4CAF50;
+  color: white;
+  border: none;
+  border-radius: 5px;
+  font-size: 18px;
+  font-weight: bold;
+  cursor: pointer;
+  transition: background 0.3s;
+}
+
+#saveProfileBtn:hover {
+  background: #45a049;
+}
+
 .videos { display:flex; gap:10px; }
-video { width:48%; background:#000; border-radius:6px; }
-.video-wrap { position:relative; width:48%; }
-.video-wrap video { width:100%; display:block; }
+.video-wrap { position:relative; flex:1; aspect-ratio: 4/3; background:#000; border-radius:6px; }
+.video-wrap video { width:100%; height:100%; display:block; object-fit:cover; background:#000; border-radius:6px; }
 .video-placeholder { position:absolute; left:0; right:0; top:0; bottom:0; background:#000; border-radius:6px; display:none; }
 .controls { margin-top:12px; }
 button { padding:8px 12px; margin-right:8px; cursor:pointer; }
 button:disabled { opacity:0.5; cursor:not-allowed; }
-#status { margin-top:10px; color:#555 }
+#status { margin-top:10px; color:#fff }
 
 /* Chat Styles */
 .chat-container { 
   margin-top:20px; 
+  width: 100%;
   border:1px solid #ddd; 
   border-radius:6px; 
   background:#fff; 
