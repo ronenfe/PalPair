@@ -9,13 +9,18 @@ const https = require('https');
 // Environment variables
 const PORT = process.env.PORT || 3000;
 const OLLAMA_URL = process.env.OLLAMA_URL || 'http://localhost:11434';
-const OLLAMA_TIMEOUT = parseInt(process.env.OLLAMA_TIMEOUT || '5000'); // 5 seconds
+const OLLAMA_TIMEOUT = parseInt(process.env.OLLAMA_TIMEOUT || '10000'); // 10 seconds (was 5)
 const NUM_BOTS = parseInt(process.env.NUM_BOTS || '5');
 const CLEANUP_INTERVAL = parseInt(process.env.CLEANUP_INTERVAL || '60000'); // 1 minute
 
 const app = express();
 const server = http.createServer(app);
-const io = new Server(server);
+const io = new Server(server, {
+  cors: {
+    origin: process.env.CORS_ORIGIN || '*', // In production, set to your domain
+    methods: ['GET', 'POST']
+  }
+});
 
 app.use(express.static(path.join(__dirname, 'public')));
 
@@ -176,22 +181,61 @@ function getPersonaByBotId(botId) {
   return botPersonas[0];
 }
 
-// Fallback responses when Ollama is unavailable
-const fallbackResponses = [
-  "That's interesting! Tell me more about that.",
-  "Oh really? I've never thought about it that way.",
-  "Haha, I like that! What else?",
-  "That's cool! How did that happen?",
-  "Wow, I didn't know that. You seem interesting!",
-  "Ha, that made me laugh. You're funny!",
-  "I totally agree with you on that.",
-  "That's a good point. Never looked at it like that before.",
-  "You seem cool! Where are you from?",
-  "I like chatting with you. You're fun to talk to!"
-];
+// Fallback responses when Ollama is unavailable - organized by common user inputs
+const fallbackResponses = {
+  greetings: ["Hey! How are you?", "Hi there! What's up?", "Hello! Nice to meet you!", "Hey! How's it going?"],
+  questions: {
+    name: "I'm {name}. What about you?",
+    age: "I'm {age}. How old are you?",
+    location: "I'm from {location}. Where are you from?",
+    hobbies: "I like chatting with new people, watching movies, and hanging out with friends. What about you?",
+  },
+  generic: [
+    "That's interesting! Tell me more.",
+    "Oh really? I've never thought about it that way.",
+    "Haha, I like that! What else?",
+    "That's cool! How did that happen?",
+    "Wow, you seem interesting!",
+    "Ha, that made me laugh. You're funny!",
+    "I totally agree with you on that.",
+    "That's a good point.",
+    "Tell me more about yourself!"
+  ]
+};
 
-function getFallbackResponse() {
-  return fallbackResponses[Math.floor(Math.random() * fallbackResponses.length)];
+function getFallbackResponse(userMessage, profile) {
+  const msg = userMessage.toLowerCase().trim();
+  
+  // Detect greetings
+  if (/^(hi|hey|hello|yo|sup|hola|what's up|whats up)/.test(msg)) {
+    return fallbackResponses.greetings[Math.floor(Math.random() * fallbackResponses.greetings.length)];
+  }
+  
+  // Detect name questions
+  if (/(your name|who are you|what.*name)/.test(msg)) {
+    return fallbackResponses.questions.name
+      .replace('{name}', profile?.name || 'Sarah');
+  }
+  
+  // Detect age questions  
+  if (/(how old|your age|age are you)/.test(msg)) {
+    return fallbackResponses.questions.age
+      .replace('{age}', profile?.age || '25');
+  }
+  
+  // Detect location questions
+  if (/(where.*from|where.*live|your location)/.test(msg)) {
+    return fallbackResponses.questions.location
+      .replace('{location}', profile?.countryName || 'United States');
+  }
+  
+  // Detect hobby/interest questions
+  if (/(hobby|hobbies|interests|do for fun|like to do)/.test(msg)) {
+    return fallbackResponses.questions.hobbies;
+  }
+  
+  // Generic response
+  return fallbackResponses.generic[Math.floor(Math.random() * fallbackResponses.generic.length)];
 }
 
 // Ollama helper function with timeout and fallback
@@ -210,7 +254,20 @@ async function getOllamaResponse(userMessage, profile) {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         model: 'dolphin-mistral',
-        prompt: `You are a woman named ${personaName}, ${personaAge} years old, from ${personaLocation}. You are chatting with a stranger in a random video chat. Style: ${personaStyle} Keep responses short (1-2 sentences max), friendly, and natural. NEVER mention you are an AI, a bot, or artificial unless directly asked "are you real?" or "are you AI?" Then tell the truth. Act completely like a real person. User said: "${userMessage}". Reply as ${personaName}:`,
+        prompt: `You are ${personaName}, a ${personaAge}-year-old woman from ${personaLocation}. You're having a casual video chat with a stranger. Respond naturally as ${personaName} would.
+
+Your personality: ${personaStyle}
+
+Rules:
+- Keep responses brief (1-2 sentences)
+- Sound like a real person having a natural conversation
+- Answer questions about yourself using your character info
+- If asked if you're real/AI/bot, be honest but casual about it
+- Match the vibe - if they're casual, be casual; if friendly, be friendly
+
+User just said: "${userMessage}"
+
+Respond as ${personaName}:`,
         stream: false,
       }),
       signal: controller.signal
@@ -220,12 +277,12 @@ async function getOllamaResponse(userMessage, profile) {
     const data = await response.json();
     if (!data.response) {
       console.warn('Empty response from Ollama, using fallback');
-      return getFallbackResponse();
+      return getFallbackResponse(userMessage, profile);
     }
     return data.response.trim();
   } catch (err) {
     console.warn('Ollama error:', err.message, '- using fallback response');
-    return getFallbackResponse();
+    return getFallbackResponse(userMessage, profile);
   }
 }
 
@@ -236,6 +293,43 @@ app.get('/socket.io/socket.io.js.map', (req, res) => {
   res.status(404).end();
 });
 app.get('/favicon.ico', (req, res) => res.sendStatus(204));
+
+// Debug endpoint to see server state
+app.get('/api/debug', (req, res) => {
+  const botsList = [];
+  const usersList = [];
+  const searchingList = [];
+  
+  for (const socket of io.sockets.sockets.values()) {
+    const info = {
+      id: socket.id.substring(0, 8),
+      isBot: socket.data.isBot || false,
+      searching: searching.has(socket.id),
+      paired: pairs.has(socket.id),
+      hasProfile: userProfiles.has(socket.id)
+    };
+    
+    if (socket.data.isBot) {
+      botsList.push(info);
+    } else {
+      usersList.push(info);
+    }
+    
+    if (searching.has(socket.id)) {
+      searchingList.push(info);
+    }
+  }
+  
+  res.json({
+    totalConnected: io.sockets.sockets.size,
+    bots: botsList.length,
+    users: usersList.length,
+    searching: searchingList.length,
+    botsList,
+    usersList,
+    searchingList
+  });
+});
 
 // Endpoint for bots to get AI responses
 app.post('/api/ai-response', express.json(), async (req, res) => {
@@ -573,8 +667,10 @@ io.on('connection', (socket) => {
   });
 });
 
-server.listen(PORT, () => {
-  console.log(`Server listening on http://localhost:${PORT}`);
+server.listen(PORT, '0.0.0.0', () => {
+  console.log(`Server listening on port ${PORT}`);
+  console.log(`Local: http://localhost:${PORT}`);
+  console.log(`Network: http://10.100.102.18:${PORT}`);
   console.log(`Ollama URL: ${OLLAMA_URL}`);
   console.log(`Ollama timeout: ${OLLAMA_TIMEOUT}ms`);
   console.log(`Number of bots: ${NUM_BOTS}`);

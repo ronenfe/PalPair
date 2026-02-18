@@ -13,7 +13,12 @@ async function startBots() {
       '--use-fake-ui-for-media-stream',
       '--use-fake-device-for-media-stream',
       '--no-sandbox',
-      '--disable-setuid-sandbox'
+      '--disable-setuid-sandbox',
+      '--disable-dev-shm-usage',
+      '--disable-gpu',
+      '--disable-software-rasterizer',
+      '--disable-extensions',
+      '--disable-background-networking'
     ]
   });
   
