@@ -410,8 +410,20 @@ function cleanupStaleEntries() {
 // Start periodic cleanup
 const cleanupInterval = setInterval(cleanupStaleEntries, CLEANUP_INTERVAL);
 
+function broadcastUserCount() {
+  const connected = Array.from(io.sockets.sockets.values());
+  const botsOnline = connected.filter(s => s.data.isBot).length;
+  const humansOnline = connected.length - botsOnline;
+  io.emit('user-count', {
+    humans: humansOnline,
+    bots: botsOnline,
+    total: connected.length
+  });
+}
+
 io.on('connection', (socket) => {
   console.log('connected', socket.id);
+  broadcastUserCount();
   
   // Handle profile setting
   socket.on('set-profile', ({ profile, filters }) => {
@@ -452,6 +464,7 @@ io.on('connection', (socket) => {
     // Add bot to searching pool (bots are always available)
     searching.add(socket.id);
     console.log(`>>> ${socket.id} added to searching pool (bot)`);
+    broadcastUserCount();
     
     console.log(`>>> ${socket.id} registered as bot - Name: ${profile.name}, Age: ${profile.age}, Gender: ${profile.gender}, Country: ${profile.countryName} (${profile.country})`);
   });
@@ -604,6 +617,32 @@ io.on('connection', (socket) => {
     if (dest) dest.emit('chat-message', { from: socket.id, text });
   });
 
+  socket.on('report-safety', ({ details, partnerId, statusText } = {}) => {
+    const safeDetails = typeof details === 'string' ? details.trim().slice(0, 2000) : '';
+    if (!safeDetails) return;
+
+    const activePartner = pairs.get(socket.id) || partnerId || null;
+    const reportEntry = {
+      timestamp: new Date().toISOString(),
+      reporterSocketId: socket.id,
+      reportedSocketId: activePartner,
+      status: typeof statusText === 'string' ? statusText.slice(0, 200) : '',
+      details: safeDetails,
+      userAgent: socket.handshake?.headers?.['user-agent'] || ''
+    };
+
+    const reportPath = path.join(__dirname, 'reports.log');
+    fs.appendFile(reportPath, `${JSON.stringify(reportEntry)}\n`, (err) => {
+      if (err) {
+        console.error('Failed to write safety report:', err);
+        return;
+      }
+      console.log('[SAFETY REPORT]', reportEntry);
+    });
+
+    socket.emit('report-received');
+  });
+
   socket.on('stop-searching', () => {
     console.log('>>> stop-searching event received from', socket.id);
     searching.delete(socket.id);
@@ -664,6 +703,9 @@ io.on('connection', (socket) => {
         lastPartner.delete(key);
       }
     }
+    
+    // Broadcast updated count when someone disconnects
+    broadcastUserCount();
   });
 });
 

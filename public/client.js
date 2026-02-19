@@ -1,8 +1,19 @@
 const socket = io();
 console.log('Socket.IO client initialized');
 
+// Sound notification for matches
+const matchSound = new Audio('data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2/LDciUFLIHO8tiJNwgZaLvt559NEAxQp+PwtmMcBjiR1/LMeSwFJHfH8N2QQAoUXrTp66hVFApGn+DyvmwhBDGH0fPTgjMGHm7A7+OZURE');
+
 socket.on('connect', () => console.log('Connected to server'));
 socket.on('disconnect', (reason) => console.log('Disconnected from server:', reason));
+
+// Update user counter
+socket.on('user-count', ({ humans = 0, bots = 0 }) => {
+  const userCountEl = document.getElementById('userCount');
+  const botCountEl = document.getElementById('botCount');
+  if (userCountEl) userCountEl.textContent = humans;
+  if (botCountEl) botCountEl.textContent = bots;
+});
 
 // Profile form elements
 const profileForm = document.getElementById('profileForm');
@@ -11,6 +22,7 @@ const saveProfileBtn = document.getElementById('saveProfileBtn');
 
 const toggleBtn = document.getElementById('toggleBtn');
 const nextBtn = document.getElementById('nextBtn');
+const reportBtn = document.getElementById('reportBtn');
 const statusEl = document.getElementById('status');
 const localVideo = document.getElementById('localVideo');
 const remoteVideo = document.getElementById('remoteVideo');
@@ -193,6 +205,14 @@ socket.on('waiting', () => {
 socket.on('matched', async ({ otherId: id, initiator, isBot, botProfile }) => {
   console.log('>>> Matched event received, otherId:', id, 'initiator:', initiator, 'isBot:', isBot);
   
+  // Play sound notification
+  try {
+    matchSound.currentTime = 0;
+    matchSound.play().catch(e => console.log('Sound play failed:', e));
+  } catch (e) {
+    console.log('Sound error:', e);
+  }
+  
   // Close old peer connection if exists
   if (pc) {
     pc.close();
@@ -279,6 +299,21 @@ socket.on('peer-left', ({ id, reason }) => {
 socket.on('chat-message', ({ from, text }) => {
   addChatMessage(text, 'remote');
 });
+
+socket.on('report-received', () => {
+  addChatMessage('Safety report submitted. Thank you for helping keep Palpair safe.', 'system');
+});
+
+reportBtn.onclick = () => {
+  const details = prompt('Report safety concern (child safety, harassment, explicit content, etc.). Please include useful details:');
+  if (!details || !details.trim()) return;
+
+  socket.emit('report-safety', {
+    details: details.trim(),
+    partnerId: otherId,
+    statusText: statusEl.textContent
+  });
+};
 
 sendBtn.onclick = () => {
   const text = chatInput.value.trim();
