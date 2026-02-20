@@ -12,6 +12,7 @@ const OLLAMA_URL = process.env.OLLAMA_URL || 'http://localhost:11434';
 const OLLAMA_TIMEOUT = parseInt(process.env.OLLAMA_TIMEOUT || '10000'); // 10 seconds (was 5)
 const NUM_BOTS = parseInt(process.env.NUM_BOTS || '5');
 const CLEANUP_INTERVAL = parseInt(process.env.CLEANUP_INTERVAL || '60000'); // 1 minute
+const ADMIN_KEY = process.env.ADMIN_KEY || '';
 
 const app = express();
 const server = http.createServer(app);
@@ -20,6 +21,25 @@ const io = new Server(server, {
     origin: process.env.CORS_ORIGIN || '*', // In production, set to your domain
     methods: ['GET', 'POST']
   }
+});
+
+function isLocalHostHeader(hostHeader = '') {
+  const host = String(hostHeader).toLowerCase();
+  return host.startsWith('localhost:') || host === 'localhost' || host.startsWith('127.0.0.1:') || host === '127.0.0.1';
+}
+
+app.use((req, res, next) => {
+  if (req.path !== '/admin.html') return next();
+
+  const hostHeader = req.headers.host || '';
+  const keyFromQuery = req.query?.key;
+  const hasValidKey = !!ADMIN_KEY && keyFromQuery === ADMIN_KEY;
+
+  if (isLocalHostHeader(hostHeader) || hasValidKey) {
+    return next();
+  }
+
+  return res.status(403).send('Admin page is local-only.');
 });
 
 app.use(express.static(path.join(__dirname, 'public')));
@@ -331,6 +351,10 @@ app.get('/api/debug', (req, res) => {
   });
 });
 
+app.get('/api/admin-online-users', (req, res) => {
+  res.json({ onlineUsers: buildOnlineUsersSnapshot() });
+});
+
 // Endpoint for bots to get AI responses
 app.post('/api/ai-response', express.json(), async (req, res) => {
   const { message, botId, socketId } = req.body;
@@ -361,6 +385,198 @@ const lastPartner = new Map(); // socket -> last partner (to avoid immediate re-
 const bots = new Set(); // track which sockets are bots
 const userProfiles = new Map(); // socket -> {profile: {name, age, gender, country}, filters: {...}}
 const searching = new Set(); // track which sockets are actively searching for a match
+const activeChatSessions = new Map(); // chatId -> session
+const completedChatSessions = []; // ended sessions
+const socketToChatSession = new Map(); // socketId -> chatId
+
+function buildParticipantDetails(socketId) {
+  const profileData = userProfiles.get(socketId);
+  const botData = botProfiles.get(socketId);
+  const connectedSocket = io.sockets.sockets.get(socketId);
+  const isBot = bots.has(socketId) || !!connectedSocket?.data?.isBot;
+
+  return {
+    socketId,
+    isBot,
+    connected: !!connectedSocket,
+    profile: {
+      name: botData?.name || profileData?.profile?.name || null,
+      age: botData?.age ?? profileData?.profile?.age ?? null,
+      gender: botData?.gender || profileData?.profile?.gender || null,
+      country: botData?.countryName || profileData?.profile?.country || null
+    },
+    filters: profileData?.filters || null
+  };
+}
+
+function buildChatSummary(session) {
+  return {
+    id: session.id,
+    startedAt: session.startedAt,
+    endedAt: session.endedAt,
+    status: session.status,
+    endReason: session.endReason || null,
+    messageCount: session.messages.length,
+    participants: session.participants.map((socketId) => {
+      const details = session.participantDetails[socketId] || {};
+      return {
+        socketId,
+        isBot: !!details.isBot,
+        name: details.profile?.name || socketId.substring(0, 8)
+      };
+    })
+  };
+}
+
+function buildOnlineUsersSnapshot() {
+  const online = [];
+  for (const socket of io.sockets.sockets.values()) {
+    const socketId = socket.id;
+    const isBot = !!socket.data?.isBot;
+    const profileData = userProfiles.get(socketId);
+    const botData = botProfiles.get(socketId);
+
+    online.push({
+      socketId,
+      shortId: socketId.substring(0, 8),
+      isBot,
+      name: botData?.name || profileData?.profile?.name || null,
+      age: botData?.age ?? profileData?.profile?.age ?? null,
+      gender: botData?.gender || profileData?.profile?.gender || null,
+      country: botData?.countryName || profileData?.profile?.country || null,
+      hasProfile: userProfiles.has(socketId),
+      searching: searching.has(socketId),
+      paired: pairs.has(socketId)
+    });
+  }
+
+  online.sort((a, b) => {
+    if (a.isBot !== b.isBot) return a.isBot ? 1 : -1;
+    return a.shortId.localeCompare(b.shortId);
+  });
+
+  return online;
+}
+
+function emitAdminOnlineUsers() {
+  adminNamespace.emit('admin-online-users', {
+    onlineUsers: buildOnlineUsersSnapshot()
+  });
+}
+
+function startChatSession(socketIdA, socketIdB) {
+  const existing = socketToChatSession.get(socketIdA) || socketToChatSession.get(socketIdB);
+  if (existing && activeChatSessions.has(existing)) {
+    return activeChatSessions.get(existing);
+  }
+
+  const chatId = `chat_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+  const session = {
+    id: chatId,
+    startedAt: new Date().toISOString(),
+    endedAt: null,
+    status: 'active',
+    endReason: null,
+    participants: [socketIdA, socketIdB],
+    participantDetails: {
+      [socketIdA]: buildParticipantDetails(socketIdA),
+      [socketIdB]: buildParticipantDetails(socketIdB)
+    },
+    messages: []
+  };
+
+  activeChatSessions.set(chatId, session);
+  socketToChatSession.set(socketIdA, chatId);
+  socketToChatSession.set(socketIdB, chatId);
+  adminNamespace.emit('chat-created', { summary: buildChatSummary(session) });
+  return session;
+}
+
+function endChatSessionForSocket(socketId, reason) {
+  const chatId = socketToChatSession.get(socketId);
+  if (!chatId) return;
+
+  const session = activeChatSessions.get(chatId);
+  if (!session) {
+    socketToChatSession.delete(socketId);
+    return;
+  }
+
+  if (session.status !== 'active') return;
+
+  session.status = 'ended';
+  session.endedAt = new Date().toISOString();
+  session.endReason = reason;
+
+  for (const participantId of session.participants) {
+    session.participantDetails[participantId] = buildParticipantDetails(participantId);
+    socketToChatSession.delete(participantId);
+  }
+
+  activeChatSessions.delete(chatId);
+  completedChatSessions.unshift(session);
+  if (completedChatSessions.length > 1000) completedChatSessions.pop();
+
+  adminNamespace.emit('chat-ended', {
+    summary: buildChatSummary(session),
+    chatId
+  });
+}
+
+function recordChatMessage(fromSocketId, toSocketId, text) {
+  const chatId = socketToChatSession.get(fromSocketId) || socketToChatSession.get(toSocketId);
+  if (!chatId) return;
+
+  const session = activeChatSessions.get(chatId);
+  if (!session || session.status !== 'active') return;
+
+  session.messages.push({
+    timestamp: new Date().toISOString(),
+    fromSocketId,
+    toSocketId,
+    text: String(text)
+  });
+
+  adminNamespace.emit('chat-updated', {
+    summary: buildChatSummary(session),
+    chatId,
+    lastMessage: session.messages[session.messages.length - 1]
+  });
+}
+
+const adminNamespace = io.of('/admin');
+
+adminNamespace.use((socket, next) => {
+  const hostHeader = socket.handshake.headers?.host || '';
+  if (!ADMIN_KEY && isLocalHostHeader(hostHeader)) return next();
+  if (!ADMIN_KEY) return next(new Error('unauthorized'));
+  const providedKey = socket.handshake.auth?.key || socket.handshake.query?.key;
+  if (providedKey === ADMIN_KEY) return next();
+  return next(new Error('unauthorized'));
+});
+
+adminNamespace.on('connection', (socket) => {
+  socket.emit('admin-init', {
+    activeChats: Array.from(activeChatSessions.values()).map(buildChatSummary),
+    completedChats: completedChatSessions.slice(0, 200).map(buildChatSummary),
+    onlineUsers: buildOnlineUsersSnapshot()
+  });
+
+  socket.on('admin-get-chat', ({ chatId } = {}) => {
+    if (!chatId) return;
+    const active = activeChatSessions.get(chatId);
+    const completed = completedChatSessions.find((chat) => chat.id === chatId);
+    const chat = active || completed;
+    if (!chat) return;
+
+    socket.emit('admin-chat-detail', {
+      chat: {
+        ...chat,
+        summary: buildChatSummary(chat)
+      }
+    });
+  });
+});
 
 // Cleanup old entries periodically to prevent memory leaks
 function cleanupStaleEntries() {
@@ -424,11 +640,13 @@ function broadcastUserCount() {
 io.on('connection', (socket) => {
   console.log('connected', socket.id);
   broadcastUserCount();
+  emitAdminOnlineUsers();
   
   // Handle profile setting
   socket.on('set-profile', ({ profile, filters }) => {
     userProfiles.set(socket.id, { profile, filters });
     console.log(`Profile set for ${socket.id}:`, profile, 'Filters:', filters);
+    emitAdminOnlineUsers();
   });
   socket.data.isBot = false; // default is real user
 
@@ -465,6 +683,7 @@ io.on('connection', (socket) => {
     searching.add(socket.id);
     console.log(`>>> ${socket.id} added to searching pool (bot)`);
     broadcastUserCount();
+    emitAdminOnlineUsers();
     
     console.log(`>>> ${socket.id} registered as bot - Name: ${profile.name}, Age: ${profile.age}, Gender: ${profile.gender}, Country: ${profile.countryName} (${profile.country})`);
   });
@@ -487,6 +706,7 @@ io.on('connection', (socket) => {
     // Mark this socket as actively searching
     searching.add(socket.id);
     console.log(`>>> ${socket.id} added to searching pool`);
+    emitAdminOnlineUsers();
     
     // Helper function to check if two users match each other's filters
     const checkFiltersMatch = (socketId1, socketId2) => {
@@ -584,6 +804,7 @@ io.on('connection', (socket) => {
       searching.delete(socket.id);
       searching.delete(otherId);
       console.log(`>>> removed ${socket.id} and ${otherId} from searching pool`);
+      emitAdminOnlineUsers();
       
       const isMatchWithBot = bots.has(otherId);
       let botProfile = null;
@@ -599,6 +820,7 @@ io.on('connection', (socket) => {
       }
       io.to(socket.id).emit('matched', { otherId, initiator: true, isBot: isMatchWithBot, botProfile });
       io.to(otherId).emit('matched', { otherId: socket.id, initiator: false });
+      startChatSession(socket.id, otherId);
     } else {
       console.log(`>>> ${socket.id} has no available partners`);
       socket.emit('waiting');
@@ -614,7 +836,10 @@ io.on('connection', (socket) => {
   socket.on('chat-message', ({ to, text }) => {
     if (!to || !text) return;
     const dest = io.sockets.sockets.get(to);
-    if (dest) dest.emit('chat-message', { from: socket.id, text });
+    if (dest) {
+      dest.emit('chat-message', { from: socket.id, text });
+      recordChatMessage(socket.id, to, text);
+    }
   });
 
   socket.on('report-safety', ({ details, partnerId, statusText } = {}) => {
@@ -647,6 +872,7 @@ io.on('connection', (socket) => {
     console.log('>>> stop-searching event received from', socket.id);
     searching.delete(socket.id);
     console.log(`>>> removed ${socket.id} from searching pool`);
+    emitAdminOnlineUsers();
   });
 
   socket.on('next', () => {
@@ -672,11 +898,14 @@ io.on('connection', (socket) => {
       
       pairs.delete(socket.id);
       pairs.delete(partner);
+      endChatSessionForSocket(socket.id, 'next');
+      emitAdminOnlineUsers();
     }
   });
 
   socket.on('disconnect', () => {
     console.log('disconnect', socket.id);
+    endChatSessionForSocket(socket.id, 'disconnect');
     const partner = pairs.get(socket.id);
     if (partner) {
       io.to(partner).emit('peer-disconnected', { id: socket.id });
@@ -706,6 +935,7 @@ io.on('connection', (socket) => {
     
     // Broadcast updated count when someone disconnects
     broadcastUserCount();
+    emitAdminOnlineUsers();
   });
 });
 
