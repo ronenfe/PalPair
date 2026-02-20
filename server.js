@@ -413,11 +413,11 @@ const cleanupInterval = setInterval(cleanupStaleEntries, CLEANUP_INTERVAL);
 function broadcastUserCount() {
   const connected = Array.from(io.sockets.sockets.values());
   const botsOnline = connected.filter(s => s.data.isBot).length;
-  const humansOnline = connected.length - botsOnline;
+  const humansOnline = connected.filter(s => !s.data.isBot && userProfiles.has(s.id)).length;
   io.emit('user-count', {
     humans: humansOnline,
     bots: botsOnline,
-    total: connected.length
+    total: humansOnline + botsOnline
   });
 }
 

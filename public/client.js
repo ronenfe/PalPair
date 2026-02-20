@@ -7,12 +7,12 @@ const matchSound = new Audio('data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAAB
 socket.on('connect', () => console.log('Connected to server'));
 socket.on('disconnect', (reason) => console.log('Disconnected from server:', reason));
 
-// Update user counter
-socket.on('user-count', ({ humans = 0, bots = 0 }) => {
+// Update user counter (real users + bots)
+socket.on('user-count', ({ total = 0, humans = 0, bots = 0 }) => {
   const userCountEl = document.getElementById('userCount');
-  const botCountEl = document.getElementById('botCount');
-  if (userCountEl) userCountEl.textContent = humans;
-  if (botCountEl) botCountEl.textContent = bots;
+  if (userCountEl) {
+    userCountEl.textContent = total || (humans + bots);
+  }
 });
 
 // Profile form elements
