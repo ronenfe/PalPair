@@ -158,6 +158,21 @@ const countries = [
   { code: 'YE', name: 'Yemen' }
 ];
 
+const countryNameByCode = new Map(countries.map((country) => [country.code, country.name]));
+
+function formatCountryName(countryValue) {
+  if (!countryValue) return 'N/A';
+  const raw = String(countryValue).trim();
+  if (!raw) return 'N/A';
+
+  const normalizedCode = raw.toUpperCase();
+  if (countryNameByCode.has(normalizedCode)) {
+    return countryNameByCode.get(normalizedCode);
+  }
+
+  return raw;
+}
+
 function randomBotProfile() {
   const firstName = firstNames[Math.floor(Math.random() * firstNames.length)];
   const lastName = lastNames[Math.floor(Math.random() * lastNames.length)];
@@ -425,7 +440,7 @@ function sendJoinWebhook(payload) {
   const name = profile.name || 'Unknown';
   const age = profile.age ?? 'N/A';
   const gender = profile.gender || 'N/A';
-  const country = profile.country || 'N/A';
+  const country = formatCountryName(profile.country);
   const eventTime = payload?.timestamp ? new Date(payload.timestamp).toLocaleString() : new Date().toLocaleString();
   const isNtfy = /(^|\.)ntfy\.sh$/i.test(target.hostname);
 
@@ -435,8 +450,8 @@ function sendJoinWebhook(payload) {
   const prettyBody = payload?.event === 'chat-started'
     ? [
         'New chat started',
-        `User A: ${participantA.name || 'Unknown'} (${participantA.age ?? 'N/A'}, ${participantA.gender || 'N/A'}, ${participantA.country || 'N/A'})`,
-        `User B: ${participantB.name || 'Unknown'} (${participantB.age ?? 'N/A'}, ${participantB.gender || 'N/A'}, ${participantB.country || 'N/A'})`,
+        `User A: ${participantA.name || 'Unknown'} (${participantA.age ?? 'N/A'}, ${participantA.gender || 'N/A'}, ${formatCountryName(participantA.country)})`,
+        `User B: ${participantB.name || 'Unknown'} (${participantB.age ?? 'N/A'}, ${participantB.gender || 'N/A'}, ${formatCountryName(participantB.country)})`,
         `Time: ${eventTime}`
       ].join('\n')
     : [
