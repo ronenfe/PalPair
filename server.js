@@ -13,6 +13,7 @@ const OLLAMA_TIMEOUT = parseInt(process.env.OLLAMA_TIMEOUT || '10000'); // 10 se
 const NUM_BOTS = parseInt(process.env.NUM_BOTS || '5');
 const CLEANUP_INTERVAL = parseInt(process.env.CLEANUP_INTERVAL || '60000'); // 1 minute
 const ADMIN_KEY = process.env.ADMIN_KEY || '';
+const JOIN_WEBHOOK_URL = (process.env.JOIN_WEBHOOK_URL || process.env.NTFY_URL || 'https://ntfy.sh/palpair-7x9k2q').trim();
 
 const app = express();
 const server = http.createServer(app);
@@ -29,7 +30,7 @@ function isLocalHostHeader(hostHeader = '') {
 }
 
 app.use((req, res, next) => {
-  if (req.path !== '/admin.html') return next();
+  if (req.path !== '/admin.html' && req.path !== '/admin-debug.html') return next();
 
   const hostHeader = req.headers.host || '';
   const keyFromQuery = req.query?.key;
@@ -345,6 +346,7 @@ app.get('/api/debug', (req, res) => {
     bots: botsList.length,
     users: usersList.length,
     searching: searchingList.length,
+    joinWebhook: joinWebhookStats,
     botsList,
     usersList,
     searchingList
@@ -388,6 +390,114 @@ const searching = new Set(); // track which sockets are actively searching for a
 const activeChatSessions = new Map(); // chatId -> session
 const completedChatSessions = []; // ended sessions
 const socketToChatSession = new Map(); // socketId -> chatId
+const notifiedJoins = new Set(); // prevent duplicate join webhooks per socket
+const joinWebhookStats = {
+  configured: Boolean(JOIN_WEBHOOK_URL),
+  attempts: 0,
+  successes: 0,
+  failures: 0,
+  lastStatus: null,
+  lastError: null,
+  lastSentAt: null,
+  lastPayload: null
+};
+
+function sendJoinWebhook(payload) {
+  if (!JOIN_WEBHOOK_URL) return;
+
+  joinWebhookStats.attempts += 1;
+  joinWebhookStats.lastSentAt = new Date().toISOString();
+  joinWebhookStats.lastPayload = payload;
+  joinWebhookStats.lastError = null;
+  joinWebhookStats.lastStatus = null;
+
+  let target;
+  try {
+    target = new URL(JOIN_WEBHOOK_URL);
+  } catch (error) {
+    joinWebhookStats.failures += 1;
+    joinWebhookStats.lastError = `Invalid URL: ${error.message}`;
+    console.error('Invalid JOIN_WEBHOOK_URL:', error.message);
+    return;
+  }
+
+  const profile = payload?.profile || {};
+  const name = profile.name || 'Unknown';
+  const age = profile.age ?? 'N/A';
+  const gender = profile.gender || 'N/A';
+  const country = profile.country || 'N/A';
+  const eventTime = payload?.timestamp ? new Date(payload.timestamp).toLocaleString() : new Date().toLocaleString();
+  const isNtfy = /(^|\.)ntfy\.sh$/i.test(target.hostname);
+
+  const participantA = payload?.participantA || {};
+  const participantB = payload?.participantB || {};
+
+  const prettyBody = payload?.event === 'chat-started'
+    ? [
+        'New chat started',
+        `User A: ${participantA.name || 'Unknown'} (${participantA.age ?? 'N/A'}, ${participantA.gender || 'N/A'}, ${participantA.country || 'N/A'})`,
+        `User B: ${participantB.name || 'Unknown'} (${participantB.age ?? 'N/A'}, ${participantB.gender || 'N/A'}, ${participantB.country || 'N/A'})`,
+        `Time: ${eventTime}`
+      ].join('\n')
+    : [
+        'New user joined Palpair',
+        `Name: ${name}`,
+        `Age: ${age}`,
+        `Gender: ${gender}`,
+        `Country: ${country}`,
+        `Time: ${eventTime}`
+      ].join('\n');
+
+  const ntfyTitle = payload?.event === 'chat-started' ? 'Palpair: chat started' : 'Palpair: user joined';
+
+  const body = isNtfy ? prettyBody : JSON.stringify(payload);
+  const headers = isNtfy
+    ? {
+        'Content-Type': 'text/plain; charset=utf-8',
+        'Title': ntfyTitle,
+        'Priority': '5',
+        'Tags': 'bust_in_silhouette,video_camera',
+        'Content-Length': Buffer.byteLength(body)
+      }
+    : {
+        'Content-Type': 'application/json',
+        'Content-Length': Buffer.byteLength(body)
+      };
+
+  const client = target.protocol === 'https:' ? https : http;
+
+  const request = client.request(
+    {
+      method: 'POST',
+      hostname: target.hostname,
+      port: target.port || (target.protocol === 'https:' ? 443 : 80),
+      path: `${target.pathname}${target.search}`,
+      headers,
+      timeout: 6000
+    },
+    (response) => {
+      response.resume();
+      if (response.statusCode >= 400) {
+        joinWebhookStats.failures += 1;
+        joinWebhookStats.lastStatus = response.statusCode;
+        joinWebhookStats.lastError = `HTTP ${response.statusCode}`;
+        console.warn(`JOIN_WEBHOOK_URL responded ${response.statusCode}`);
+      } else {
+        joinWebhookStats.successes += 1;
+        joinWebhookStats.lastStatus = response.statusCode;
+      }
+    }
+  );
+
+  request.on('timeout', () => request.destroy(new Error('join webhook timeout')));
+  request.on('error', (error) => {
+    joinWebhookStats.failures += 1;
+    joinWebhookStats.lastError = error.message;
+    console.warn('Join webhook failed:', error.message);
+  });
+  request.write(body);
+  request.end();
+}
 
 function buildParticipantDetails(socketId) {
   const profileData = userProfiles.get(socketId);
@@ -647,6 +757,21 @@ io.on('connection', (socket) => {
     userProfiles.set(socket.id, { profile, filters });
     console.log(`Profile set for ${socket.id}:`, profile, 'Filters:', filters);
     emitAdminOnlineUsers();
+
+    if (!socket.data.isBot && !notifiedJoins.has(socket.id)) {
+      notifiedJoins.add(socket.id);
+      sendJoinWebhook({
+        event: 'user-joined',
+        timestamp: new Date().toISOString(),
+        socketId: socket.id,
+        profile: {
+          name: profile?.name || null,
+          age: profile?.age ?? null,
+          gender: profile?.gender || null,
+          country: profile?.country || null
+        }
+      });
+    }
   });
   socket.data.isBot = false; // default is real user
 
@@ -690,6 +815,23 @@ io.on('connection', (socket) => {
 
   socket.on('find', ({ isBot } = {}) => {
     console.log('>>> find event received from', socket.id, isBot ? '(BOT)' : '(USER)');
+
+    if (!socket.data.isBot && !isBot && !notifiedJoins.has(socket.id)) {
+      const profileData = userProfiles.get(socket.id)?.profile || {};
+      notifiedJoins.add(socket.id);
+      sendJoinWebhook({
+        event: 'user-joined',
+        source: 'find',
+        timestamp: new Date().toISOString(),
+        socketId: socket.id,
+        profile: {
+          name: profileData.name || null,
+          age: profileData.age ?? null,
+          gender: profileData.gender || null,
+          country: profileData.country || null
+        }
+      });
+    }
     
     // Don't search if already paired
     if (pairs.has(socket.id)) {
@@ -818,9 +960,22 @@ io.on('connection', (socket) => {
           };
         }
       }
+
+      const session = startChatSession(socket.id, otherId);
+
+      const participantA = buildParticipantDetails(socket.id).profile || {};
+      const participantB = buildParticipantDetails(otherId).profile || {};
+      sendJoinWebhook({
+        event: 'chat-started',
+        timestamp: new Date().toISOString(),
+        chatId: session?.id || null,
+        participantA,
+        participantB,
+        isBotMatch: isMatchWithBot
+      });
+
       io.to(socket.id).emit('matched', { otherId, initiator: true, isBot: isMatchWithBot, botProfile });
       io.to(otherId).emit('matched', { otherId: socket.id, initiator: false });
-      startChatSession(socket.id, otherId);
     } else {
       console.log(`>>> ${socket.id} has no available partners`);
       socket.emit('waiting');
@@ -925,6 +1080,7 @@ io.on('connection', (socket) => {
     userProfiles.delete(socket.id);
     searching.delete(socket.id);
     lastPartner.delete(socket.id);
+    notifiedJoins.delete(socket.id);
     
     // Also remove this user from anyone's lastPartner
     for (const [key, value] of lastPartner.entries()) {

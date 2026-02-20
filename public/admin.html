@@ -20,6 +20,17 @@
         align-items: center;
       }
       .status { font-size: 0.9rem; opacity: 0.9; }
+      .notify-btn {
+        margin-left: 10px;
+        background: #2563eb;
+        color: #fff;
+        border: 0;
+        border-radius: 8px;
+        padding: 6px 10px;
+        font-size: 0.8rem;
+        cursor: pointer;
+      }
+      .notify-btn:disabled { opacity: 0.6; cursor: default; }
       .wrap {
         display: grid;
         grid-template-columns: 360px 1fr;
@@ -101,7 +112,10 @@
   <body>
     <div class="topbar">
       <strong>Palpair Admin - Live Chats</strong>
-      <span id="connStatus" class="status">Connecting...</span>
+      <div>
+        <span id="connStatus" class="status">Connecting...</span>
+        <button id="enableNotifyBtn" class="notify-btn">Enable Notifications</button>
+      </div>
     </div>
     <div class="wrap">
       <div class="list">
@@ -132,10 +146,52 @@
       const chatMetaEl = document.getElementById('chatMeta');
       const chatMessagesEl = document.getElementById('chatMessages');
       const connStatusEl = document.getElementById('connStatus');
+      const enableNotifyBtn = document.getElementById('enableNotifyBtn');
 
       const chatSummaries = new Map();
       let onlineUsers = [];
+      let previousOnlineUserIds = new Set();
+      let onlineUsersInitialized = false;
       let selectedChatId = null;
+
+      function updateNotifyButtonState() {
+        if (!('Notification' in window)) {
+          enableNotifyBtn.textContent = 'Notifications Unsupported';
+          enableNotifyBtn.disabled = true;
+          return;
+        }
+        if (Notification.permission === 'granted') {
+          enableNotifyBtn.textContent = 'Notifications Enabled';
+          enableNotifyBtn.disabled = true;
+          return;
+        }
+        if (Notification.permission === 'denied') {
+          enableNotifyBtn.textContent = 'Notifications Blocked';
+          enableNotifyBtn.disabled = true;
+          return;
+        }
+        enableNotifyBtn.textContent = 'Enable Notifications';
+        enableNotifyBtn.disabled = false;
+      }
+
+      function notifyUserJoined(newUsers) {
+        if (!newUsers.length) return;
+        const count = newUsers.length;
+        const title = count === 1 ? 'New user joined' : `${count} new users joined`;
+        const body = newUsers.map((u) => u.name || u.shortId).join(', ');
+
+        if ('Notification' in window && Notification.permission === 'granted') {
+          try {
+            new Notification(title, { body: body || 'A new user connected to Palpair.' });
+          } catch (e) {
+            // ignore notification errors
+          }
+        }
+
+        if (navigator.vibrate) {
+          navigator.vibrate([120, 80, 120]);
+        }
+      }
 
       function fmtTime(ts) {
         if (!ts) return '-';
@@ -196,6 +252,22 @@
             </div>
           `;
         }).join('');
+      }
+
+      function processOnlineUsers(users) {
+        onlineUsers = users || [];
+        renderOnlineUsers();
+
+        const currentRealUsers = onlineUsers.filter((u) => !u.isBot);
+        const currentIds = new Set(currentRealUsers.map((u) => u.socketId));
+
+        if (onlineUsersInitialized) {
+          const joined = currentRealUsers.filter((u) => !previousOnlineUserIds.has(u.socketId));
+          notifyUserJoined(joined);
+        }
+
+        previousOnlineUserIds = currentIds;
+        onlineUsersInitialized = true;
       }
 
       function renderDetail(chat) {
@@ -261,14 +333,12 @@
       socket.on('admin-init', ({ activeChats = [], completedChats = [], onlineUsers: users = [] }) => {
         chatSummaries.clear();
         [...activeChats, ...completedChats].forEach((chat) => chatSummaries.set(chat.id, chat));
-        onlineUsers = users;
-        renderOnlineUsers();
+        processOnlineUsers(users);
         renderList();
       });
 
       socket.on('admin-online-users', ({ onlineUsers: users = [] }) => {
-        onlineUsers = users;
-        renderOnlineUsers();
+        processOnlineUsers(users);
       });
 
       async function refreshOnlineUsersFallback() {
@@ -276,8 +346,7 @@
           const response = await fetch('/api/admin-online-users', { cache: 'no-store' });
           if (!response.ok) return;
           const payload = await response.json();
-          onlineUsers = payload.onlineUsers || [];
-          renderOnlineUsers();
+          processOnlineUsers(payload.onlineUsers || []);
         } catch (e) {
           // ignore fallback polling errors
         }
@@ -285,6 +354,18 @@
 
       setInterval(refreshOnlineUsersFallback, 3000);
       refreshOnlineUsersFallback();
+
+      enableNotifyBtn.addEventListener('click', async () => {
+        if (!('Notification' in window)) return;
+        try {
+          await Notification.requestPermission();
+        } catch (e) {
+          // ignore
+        }
+        updateNotifyButtonState();
+      });
+
+      updateNotifyButtonState();
 
       socket.on('chat-created', ({ summary }) => {
         if (!summary) return;
