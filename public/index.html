@@ -4,30 +4,35 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width,initial-scale=1" />
     <title>Palpair - Random Video Chat</title>
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <link rel="stylesheet" href="/style.css">
   </head>
   <body>
     <div class="container">
-      <h1>Palpair</h1>
-      <p class="subtitle">Meet new people instantly • Video chat worldwide</p>
-      <div id="userCounter" class="user-counter-wrap">
-        <span class="counter-chip"><span id="userCount">0</span>&nbsp;people online now</span>
+      <div class="lang-row">
+        <label for="languageSelect" data-i18n="language">Language</label>
+        <select id="languageSelect"></select>
       </div>
-      <p class="safety-note">Palpair - Random Video Chat allows users to report child safety concerns in-app. To learn more about reporting requirements, visit the <a href="/help-center.html" target="_blank" rel="noopener">Help center</a>.</p>
+      <h1>Palpair</h1>
+      <p class="subtitle" data-i18n="subtitle">Meet new people instantly • Video chat worldwide</p>
+      <div id="userCounter" class="user-counter-wrap">
+        <span class="counter-chip"><span id="userCount">0</span>&nbsp;<span data-i18n="peopleOnline">people online now</span></span>
+      </div>
+      <p class="safety-note" data-i18n-html="safetyNote">Palpair - Random Video Chat allows users to report child safety concerns in-app. To learn more about reporting requirements, visit the <a href="/help-center.html" target="_blank" rel="noopener">Help center</a>.</p>
       
       <!-- Profile Form -->
       <div id="profileForm" class="profile-form">
-        <h3>Your Profile</h3>
-        <input id="userName" type="text" placeholder="Name" required />
-        <input id="userAge" type="number" placeholder="Age" min="18" max="100" required />
+        <h3 data-i18n="yourProfile">Your Profile</h3>
+        <input id="userName" type="text" placeholder="Name" data-i18n-placeholder="namePlaceholder" required />
+        <input id="userAge" type="number" placeholder="Age" data-i18n-placeholder="agePlaceholder" min="18" max="100" required />
         <select id="userGender" required>
-          <option value="">Select Gender</option>
-          <option value="male">Male</option>
-          <option value="female">Female</option>
-          <option value="other">Other</option>
+          <option value="" data-i18n="selectGender">Select Gender</option>
+          <option value="male" data-i18n="male">Male</option>
+          <option value="female" data-i18n="female">Female</option>
+          <option value="other" data-i18n="other">Other</option>
         </select>
         <select id="userCountry" required>
-          <option value="">Select Country</option>
+          <option value="" data-i18n="selectCountry">Select Country</option>
           <option value="AF">Afghanistan</option>
           <option value="AL">Albania</option>
           <option value="DZ">Algeria</option>
@@ -228,23 +233,23 @@
           <option value="ZW">Zimbabwe</option>
         </select>
         
-        <h3>Filter Preferences</h3>
-        <label>Age Range:</label>
+        <h3 data-i18n="filterPreferences">Filter Preferences</h3>
+        <label data-i18n="ageRange">Age Range:</label>
         <div class="range-inputs">
-          <input id="minAge" type="number" placeholder="Min" min="18" max="100" value="18" />
-          <span>to</span>
-          <input id="maxAge" type="number" placeholder="Max" min="18" max="100" value="100" />
+          <input id="minAge" type="number" placeholder="Min" data-i18n-placeholder="minPlaceholder" min="18" max="100" value="18" />
+          <span data-i18n="to">to</span>
+          <input id="maxAge" type="number" placeholder="Max" data-i18n-placeholder="maxPlaceholder" min="18" max="100" value="100" />
         </div>
         
         <select id="filterGender">
-          <option value="any">Any Gender</option>
-          <option value="male">Male Only</option>
-          <option value="female">Female Only</option>
-          <option value="other">Other Only</option>
+          <option value="any" data-i18n="anyGender">Any Gender</option>
+          <option value="male" data-i18n="maleOnly">Male Only</option>
+          <option value="female" data-i18n="femaleOnly">Female Only</option>
+          <option value="other" data-i18n="otherOnly">Other Only</option>
         </select>
         
         <select id="filterCountry">
-          <option value="any">Any Country</option>
+          <option value="any" data-i18n="anyCountry">Any Country</option>
           <option value="AF">Afghanistan</option>
           <option value="AL">Albania</option>
           <option value="DZ">Algeria</option>
@@ -445,7 +450,7 @@
           <option value="ZW">Zimbabwe</option>
         </select>
         
-        <button id="saveProfileBtn">Save & Continue</button>
+        <button id="saveProfileBtn" data-i18n="saveContinue">Save & Continue</button>
       </div>
       
       <!-- Main Chat Interface (hidden initially) -->
@@ -461,12 +466,12 @@
       </div>
 
       <div class="controls">
-        <button id="toggleBtn">Start</button>
-        <button id="nextBtn" disabled>Find Next</button>
-        <button id="reportBtn">Report Concern</button>
+        <button id="toggleBtn" data-i18n="start">Start</button>
+        <button id="nextBtn" data-i18n="findNext" disabled>Find Next</button>
+        <button id="reportBtn" data-i18n="reportConcern">Report Concern</button>
       </div>
 
-      <p id="status">Idle</p>
+      <p id="status" data-i18n="idle">Idle</p>
 
       <!-- Chat Interface -->
       <div class="chat-container">
@@ -475,16 +480,18 @@
           <input 
             id="chatInput" 
             type="text" 
-            placeholder="Type a message..." 
+            placeholder="Type a message..."
+            data-i18n-placeholder="typeMessage" 
             disabled
           />
-          <button id="sendBtn" disabled>Send</button>
+          <button id="sendBtn" data-i18n="send" disabled>Send</button>
         </div>
       </div>
       </div>
     </div>
 
     <script src="/socket.io/socket.io.js"></script>
+    <script src="/i18n.js"></script>
     <script src="/client.js"></script>
   </body>
 </html>

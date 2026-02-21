@@ -1,6 +1,31 @@
 const socket = io();
 console.log('Socket.IO client initialized');
 
+const i18n = window.PALPAIR_I18N;
+const translate = i18n ? i18n.t : (key, params = {}) => {
+  const dictionary = {
+    alertFillProfile: 'Please fill in all profile fields',
+    alertAgeRange: 'Age must be between 18 and 100',
+    alertMinMax: 'Minimum age cannot be greater than maximum age',
+    statusFindingPartner: 'Finding partner...',
+    statusCameraError: 'Could not start camera',
+    statusStopped: 'Stopped',
+    statusFindingNext: 'Finding next...',
+    statusWaiting: 'Waiting for a partner...',
+    statusConnected: 'Connected',
+    statusConnectedBot: 'Connected to {name}, {age}, from {country}',
+    reportPrompt: 'Report safety concern (child safety, harassment, explicit content, etc.). Please include useful details:',
+    reportSubmitted: 'Safety report submitted. Thank you for helping keep Palpair safe.',
+    start: 'Start',
+    stop: 'Stop'
+  };
+  let text = dictionary[key] || key;
+  Object.keys(params).forEach((paramName) => {
+    text = text.replaceAll(`{${paramName}}`, String(params[paramName]));
+  });
+  return text;
+};
+
 // Sound notification for matches
 const matchSound = new Audio('data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2/LDciUFLIHO8tiJNwgZaLvt559NEAxQp+PwtmMcBjiR1/LMeSwFJHfH8N2QQAoUXrTp66hVFApGn+DyvmwhBDGH0fPTgjMGHm7A7+OZURE');
 
@@ -32,6 +57,7 @@ const remotePlaceholder = document.getElementById('remotePlaceholder');
 const chatInput = document.getElementById('chatInput');
 const sendBtn = document.getElementById('sendBtn');
 const chatMessages = document.getElementById('chatMessages');
+const languageSelect = document.getElementById('languageSelect');
 
 // Initialize video display state
 remoteVideo.style.display = 'none';
@@ -46,6 +72,36 @@ let isActive = false;
 // User profile and filters
 let userProfile = null;
 let userFilters = null;
+
+function renderLanguageSelector() {
+  if (!languageSelect || !i18n) return;
+  const languages = i18n.getLanguages();
+  const selected = i18n.getLanguage();
+  languageSelect.innerHTML = languages
+    .map((language) => `<option value="${language.code}">${language.name}</option>`)
+    .join('');
+  languageSelect.value = selected;
+}
+
+if (languageSelect && i18n) {
+  renderLanguageSelector();
+  languageSelect.addEventListener('change', () => {
+    i18n.setLanguage(languageSelect.value);
+    if (!isRunning) {
+      toggleBtn.textContent = translate('start');
+    } else {
+      toggleBtn.textContent = translate('stop');
+    }
+  });
+  window.addEventListener('palpair-language-changed', () => {
+    languageSelect.value = i18n.getLanguage();
+    if (!isRunning) {
+      toggleBtn.textContent = translate('start');
+    } else {
+      toggleBtn.textContent = translate('stop');
+    }
+  });
+}
 
 // Load saved form values from localStorage
 function loadSavedFormValues() {
@@ -83,17 +139,17 @@ saveProfileBtn.addEventListener('click', () => {
 
   // Validation
   if (!name || !age || !gender || !country) {
-    alert('Please fill in all profile fields');
+    alert(translate('alertFillProfile'));
     return;
   }
 
   if (age < 18 || age > 100) {
-    alert('Age must be between 18 and 100');
+    alert(translate('alertAgeRange'));
     return;
   }
 
   if (minAge > maxAge) {
-    alert('Minimum age cannot be greater than maximum age');
+    alert(translate('alertMinMax'));
     return;
   }
 
@@ -142,18 +198,18 @@ toggleBtn.onclick = async () => {
       }
       
       isRunning = true;
-      toggleBtn.textContent = 'Stop';
-      status('Finding partner...');
+      toggleBtn.textContent = translate('stop');
+      status(translate('statusFindingPartner'));
       socket.emit('find');
     } catch (e) {
       console.error(e);
-      status('Could not start camera');
+      status(translate('statusCameraError'));
     }
   } else {
     // STOP: close everything
     console.log('>>> Stop button clicked, otherId:', otherId);
     isRunning = false;
-    toggleBtn.textContent = 'Start';
+    toggleBtn.textContent = translate('start');
     nextBtn.disabled = true;
     
     // Remove from searching pool
@@ -178,14 +234,14 @@ toggleBtn.onclick = async () => {
     // Clear videos
     localVideo.srcObject = null;
     clearRemoteVideo();
-    status('Stopped');
+    status(translate('statusStopped'));
   }
 };
 
 nextBtn.onclick = () => {
   // Find next partner while already connected
   console.log('>>> Find Next button clicked, otherId:', otherId);
-  status('Finding next...');
+  status(translate('statusFindingNext'));
   socket.emit('next');
   if (pc) pc.close();
   pc = null;
@@ -199,7 +255,7 @@ nextBtn.onclick = () => {
 
 socket.on('waiting', () => {
   console.log('>>> waiting event received');
-  status('Waiting for a partner...');
+  status(translate('statusWaiting'));
 });
 
 socket.on('matched', async ({ otherId: id, initiator, isBot, botProfile }) => {
@@ -233,9 +289,13 @@ socket.on('matched', async ({ otherId: id, initiator, isBot, botProfile }) => {
   console.log('>>> Setting status to Connected');
   
   if (isBot && botProfile) {
-    status(`Connected to ${botProfile.name}, ${botProfile.age}, from ${botProfile.country}`);
+    status(translate('statusConnectedBot', {
+      name: botProfile.name,
+      age: botProfile.age,
+      country: botProfile.country
+    }));
   } else {
-    status('Connected');
+    status(translate('statusConnected'));
   }
   
   // stop any pending auto-reconnect attempts
@@ -270,7 +330,7 @@ socket.on('signal', async ({ from, data }) => {
 socket.on('peer-disconnected', ({ id }) => {
   // partner was disconnected (or asked to leave) — always reset state
   console.log('*** peer-disconnected event received from', id, '***');
-  status('Waiting for a partner...');
+  status(translate('statusWaiting'));
   if (pc) pc.close();
   pc = null;
   clearRemoteVideo();
@@ -284,7 +344,7 @@ socket.on('peer-disconnected', ({ id }) => {
 // some server flows emit `peer-left` to ensure clients handle forced leaves
 socket.on('peer-left', ({ id, reason }) => {
   console.log('*** peer-left event received *** id:', id, 'reason:', reason);
-  status('Waiting for a partner...');
+  status(translate('statusWaiting'));
   if (pc) pc.close();
   pc = null;
   clearRemoteVideo();
@@ -301,11 +361,11 @@ socket.on('chat-message', ({ from, text }) => {
 });
 
 socket.on('report-received', () => {
-  addChatMessage('Safety report submitted. Thank you for helping keep Palpair safe.', 'system');
+  addChatMessage(translate('reportSubmitted'), 'system');
 });
 
 reportBtn.onclick = () => {
-  const details = prompt('Report safety concern (child safety, harassment, explicit content, etc.). Please include useful details:');
+  const details = prompt(translate('reportPrompt'));
   if (!details || !details.trim()) return;
 
   socket.emit('report-safety', {

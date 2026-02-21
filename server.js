@@ -328,7 +328,7 @@ app.get('/socket.io/socket.io.js.map', (req, res) => {
   if (fs.existsSync(mapPath)) return res.sendFile(mapPath);
   res.status(404).end();
 });
-app.get('/favicon.ico', (req, res) => res.sendStatus(204));
+app.get('/favicon.ico', (req, res) => res.redirect(302, '/favicon.svg'));
 
 // Debug endpoint to see server state
 app.get('/api/debug', (req, res) => {

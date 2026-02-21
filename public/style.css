@@ -18,6 +18,26 @@ body {
   animation: fadeIn 0.5s ease-in;
 }
 
+.lang-row {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.lang-row label {
+  font-size: 0.9rem;
+  opacity: 0.9;
+}
+
+.lang-row select {
+  border: 0;
+  border-radius: 8px;
+  padding: 6px 10px;
+  font-size: 0.9rem;
+}
+
 .subtitle {
   text-align: center;
   font-size: 1.2em;
