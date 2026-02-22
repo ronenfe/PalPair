@@ -303,11 +303,7 @@
     }
   }
 
-  const storageKey = 'palpairLanguage';
-
   function getInitialLanguage() {
-    const saved = localStorage.getItem(storageKey);
-    if (saved && translations[saved]) return saved;
     const browser = (navigator.language || 'en').slice(0, 2).toLowerCase();
     if (translations[browser]) return browser;
     return 'en';
@@ -353,7 +349,6 @@
   function setLanguage(languageCode) {
     if (!translations[languageCode]) return;
     currentLanguage = languageCode;
-    localStorage.setItem(storageKey, languageCode);
     applyTranslations();
   }
 

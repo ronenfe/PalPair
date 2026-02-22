@@ -372,6 +372,17 @@ app.get('/api/admin-online-users', (req, res) => {
   res.json({ onlineUsers: buildOnlineUsersSnapshot() });
 });
 
+app.get('/api/user-count', (req, res) => {
+  const connected = Array.from(io.sockets.sockets.values());
+  const botsOnline = connected.filter((socket) => socket.data.isBot).length;
+  const humansOnline = connected.filter((socket) => !socket.data.isBot).length;
+  res.json({
+    humans: humansOnline,
+    bots: botsOnline,
+    total: humansOnline + botsOnline
+  });
+});
+
 // Endpoint for bots to get AI responses
 app.post('/api/ai-response', express.json(), async (req, res) => {
   const { message, botId, socketId } = req.body;
@@ -754,7 +765,7 @@ const cleanupInterval = setInterval(cleanupStaleEntries, CLEANUP_INTERVAL);
 function broadcastUserCount() {
   const connected = Array.from(io.sockets.sockets.values());
   const botsOnline = connected.filter(s => s.data.isBot).length;
-  const humansOnline = connected.filter(s => !s.data.isBot && userProfiles.has(s.id)).length;
+  const humansOnline = connected.filter(s => !s.data.isBot).length;
   io.emit('user-count', {
     humans: humansOnline,
     bots: botsOnline,

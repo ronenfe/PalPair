@@ -40,24 +40,63 @@ socket.on('user-count', ({ total = 0, humans = 0, bots = 0 }) => {
   }
 });
 
+async function refreshUserCountFallback() {
+  try {
+    const response = await fetch('/api/debug', { cache: 'no-store' });
+    if (!response.ok) return;
+
+    const payload = await response.json();
+    const userCountEl = document.getElementById('userCount');
+    if (userCountEl) {
+      userCountEl.textContent = payload.totalConnected || ((payload.users || 0) + (payload.bots || 0));
+    }
+  } catch (error) {
+    // ignore fallback polling errors
+  }
+}
+
+setInterval(refreshUserCountFallback, 3000);
+refreshUserCountFallback();
+
 // Profile form elements
 const profileForm = document.getElementById('profileForm');
 const chatInterface = document.getElementById('chatInterface');
 const saveProfileBtn = document.getElementById('saveProfileBtn');
+const userCounterWrap = document.getElementById('userCounter');
 
 const toggleBtn = document.getElementById('toggleBtn');
 const nextBtn = document.getElementById('nextBtn');
 const reportBtn = document.getElementById('reportBtn');
+const chatToggleBtn = document.getElementById('chatToggleBtn');
 const statusEl = document.getElementById('status');
 const localVideo = document.getElementById('localVideo');
 const remoteVideo = document.getElementById('remoteVideo');
 const remotePlaceholder = document.getElementById('remotePlaceholder');
+const chatContainer = document.querySelector('.chat-container');
 
 // Chat elements
 const chatInput = document.getElementById('chatInput');
 const sendBtn = document.getElementById('sendBtn');
 const chatMessages = document.getElementById('chatMessages');
-const languageSelect = document.getElementById('languageSelect');
+
+function syncViewportHeight() {
+  const viewportHeight = Math.round(window.visualViewport?.height || window.innerHeight || document.documentElement.clientHeight);
+  document.documentElement.style.setProperty('--app-height', `${viewportHeight}px`);
+
+  let chatScale = 0.9;
+  if (viewportHeight <= 700) {
+    chatScale = 0.82;
+  } else if (viewportHeight <= 820) {
+    chatScale = 0.86;
+  }
+  document.documentElement.style.setProperty('--chat-scale', String(chatScale));
+}
+
+syncViewportHeight();
+window.addEventListener('resize', syncViewportHeight);
+window.addEventListener('orientationchange', () => {
+  setTimeout(syncViewportHeight, 120);
+});
 
 // Initialize video display state
 remoteVideo.style.display = 'none';
@@ -72,36 +111,6 @@ let isActive = false;
 // User profile and filters
 let userProfile = null;
 let userFilters = null;
-
-function renderLanguageSelector() {
-  if (!languageSelect || !i18n) return;
-  const languages = i18n.getLanguages();
-  const selected = i18n.getLanguage();
-  languageSelect.innerHTML = languages
-    .map((language) => `<option value="${language.code}">${language.name}</option>`)
-    .join('');
-  languageSelect.value = selected;
-}
-
-if (languageSelect && i18n) {
-  renderLanguageSelector();
-  languageSelect.addEventListener('change', () => {
-    i18n.setLanguage(languageSelect.value);
-    if (!isRunning) {
-      toggleBtn.textContent = translate('start');
-    } else {
-      toggleBtn.textContent = translate('stop');
-    }
-  });
-  window.addEventListener('palpair-language-changed', () => {
-    languageSelect.value = i18n.getLanguage();
-    if (!isRunning) {
-      toggleBtn.textContent = translate('start');
-    } else {
-      toggleBtn.textContent = translate('stop');
-    }
-  });
-}
 
 // Load saved form values from localStorage
 function loadSavedFormValues() {
@@ -125,6 +134,20 @@ function loadSavedFormValues() {
 
 // Load saved values when page loads
 loadSavedFormValues();
+
+function mountStageOverlays() {
+  const partnerStage = document.querySelector('.videos .video-wrap:nth-child(2)');
+  if (!partnerStage) return;
+  if (userCounterWrap && userCounterWrap.parentElement !== partnerStage) {
+    partnerStage.appendChild(userCounterWrap);
+  }
+  if (statusEl && statusEl.parentElement !== partnerStage) {
+    partnerStage.appendChild(statusEl);
+  }
+  if (chatContainer && chatContainer.parentElement !== partnerStage) {
+    partnerStage.appendChild(chatContainer);
+  }
+}
 
 // Profile form handler
 saveProfileBtn.addEventListener('click', () => {
@@ -180,14 +203,42 @@ saveProfileBtn.addEventListener('click', () => {
   // Show chat interface
   profileForm.style.display = 'none';
   chatInterface.style.display = 'block';
+  document.body.classList.add('chat-active');
+  mountStageOverlays();
+  setChatCollapsed(true);
 });
 let otherId = null;
 let isRunning = false;
+let isChatCollapsed = false;
+
+function setChatCollapsed(collapsed) {
+  isChatCollapsed = collapsed;
+  if (chatInterface) {
+    chatInterface.classList.toggle('chat-collapsed', collapsed);
+  }
+  if (chatToggleBtn) {
+    chatToggleBtn.textContent = '💬';
+    chatToggleBtn.setAttribute('aria-label', collapsed ? 'Expand chat' : 'Collapse chat');
+    chatToggleBtn.setAttribute('title', collapsed ? 'Expand Chat' : 'Collapse Chat');
+  }
+}
+
+if (chatToggleBtn) {
+  chatToggleBtn.onclick = () => {
+    setChatCollapsed(!isChatCollapsed);
+  };
+}
 
 toggleBtn.onclick = async () => {
   if (!isRunning) {
     // START: start camera and find partner
     try {
+      otherId = null;
+      clearChat();
+      nextBtn.disabled = true;
+      chatInput.disabled = true;
+      sendBtn.disabled = true;
+
       localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
       localVideo.srcObject = localStream;
       
@@ -198,7 +249,8 @@ toggleBtn.onclick = async () => {
       }
       
       isRunning = true;
-      toggleBtn.textContent = translate('stop');
+      toggleBtn.textContent = '⏹';
+      toggleBtn.setAttribute('aria-label', translate('stop'));
       status(translate('statusFindingPartner'));
       socket.emit('find');
     } catch (e) {
@@ -209,16 +261,19 @@ toggleBtn.onclick = async () => {
     // STOP: close everything
     console.log('>>> Stop button clicked, otherId:', otherId);
     isRunning = false;
-    toggleBtn.textContent = translate('start');
+    toggleBtn.textContent = '▶';
+    toggleBtn.setAttribute('aria-label', translate('start'));
     nextBtn.disabled = true;
-    
-    // Remove from searching pool
-    socket.emit('stop-searching');
+    chatInput.disabled = true;
+    sendBtn.disabled = true;
     
     // Notify remote partner if connected
     if (otherId) {
       socket.emit('next');
     }
+
+    // Remove from searching pool
+    socket.emit('stop-searching');
     
     // Stop local stream
     if (localStream) {
@@ -234,6 +289,7 @@ toggleBtn.onclick = async () => {
     // Clear videos
     localVideo.srcObject = null;
     clearRemoteVideo();
+    clearChat();
     status(translate('statusStopped'));
   }
 };
@@ -254,11 +310,19 @@ nextBtn.onclick = () => {
 
 
 socket.on('waiting', () => {
+  if (!isRunning) {
+    status(translate('statusStopped'));
+    return;
+  }
   console.log('>>> waiting event received');
   status(translate('statusWaiting'));
 });
 
 socket.on('matched', async ({ otherId: id, initiator, isBot, botProfile }) => {
+  if (!isRunning) {
+    status(translate('statusStopped'));
+    return;
+  }
   console.log('>>> Matched event received, otherId:', id, 'initiator:', initiator, 'isBot:', isBot);
   
   // Play sound notification
@@ -306,6 +370,7 @@ socket.on('matched', async ({ otherId: id, initiator, isBot, botProfile }) => {
 });
 
 socket.on('signal', async ({ from, data }) => {
+  if (!isRunning) return;
   console.log('>>> signal received from', from, 'type:', data.type);
   if (data.type === 'offer') {
     if (!pc) await createPeerConnection(from, false);
@@ -328,6 +393,10 @@ socket.on('signal', async ({ from, data }) => {
 });
 
 socket.on('peer-disconnected', ({ id }) => {
+  if (!isRunning) {
+    status(translate('statusStopped'));
+    return;
+  }
   // partner was disconnected (or asked to leave) — always reset state
   console.log('*** peer-disconnected event received from', id, '***');
   status(translate('statusWaiting'));
@@ -343,6 +412,10 @@ socket.on('peer-disconnected', ({ id }) => {
 
 // some server flows emit `peer-left` to ensure clients handle forced leaves
 socket.on('peer-left', ({ id, reason }) => {
+  if (!isRunning) {
+    status(translate('statusStopped'));
+    return;
+  }
   console.log('*** peer-left event received *** id:', id, 'reason:', reason);
   status(translate('statusWaiting'));
   if (pc) pc.close();
