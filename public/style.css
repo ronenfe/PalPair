@@ -6,6 +6,15 @@
 
 :root {
   --app-height: 100vh;
+  --stage-side-gap: 12px;
+  --stage-vertical-gap: 12px;
+}
+
+@media (min-width: 1200px) {
+  :root {
+    --stage-side-gap: 16px;
+    --stage-vertical-gap: 16px;
+  }
 }
 
 html,
@@ -47,6 +56,7 @@ body.chat-active {
 body:not(.chat-active) .container {
   margin: 0;
   width: min(96vw, 960px);
+  padding-top: 20px;
 }
 
 body:not(.chat-active) h1 {
@@ -292,10 +302,11 @@ body.chat-active #chatInterface {
 
 body.chat-active .videos {
   flex: 0 0 auto;
-  min-height: calc(var(--app-height) * 0.9);
-  height: calc(var(--app-height) * 0.9);
-  margin: 0;
-  max-height: calc(var(--app-height) * 0.9);
+  min-height: calc((var(--app-height) - var(--chat-safe-top) - var(--chat-safe-bottom)) - (var(--stage-vertical-gap) * 2));
+  height: calc((var(--app-height) - var(--chat-safe-top) - var(--chat-safe-bottom)) - (var(--stage-vertical-gap) * 2));
+  width: calc(100% - (var(--stage-side-gap) * 2));
+  margin: 0 auto;
+  max-height: calc((var(--app-height) - var(--chat-safe-top) - var(--chat-safe-bottom)) - (var(--stage-vertical-gap) * 2));
   transform: none;
 }
 
@@ -315,7 +326,7 @@ body.chat-active .videos {
 }
 
 body.chat-active .videos .video-wrap:nth-child(2) {
-  height: calc(var(--app-height) * 0.9);
+  height: calc((var(--app-height) - var(--chat-safe-top) - var(--chat-safe-bottom)) - (var(--stage-vertical-gap) * 2));
 }
 
 /* Local video: picture-in-picture */
@@ -541,8 +552,8 @@ body.chat-active .videos .video-wrap:nth-child(2) #status {
 body.chat-active .chat-container {
   position: absolute;
   left: 10px;
-  bottom: 54px;
-  width: min(78%, 420px);
+  bottom: 62px;
+  width: min(86%, 520px);
   height: clamp(170px, 30vh, 290px);
   margin: 0;
   z-index: 7;
@@ -637,6 +648,7 @@ body.chat-active .chat-container {
 
 #chatInput { 
   flex: 1;
+  min-width: 0;
   padding: 14px 18px;
   border: 2px solid #e0e0e0;
   border-radius: 25px;
@@ -656,6 +668,7 @@ body.chat-active .chat-container {
 }
 
 #sendBtn { 
+  flex: 0 0 auto;
   padding: 14px 28px;
   background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
   color: white;
@@ -670,6 +683,11 @@ body.chat-active .chat-container {
 
 /* Mobile Responsive */
 @media (max-width: 768px) {
+  :root {
+    --stage-side-gap: 8px;
+    --stage-vertical-gap: 8px;
+  }
+
   body {
     padding: 8px;
     padding-bottom: calc(12px + env(safe-area-inset-bottom));
@@ -717,10 +735,11 @@ body.chat-active .chat-container {
   }
 
   body.chat-active .videos {
-    margin: 0;
-    min-height: calc(var(--app-height) * 0.9);
-    height: calc(var(--app-height) * 0.9);
-    max-height: calc(var(--app-height) * 0.9);
+    width: calc(100% - (var(--stage-side-gap) * 2));
+    margin: 0 auto;
+    min-height: calc((var(--app-height) - var(--chat-safe-top) - var(--chat-safe-bottom)) - (var(--stage-vertical-gap) * 2));
+    height: calc((var(--app-height) - var(--chat-safe-top) - var(--chat-safe-bottom)) - (var(--stage-vertical-gap) * 2));
+    max-height: calc((var(--app-height) - var(--chat-safe-top) - var(--chat-safe-bottom)) - (var(--stage-vertical-gap) * 2));
     transform: none;
   }
 
@@ -812,8 +831,8 @@ body.chat-active .chat-container {
 
   body.chat-active .chat-container {
     left: 8px;
-    bottom: 48px;
-    width: min(84%, 360px);
+    bottom: 56px;
+    width: min(92%, 420px);
     height: clamp(140px, 29vh, 240px);
     transform: translate(0, 0) scale(1);
   }
@@ -839,10 +858,11 @@ body.chat-active .chat-container {
   }
 
   body.chat-active .videos {
-    margin: 0;
-    min-height: calc(var(--app-height) * 0.9);
-    height: calc(var(--app-height) * 0.9);
-    max-height: calc(var(--app-height) * 0.9);
+    width: calc(100% - (var(--stage-side-gap) * 2));
+    margin: 0 auto;
+    min-height: calc((var(--app-height) - var(--chat-safe-top) - var(--chat-safe-bottom)) - (var(--stage-vertical-gap) * 2));
+    height: calc((var(--app-height) - var(--chat-safe-top) - var(--chat-safe-bottom)) - (var(--stage-vertical-gap) * 2));
+    max-height: calc((var(--app-height) - var(--chat-safe-top) - var(--chat-safe-bottom)) - (var(--stage-vertical-gap) * 2));
     transform: none;
   }
 
@@ -862,8 +882,8 @@ body.chat-active .chat-container {
 
   body.chat-active .chat-container {
     left: 6px;
-    bottom: 44px;
-    width: min(88%, 320px);
+    bottom: 52px;
+    width: min(94%, 400px);
     height: clamp(120px, 28vh, 210px);
     transform: translate(0, 0) scale(1);
   }
@@ -903,7 +923,7 @@ body.chat-active .chat-container {
     width: min(62%, 320px);
     height: clamp(100px, 40vh, 170px);
     left: 6px;
-    bottom: 42px;
+    bottom: 48px;
     transform: translate(0, 0) scale(1);
   }
 
