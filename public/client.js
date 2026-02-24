@@ -318,7 +318,7 @@ socket.on('waiting', () => {
   status(translate('statusWaiting'));
 });
 
-socket.on('matched', async ({ otherId: id, initiator, isBot, botProfile }) => {
+socket.on('matched', async ({ otherId: id, initiator, isBot, botProfile, partnerProfile }) => {
   if (!isRunning) {
     status(translate('statusStopped'));
     return;
@@ -352,7 +352,13 @@ socket.on('matched', async ({ otherId: id, initiator, isBot, botProfile }) => {
   sendBtn.disabled = false;
   console.log('>>> Setting status to Connected');
   
-  if (isBot && botProfile) {
+  if (partnerProfile) {
+    status(translate('statusConnectedBot', {
+      name: partnerProfile.name,
+      age: partnerProfile.age,
+      country: partnerProfile.country
+    }));
+  } else if (isBot && botProfile) {
     status(translate('statusConnectedBot', {
       name: botProfile.name,
       age: botProfile.age,

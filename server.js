@@ -912,6 +912,45 @@ io.on('connection', (socket) => {
       
       return true;
     };
+
+    const normalizeText = (value) => String(value || '').trim().toLowerCase();
+
+    const getClientIp = (socketObj) => {
+      const forwarded = socketObj?.handshake?.headers?.['x-forwarded-for'];
+      if (forwarded) {
+        return String(forwarded).split(',')[0].trim();
+      }
+      return normalizeText(socketObj?.handshake?.address);
+    };
+
+    // Prevent matching two concurrent connections that are likely the same person.
+    const isLikelySamePerson = (socketId1, socketId2) => {
+      const socket1 = io.sockets.sockets.get(socketId1);
+      const socket2 = io.sockets.sockets.get(socketId2);
+      if (!socket1 || !socket2) return false;
+      if (socket1.data.isBot || socket2.data.isBot) return false;
+
+      const profile1 = userProfiles.get(socketId1)?.profile;
+      const profile2 = userProfiles.get(socketId2)?.profile;
+      if (!profile1 || !profile2) return false;
+
+      const sameName = normalizeText(profile1.name) && normalizeText(profile1.name) === normalizeText(profile2.name);
+      const sameAge = Number(profile1.age) === Number(profile2.age);
+      const sameGender = normalizeText(profile1.gender) === normalizeText(profile2.gender);
+      const sameCountry = normalizeText(profile1.country) === normalizeText(profile2.country);
+      const sameProfile = sameName && sameAge && sameGender && sameCountry;
+
+      const ip1 = getClientIp(socket1);
+      const ip2 = getClientIp(socket2);
+      const sameIp = !!ip1 && ip1 === ip2;
+
+      if (sameProfile && sameIp) {
+        console.log(`>>> skip likely self-match between ${socketId1} and ${socketId2}`);
+        return true;
+      }
+
+      return false;
+    };
     
     // Get all available people (not paired, not self, not last partner, matching filters)
     const availableUsers = [];
@@ -922,7 +961,8 @@ io.on('connection', (socket) => {
       if (sid === socket.id) continue; // skip self
       if (pairs.has(sid)) continue; // skip already paired
       if (!searching.has(sid)) continue; // skip users not actively searching
-      if (lastPartner.get(socket.id) === sid) continue; // skip last partner
+      if (lastPartner.get(socket.id) === sid || lastPartner.get(sid) === socket.id) continue; // skip immediate rematch in either direction
+      if (isLikelySamePerson(socket.id, sid)) continue; // skip likely same person concurrent connection
       
       // Check if filters match
       if (!checkFiltersMatch(socket.id, sid)) continue;
@@ -987,6 +1027,18 @@ io.on('connection', (socket) => {
         }
       }
 
+      const toClientPartnerProfile = (profile) => {
+        if (!profile) return null;
+        return {
+          name: profile.name || 'Partner',
+          age: profile.age ?? 'N/A',
+          country: formatCountryName(profile.country)
+        };
+      };
+
+      const requesterPartnerProfile = toClientPartnerProfile(userProfiles.get(otherId)?.profile);
+      const otherPartnerProfile = toClientPartnerProfile(userProfiles.get(socket.id)?.profile);
+
       const session = startChatSession(socket.id, otherId);
 
       const participantA = buildParticipantDetails(socket.id).profile || {};
@@ -1000,8 +1052,19 @@ io.on('connection', (socket) => {
         isBotMatch: isMatchWithBot
       });
 
-      io.to(socket.id).emit('matched', { otherId, initiator: true, isBot: isMatchWithBot, botProfile });
-      io.to(otherId).emit('matched', { otherId: socket.id, initiator: false });
+      io.to(socket.id).emit('matched', {
+        otherId,
+        initiator: true,
+        isBot: isMatchWithBot,
+        botProfile,
+        partnerProfile: requesterPartnerProfile
+      });
+      io.to(otherId).emit('matched', {
+        otherId: socket.id,
+        initiator: false,
+        isBot: bots.has(socket.id),
+        partnerProfile: otherPartnerProfile
+      });
     } else {
       console.log(`>>> ${socket.id} has no available partners`);
       socket.emit('waiting');
@@ -1061,8 +1124,9 @@ io.on('connection', (socket) => {
     const partner = pairs.get(socket.id);
     
     if (partner) {
-      // Remember who we just disconnected from (unidirectional - only block for the person who clicked next)
+      // Remember who we just disconnected from for BOTH sides to avoid immediate rematch
       lastPartner.set(socket.id, partner);
+      lastPartner.set(partner, socket.id);
       console.log(`>>> set lastPartner: ${socket.id} -> ${partner}`);
       
       // If partner is a bot, add it back to searching pool
