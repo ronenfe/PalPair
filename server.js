@@ -6,6 +6,80 @@ const { Server } = require('socket.io');
 const { spawn } = require('child_process');
 const https = require('https');
 
+const SERVER_LOCK_PATH = path.join(__dirname, '.server.lock');
+let lockFileHandle = null;
+
+function isProcessAlive(pid) {
+  if (!Number.isInteger(pid) || pid <= 0) return false;
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function releaseServerLock() {
+  try {
+    lockFileHandle?.close();
+  } catch {}
+  lockFileHandle = null;
+
+  try {
+    if (fs.existsSync(SERVER_LOCK_PATH)) {
+      fs.unlinkSync(SERVER_LOCK_PATH);
+    }
+  } catch {}
+}
+
+function acquireServerLock() {
+  const writeLock = () => {
+    lockFileHandle = fs.openSync(SERVER_LOCK_PATH, 'wx');
+    fs.writeFileSync(
+      lockFileHandle,
+      JSON.stringify({ pid: process.pid, startedAt: new Date().toISOString() }),
+      'utf8'
+    );
+  };
+
+  try {
+    writeLock();
+    return;
+  } catch (error) {
+    if (error.code !== 'EEXIST') throw error;
+  }
+
+  let existingPid = null;
+  try {
+    const raw = fs.readFileSync(SERVER_LOCK_PATH, 'utf8');
+    existingPid = Number.parseInt(JSON.parse(raw)?.pid, 10);
+  } catch {}
+
+  if (isProcessAlive(existingPid)) {
+    console.error(`Another server instance is already running (PID ${existingPid}).`);
+    process.exit(1);
+    return;
+  }
+
+  try {
+    fs.unlinkSync(SERVER_LOCK_PATH);
+  } catch {}
+
+  try {
+    writeLock();
+  } catch {
+    console.error('Unable to acquire server lock; another instance may have started.');
+    process.exit(1);
+  }
+}
+
+acquireServerLock();
+process.on('exit', releaseServerLock);
+process.on('SIGTERM', () => {
+  releaseServerLock();
+  process.exit(0);
+});
+
 // Environment variables
 const PORT = process.env.PORT || 3000;
 const OLLAMA_URL = process.env.OLLAMA_URL || 'http://localhost:11434';
@@ -452,6 +526,9 @@ function sendJoinWebhook(payload) {
   const age = profile.age ?? 'N/A';
   const gender = profile.gender || 'N/A';
   const country = formatCountryName(profile.country);
+  const realUsersOnline = Number.isFinite(Number(payload?.realUsersOnline))
+    ? Number(payload.realUsersOnline)
+    : null;
   const eventTime = payload?.timestamp ? new Date(payload.timestamp).toLocaleString() : new Date().toLocaleString();
   const isNtfy = /(^|\.)ntfy\.sh$/i.test(target.hostname);
 
@@ -471,6 +548,7 @@ function sendJoinWebhook(payload) {
         `Age: ${age}`,
         `Gender: ${gender}`,
         `Country: ${country}`,
+        `Real users online: ${realUsersOnline ?? 'N/A'}`,
         `Time: ${eventTime}`
       ].join('\n');
 
@@ -773,6 +851,11 @@ function broadcastUserCount() {
   });
 }
 
+function getRealUsersOnlineCount() {
+  const connected = Array.from(io.sockets.sockets.values());
+  return connected.filter((s) => !s.data.isBot).length;
+}
+
 io.on('connection', (socket) => {
   console.log('connected', socket.id);
   broadcastUserCount();
@@ -790,6 +873,7 @@ io.on('connection', (socket) => {
         event: 'user-joined',
         timestamp: new Date().toISOString(),
         socketId: socket.id,
+        realUsersOnline: getRealUsersOnlineCount(),
         profile: {
           name: profile?.name || null,
           age: profile?.age ?? null,
@@ -841,23 +925,6 @@ io.on('connection', (socket) => {
 
   socket.on('find', ({ isBot } = {}) => {
     console.log('>>> find event received from', socket.id, isBot ? '(BOT)' : '(USER)');
-
-    if (!socket.data.isBot && !isBot && !notifiedJoins.has(socket.id)) {
-      const profileData = userProfiles.get(socket.id)?.profile || {};
-      notifiedJoins.add(socket.id);
-      sendJoinWebhook({
-        event: 'user-joined',
-        source: 'find',
-        timestamp: new Date().toISOString(),
-        socketId: socket.id,
-        profile: {
-          name: profileData.name || null,
-          age: profileData.age ?? null,
-          gender: profileData.gender || null,
-          country: profileData.country || null
-        }
-      });
-    }
     
     // Don't search if already paired
     if (pairs.has(socket.id)) {
