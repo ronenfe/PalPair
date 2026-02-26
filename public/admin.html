@@ -55,6 +55,31 @@
         overflow-y: auto;
         border-bottom: 1px solid #1f2937;
       }
+      .login-sessions {
+        max-height: 30vh;
+        overflow: auto;
+        border-bottom: 1px solid #1f2937;
+      }
+      .sessions-table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 0.82rem;
+      }
+      .sessions-table th,
+      .sessions-table td {
+        padding: 8px 10px;
+        border-bottom: 1px solid #1f2937;
+        text-align: left;
+        white-space: nowrap;
+      }
+      .sessions-table th {
+        position: sticky;
+        top: 0;
+        background: #0f172a;
+        z-index: 1;
+        font-weight: 600;
+      }
+      .sessions-table tr:last-child td { border-bottom: 0; }
       .online-item {
         padding: 10px 12px;
         border-bottom: 1px solid #1f2937;
@@ -122,6 +147,8 @@
       <div class="list">
         <div class="panel-title">Online Users</div>
         <div id="onlineUsers" class="online-users"></div>
+        <div class="panel-title">Login Sessions</div>
+        <div id="loginSessions" class="login-sessions"></div>
         <div class="panel-title">Chats</div>
         <div id="chatList"></div>
       </div>
@@ -144,6 +171,7 @@
 
       const chatListEl = document.getElementById('chatList');
       const onlineUsersEl = document.getElementById('onlineUsers');
+      const loginSessionsEl = document.getElementById('loginSessions');
       const chatMetaEl = document.getElementById('chatMeta');
       const chatMessagesEl = document.getElementById('chatMessages');
       const connStatusEl = document.getElementById('connStatus');
@@ -151,6 +179,7 @@
 
       const chatSummaries = new Map();
       let onlineUsers = [];
+      let loginSessions = [];
       let previousOnlineUserIds = new Set();
       let onlineUsersInitialized = false;
       let selectedChatId = null;
@@ -198,6 +227,16 @@
         if (!ts) return '-';
         const date = new Date(ts);
         return `${date.toLocaleDateString()} ${date.toLocaleTimeString()}`;
+      }
+
+      function fmtDuration(totalSeconds) {
+        const sec = Number(totalSeconds) || 0;
+        const hours = Math.floor(sec / 3600);
+        const minutes = Math.floor((sec % 3600) / 60);
+        const seconds = sec % 60;
+        if (hours > 0) return `${hours}h ${minutes}m ${seconds}s`;
+        if (minutes > 0) return `${minutes}m ${seconds}s`;
+        return `${seconds}s`;
       }
 
       function renderList() {
@@ -271,6 +310,56 @@
         onlineUsersInitialized = true;
       }
 
+      function renderLoginSessions() {
+        if (!loginSessions.length) {
+          loginSessionsEl.innerHTML = '<div class="empty">No login sessions yet.</div>';
+          return;
+        }
+
+        const nowMs = Date.now();
+        const sortedSessions = [...loginSessions].sort((a, b) => {
+          const aTime = Date.parse(a.loginAt) || 0;
+          const bTime = Date.parse(b.loginAt) || 0;
+          return bTime - aTime;
+        });
+
+        const rows = sortedSessions.slice(0, 200).map((session) => {
+          const loginMs = Date.parse(session.loginAt);
+          const logoutMs = session.logoutAt ? Date.parse(session.logoutAt) : nowMs;
+          const durationSeconds = Number.isFinite(loginMs) && Number.isFinite(logoutMs)
+            ? Math.max(0, Math.floor((logoutMs - loginMs) / 1000))
+            : (session.durationSeconds || 0);
+
+          return `
+            <tr>
+              <td>${(session.name || 'Unknown').replace(/</g, '&lt;').replace(/>/g, '&gt;')}</td>
+              <td>${fmtTime(session.loginAt)}</td>
+              <td>${fmtDuration(durationSeconds)}</td>
+              <td>${session.isOnline ? 'Online' : 'Offline'}</td>
+            </tr>
+          `;
+        }).join('');
+
+        loginSessionsEl.innerHTML = `
+          <table class="sessions-table">
+            <thead>
+              <tr>
+                <th>Name</th>
+                <th>Login Time</th>
+                <th>Duration</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody>${rows}</tbody>
+          </table>
+        `;
+      }
+
+      function processLoginSessions(sessions) {
+        loginSessions = sessions || [];
+        renderLoginSessions();
+      }
+
       function renderDetail(chat) {
         if (!chat) return;
 
@@ -331,15 +420,17 @@
         connStatusEl.textContent = `Auth/Error: ${err.message}`;
       });
 
-      socket.on('admin-init', ({ activeChats = [], completedChats = [], onlineUsers: users = [] }) => {
+      socket.on('admin-init', ({ activeChats = [], completedChats = [], onlineUsers: users = [], loginSessions: sessions = [] }) => {
         chatSummaries.clear();
         [...activeChats, ...completedChats].forEach((chat) => chatSummaries.set(chat.id, chat));
         processOnlineUsers(users);
+        processLoginSessions(sessions);
         renderList();
       });
 
-      socket.on('admin-online-users', ({ onlineUsers: users = [] }) => {
+      socket.on('admin-online-users', ({ onlineUsers: users = [], loginSessions: sessions = [] }) => {
         processOnlineUsers(users);
+        processLoginSessions(sessions);
       });
 
       async function refreshOnlineUsersFallback() {
@@ -348,10 +439,17 @@
           if (!response.ok) return;
           const payload = await response.json();
           processOnlineUsers(payload.onlineUsers || []);
+          processLoginSessions(payload.loginSessions || []);
         } catch (e) {
           // ignore fallback polling errors
         }
       }
+
+      setInterval(() => {
+        if (loginSessions.length) {
+          renderLoginSessions();
+        }
+      }, 1000);
 
       setInterval(refreshOnlineUsersFallback, 3000);
       refreshOnlineUsersFallback();

@@ -443,7 +443,10 @@ app.get('/api/debug', (req, res) => {
 });
 
 app.get('/api/admin-online-users', (req, res) => {
-  res.json({ onlineUsers: buildOnlineUsersSnapshot() });
+  res.json({
+    onlineUsers: buildOnlineUsersSnapshot(),
+    loginSessions: buildLoginSessionsSnapshot()
+  });
 });
 
 app.get('/api/user-count', (req, res) => {
@@ -491,6 +494,8 @@ const activeChatSessions = new Map(); // chatId -> session
 const completedChatSessions = []; // ended sessions
 const socketToChatSession = new Map(); // socketId -> chatId
 const notifiedJoins = new Set(); // prevent duplicate join webhooks per socket
+const activeLoginSessions = new Map(); // socketId -> { socketId, name, loginAt, lastSeenAt }
+const completedLoginSessions = []; // recent ended login sessions
 const joinWebhookStats = {
   configured: Boolean(JOIN_WEBHOOK_URL),
   attempts: 0,
@@ -603,6 +608,83 @@ function sendJoinWebhook(payload) {
   request.end();
 }
 
+function upsertLoginSession(socketId, name) {
+  if (!socketId) return;
+  const now = new Date().toISOString();
+  const existing = activeLoginSessions.get(socketId);
+
+  if (existing) {
+    existing.name = (name || existing.name || 'Unknown').trim() || 'Unknown';
+    existing.lastSeenAt = now;
+    return;
+  }
+
+  activeLoginSessions.set(socketId, {
+    socketId,
+    name: (name || 'Unknown').trim() || 'Unknown',
+    loginAt: now,
+    lastSeenAt: now
+  });
+}
+
+function closeLoginSession(socketId) {
+  const active = activeLoginSessions.get(socketId);
+  if (!active) return;
+
+  activeLoginSessions.delete(socketId);
+  completedLoginSessions.unshift({
+    ...active,
+    logoutAt: new Date().toISOString()
+  });
+
+  if (completedLoginSessions.length > 500) {
+    completedLoginSessions.pop();
+  }
+}
+
+function buildLoginSessionsSnapshot() {
+  const now = Date.now();
+
+  const active = Array.from(activeLoginSessions.values()).map((session) => {
+    const loginAtMs = Date.parse(session.loginAt);
+    const durationSeconds = Number.isFinite(loginAtMs)
+      ? Math.max(0, Math.floor((now - loginAtMs) / 1000))
+      : 0;
+
+    return {
+      socketId: session.socketId,
+      name: session.name,
+      loginAt: session.loginAt,
+      logoutAt: null,
+      durationSeconds,
+      isOnline: true
+    };
+  });
+
+  const recentCompleted = completedLoginSessions.slice(0, 300).map((session) => {
+    const loginAtMs = Date.parse(session.loginAt);
+    const logoutAtMs = Date.parse(session.logoutAt);
+    const durationSeconds = Number.isFinite(loginAtMs) && Number.isFinite(logoutAtMs)
+      ? Math.max(0, Math.floor((logoutAtMs - loginAtMs) / 1000))
+      : 0;
+
+    return {
+      socketId: session.socketId,
+      name: session.name,
+      loginAt: session.loginAt,
+      logoutAt: session.logoutAt,
+      durationSeconds,
+      isOnline: false
+    };
+  });
+
+  return [...active, ...recentCompleted].sort((a, b) => {
+    const aTime = Date.parse(a.loginAt) || 0;
+    const bTime = Date.parse(b.loginAt) || 0;
+    return bTime - aTime;
+  });
+}
+
 function buildParticipantDetails(socketId) {
   const profileData = userProfiles.get(socketId);
   const botData = botProfiles.get(socketId);
@@ -674,7 +756,8 @@ function buildOnlineUsersSnapshot() {
 
 function emitAdminOnlineUsers() {
   adminNamespace.emit('admin-online-users', {
-    onlineUsers: buildOnlineUsersSnapshot()
+    onlineUsers: buildOnlineUsersSnapshot(),
+    loginSessions: buildLoginSessionsSnapshot()
   });
 }
 
@@ -773,7 +856,8 @@ adminNamespace.on('connection', (socket) => {
   socket.emit('admin-init', {
     activeChats: Array.from(activeChatSessions.values()).map(buildChatSummary),
     completedChats: completedChatSessions.slice(0, 200).map(buildChatSummary),
-    onlineUsers: buildOnlineUsersSnapshot()
+    onlineUsers: buildOnlineUsersSnapshot(),
+    loginSessions: buildLoginSessionsSnapshot()
   });
 
   socket.on('admin-get-chat', ({ chatId } = {}) => {
@@ -865,6 +949,9 @@ io.on('connection', (socket) => {
   socket.on('set-profile', ({ profile, filters }) => {
     userProfiles.set(socket.id, { profile, filters });
     console.log(`Profile set for ${socket.id}:`, profile, 'Filters:', filters);
+    if (!socket.data.isBot) {
+      upsertLoginSession(socket.id, profile?.name);
+    }
     emitAdminOnlineUsers();
 
     if (!socket.data.isBot && !notifiedJoins.has(socket.id)) {
@@ -1108,17 +1195,6 @@ io.on('connection', (socket) => {
 
       const session = startChatSession(socket.id, otherId);
 
-      const participantA = buildParticipantDetails(socket.id).profile || {};
-      const participantB = buildParticipantDetails(otherId).profile || {};
-      sendJoinWebhook({
-        event: 'chat-started',
-        timestamp: new Date().toISOString(),
-        chatId: session?.id || null,
-        participantA,
-        participantB,
-        isBotMatch: isMatchWithBot
-      });
-
       io.to(socket.id).emit('matched', {
         otherId,
         initiator: true,
@@ -1217,6 +1293,7 @@ io.on('connection', (socket) => {
 
   socket.on('disconnect', () => {
     console.log('disconnect', socket.id);
+    closeLoginSession(socket.id);
     endChatSessionForSocket(socket.id, 'disconnect');
     const partner = pairs.get(socket.id);
     if (partner) {
