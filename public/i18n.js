@@ -65,6 +65,8 @@
       statusWaiting: 'Waiting for a partner...',
       statusConnected: 'Connected',
       statusConnectedBot: 'Connected to {name}, {age}, from {country}',
+      statusPublicRoom: 'Public room',
+      statusReturnedPublic: 'Back in public room',
       reportPrompt: 'Report safety concern (child safety, harassment, explicit content, etc.). Please include useful details:',
       reportSubmitted: 'Safety report submitted. Thank you for helping keep Palpair safe.'
     },

@@ -496,6 +496,7 @@ const socketToChatSession = new Map(); // socketId -> chatId
 const notifiedJoins = new Set(); // prevent duplicate join webhooks per socket
 const activeLoginSessions = new Map(); // socketId -> { socketId, name, loginAt, lastSeenAt }
 const completedLoginSessions = []; // recent ended login sessions
+const publicRoomEvents = []; // recent public room system/user messages
 const joinWebhookStats = {
   configured: Boolean(JOIN_WEBHOOK_URL),
   attempts: 0,
@@ -606,6 +607,35 @@ function sendJoinWebhook(payload) {
   });
   request.write(body);
   request.end();
+}
+
+function buildPublicRoomEvent({ type, text, socketId = null, name = null, clientMsgId = null }) {
+  return {
+    id: `room_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+    type,
+    text: String(text || '').trim(),
+    socketId,
+    name: name || null,
+    clientMsgId: clientMsgId || null,
+    timestamp: new Date().toISOString()
+  };
+}
+
+function pushPublicRoomEvent(event) {
+  if (!event || !event.text) return null;
+  publicRoomEvents.push(event);
+  if (publicRoomEvents.length > 300) {
+    publicRoomEvents.shift();
+  }
+  io.emit('public-room-event', event);
+  return event;
+}
+
+function getSocketDisplayName(socketId) {
+  const profileName = userProfiles.get(socketId)?.profile?.name;
+  const botName = botProfiles.get(socketId)?.name;
+  const resolvedName = (profileName || botName || 'Guest').trim();
+  return resolvedName || 'Guest';
 }
 
 function upsertLoginSession(socketId, name) {
@@ -759,6 +789,69 @@ function emitAdminOnlineUsers() {
     onlineUsers: buildOnlineUsersSnapshot(),
     loginSessions: buildLoginSessionsSnapshot()
   });
+}
+
+function buildPublicOnlineUsersSnapshot() {
+  const users = [];
+  for (const socket of io.sockets.sockets.values()) {
+    const socketId = socket.id;
+    const isBot = !!socket.data?.isBot;
+    const profile = userProfiles.get(socketId)?.profile || {};
+    const botProfile = botProfiles.get(socketId) || {};
+    const profileName = profile.name || botProfile.name;
+    const fallbackName = `Guest-${socketId.substring(0, 4)}`;
+    users.push({
+      socketId,
+      name: (profileName || fallbackName).trim(),
+      isBot,
+      gender: (profile.gender || botProfile.gender || '').toString().toLowerCase(),
+      searching: searching.has(socketId),
+      paired: pairs.has(socketId)
+    });
+  }
+
+  users.sort((a, b) => a.name.localeCompare(b.name));
+  return users;
+}
+
+function emitPublicOnlineUsers() {
+  io.emit('online-users', {
+    users: buildPublicOnlineUsersSnapshot()
+  });
+}
+
+function getPublicRoomBotSocketIds() {
+  const botSocketIds = [];
+  for (const socket of io.sockets.sockets.values()) {
+    if (!socket.data?.isBot) continue;
+    if (!socket.data?.publicRoomJoined) continue;
+    botSocketIds.push(socket.id);
+  }
+  return botSocketIds;
+}
+
+function maybeEmitBotReplyToHumanPublicMessage(fromSocketId, text) {
+  const botSocketIds = getPublicRoomBotSocketIds();
+  if (botSocketIds.length < 1) return;
+
+  const humanName = getSocketDisplayName(fromSocketId);
+  const speakerId = botSocketIds[Math.floor(Math.random() * botSocketIds.length)];
+  const botProfile = botProfiles.get(speakerId) || userProfiles.get(speakerId)?.profile || {};
+  const speakerName = getSocketDisplayName(speakerId);
+  const replyBody = getFallbackResponse(text, botProfile);
+  const replyText = `${humanName}, ${replyBody}`;
+
+  setTimeout(() => {
+    const speakerSocket = io.sockets.sockets.get(speakerId);
+    if (!speakerSocket || !speakerSocket.data?.publicRoomJoined) return;
+
+    pushPublicRoomEvent(buildPublicRoomEvent({
+      type: 'message',
+      text: replyText,
+      socketId: speakerId,
+      name: speakerName
+    }));
+  }, 900);
 }
 
 function startChatSession(socketIdA, socketIdB) {
@@ -942,8 +1035,12 @@ function getRealUsersOnlineCount() {
 
 io.on('connection', (socket) => {
   console.log('connected', socket.id);
+  socket.data.isBot = false;
+  socket.data.publicRoomJoined = false;
+  socket.data.publicRoomName = null;
   broadcastUserCount();
   emitAdminOnlineUsers();
+  emitPublicOnlineUsers();
   
   // Handle profile setting
   socket.on('set-profile', ({ profile, filters }) => {
@@ -969,11 +1066,30 @@ io.on('connection', (socket) => {
         }
       });
     }
+
+    if (!socket.data.isBot) {
+      const displayName = getSocketDisplayName(socket.id);
+      socket.data.publicRoomName = displayName;
+
+      socket.emit('public-room-init', {
+        events: publicRoomEvents.slice(-150)
+      });
+
+      if (!socket.data.publicRoomJoined) {
+        socket.data.publicRoomJoined = true;
+        pushPublicRoomEvent(buildPublicRoomEvent({
+          type: 'system',
+          text: `${displayName} joined the public room`
+        }));
+      }
+    }
+
+    emitPublicOnlineUsers();
   });
-  socket.data.isBot = false; // default is real user
 
   socket.on('register-bot', () => {
     socket.data.isBot = true;
+    socket.data.publicRoomJoined = true;
     bots.add(socket.id);
     // Generate random profile for this bot session
     const profile = randomBotProfile();
@@ -984,6 +1100,7 @@ io.on('connection', (socket) => {
     profile.gender = 'female'; // All bots are female personas
     
     botProfiles.set(socket.id, profile);
+    socket.data.publicRoomName = profile.name;
     
     // Set bot profile in userProfiles so it can be matched
     userProfiles.set(socket.id, {
@@ -1004,10 +1121,35 @@ io.on('connection', (socket) => {
     // Add bot to searching pool (bots are always available)
     searching.add(socket.id);
     console.log(`>>> ${socket.id} added to searching pool (bot)`);
+
+    pushPublicRoomEvent(buildPublicRoomEvent({
+      type: 'system',
+      text: `${profile.name} joined the public room`
+    }));
+
     broadcastUserCount();
     emitAdminOnlineUsers();
+    emitPublicOnlineUsers();
     
     console.log(`>>> ${socket.id} registered as bot - Name: ${profile.name}, Age: ${profile.age}, Gender: ${profile.gender}, Country: ${profile.countryName} (${profile.country})`);
+  });
+
+  socket.on('public-chat-message', ({ text, clientMsgId } = {}) => {
+    if (socket.data.isBot) return;
+    if (!socket.data.publicRoomJoined) return;
+
+    const safeText = String(text || '').trim().slice(0, 500);
+    if (!safeText) return;
+
+    pushPublicRoomEvent(buildPublicRoomEvent({
+      type: 'message',
+      text: safeText,
+      socketId: socket.id,
+      name: getSocketDisplayName(socket.id),
+      clientMsgId: typeof clientMsgId === 'string' ? clientMsgId.slice(0, 80) : null
+    }));
+
+    maybeEmitBotReplyToHumanPublicMessage(socket.id, safeText);
   });
 
   socket.on('find', ({ isBot } = {}) => {
@@ -1029,6 +1171,7 @@ io.on('connection', (socket) => {
     searching.add(socket.id);
     console.log(`>>> ${socket.id} added to searching pool`);
     emitAdminOnlineUsers();
+    emitPublicOnlineUsers();
     
     // Helper function to check if two users match each other's filters
     const checkFiltersMatch = (socketId1, socketId2) => {
@@ -1167,6 +1310,7 @@ io.on('connection', (socket) => {
       searching.delete(otherId);
       console.log(`>>> removed ${socket.id} and ${otherId} from searching pool`);
       emitAdminOnlineUsers();
+      emitPublicOnlineUsers();
       
       const isMatchWithBot = bots.has(otherId);
       let botProfile = null;
@@ -1260,6 +1404,7 @@ io.on('connection', (socket) => {
     searching.delete(socket.id);
     console.log(`>>> removed ${socket.id} from searching pool`);
     emitAdminOnlineUsers();
+    emitPublicOnlineUsers();
   });
 
   socket.on('next', () => {
@@ -1288,11 +1433,14 @@ io.on('connection', (socket) => {
       pairs.delete(partner);
       endChatSessionForSocket(socket.id, 'next');
       emitAdminOnlineUsers();
+      emitPublicOnlineUsers();
     }
   });
 
   socket.on('disconnect', () => {
     console.log('disconnect', socket.id);
+    const publicRoomName = socket.data.publicRoomName || getSocketDisplayName(socket.id);
+    const wasInPublicRoom = socket.data.publicRoomJoined;
     closeLoginSession(socket.id);
     endChatSessionForSocket(socket.id, 'disconnect');
     const partner = pairs.get(socket.id);
@@ -1315,6 +1463,13 @@ io.on('connection', (socket) => {
     searching.delete(socket.id);
     lastPartner.delete(socket.id);
     notifiedJoins.delete(socket.id);
+
+    if (wasInPublicRoom) {
+      pushPublicRoomEvent(buildPublicRoomEvent({
+        type: 'system',
+        text: `${publicRoomName} left the public room`
+      }));
+    }
     
     // Also remove this user from anyone's lastPartner
     for (const [key, value] of lastPartner.entries()) {
@@ -1326,6 +1481,7 @@ io.on('connection', (socket) => {
     // Broadcast updated count when someone disconnects
     broadcastUserCount();
     emitAdminOnlineUsers();
+    emitPublicOnlineUsers();
   });
 });
 

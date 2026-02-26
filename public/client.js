@@ -14,6 +14,8 @@ const translate = i18n ? i18n.t : (key, params = {}) => {
     statusWaiting: 'Waiting for a partner...',
     statusConnected: 'Connected',
     statusConnectedBot: 'Connected to {name}, {age}, from {country}',
+    statusPublicRoom: 'Public room',
+    statusReturnedPublic: 'Back in public room',
     reportPrompt: 'Report safety concern (child safety, harassment, explicit content, etc.). Please include useful details:',
     reportSubmitted: 'Safety report submitted. Thank you for helping keep Palpair safe.',
     start: 'Start',
@@ -64,7 +66,7 @@ const chatInterface = document.getElementById('chatInterface');
 const saveProfileBtn = document.getElementById('saveProfileBtn');
 const userCounterWrap = document.getElementById('userCounter');
 
-const toggleBtn = document.getElementById('toggleBtn');
+const goRandomBtn = document.getElementById('goRandomBtn');
 const nextBtn = document.getElementById('nextBtn');
 const reportBtn = document.getElementById('reportBtn');
 const chatToggleBtn = document.getElementById('chatToggleBtn');
@@ -72,12 +74,15 @@ const statusEl = document.getElementById('status');
 const localVideo = document.getElementById('localVideo');
 const remoteVideo = document.getElementById('remoteVideo');
 const remotePlaceholder = document.getElementById('remotePlaceholder');
+const aiPartnerBadge = document.getElementById('aiPartnerBadge');
 const chatContainer = document.querySelector('.chat-container');
 
 // Chat elements
 const chatInput = document.getElementById('chatInput');
 const sendBtn = document.getElementById('sendBtn');
 const chatMessages = document.getElementById('chatMessages');
+const onlineUsersList = document.getElementById('onlineUsersList');
+const AI_PARTNER_LABEL = '🤖 AI Partner';
 
 function syncViewportHeight() {
   const viewportHeight = Math.round(window.visualViewport?.height || window.innerHeight || document.documentElement.clientHeight);
@@ -107,6 +112,7 @@ if (remotePlaceholder) {
 let localStream = null;
 let pc = null;
 let isActive = false;
+const pendingPublicMessageIds = new Set();
 
 // User profile and filters
 let userProfile = null;
@@ -134,20 +140,6 @@ function loadSavedFormValues() {
 
 // Load saved values when page loads
 loadSavedFormValues();
-
-function mountStageOverlays() {
-  const partnerStage = document.querySelector('.videos .video-wrap:nth-child(2)');
-  if (!partnerStage) return;
-  if (userCounterWrap && userCounterWrap.parentElement !== partnerStage) {
-    partnerStage.appendChild(userCounterWrap);
-  }
-  if (statusEl && statusEl.parentElement !== partnerStage) {
-    partnerStage.appendChild(statusEl);
-  }
-  if (chatContainer && chatContainer.parentElement !== partnerStage) {
-    partnerStage.appendChild(chatContainer);
-  }
-}
 
 // Profile form handler
 saveProfileBtn.addEventListener('click', () => {
@@ -204,8 +196,11 @@ saveProfileBtn.addEventListener('click', () => {
   profileForm.style.display = 'none';
   chatInterface.style.display = 'block';
   document.body.classList.add('chat-active');
-  mountStageOverlays();
-  setChatCollapsed(true);
+  setRandomMode(false);
+  setChatCollapsed(false);
+  chatInput.disabled = false;
+  sendBtn.disabled = false;
+  status(translate('statusPublicRoom'));
 });
 let otherId = null;
 let isRunning = false;
@@ -223,78 +218,92 @@ function setChatCollapsed(collapsed) {
   }
 }
 
+function setRandomMode(active) {
+  isRunning = active;
+  document.body.classList.toggle('random-active', active);
+
+  if (goRandomBtn) {
+    goRandomBtn.textContent = active ? '⏹ Stop Random' : '🎥 Go Random';
+  }
+
+  if (!active) {
+    nextBtn.disabled = true;
+    reportBtn.disabled = true;
+    if (pc) {
+      pc.close();
+      pc = null;
+    }
+    otherId = null;
+    clearRemoteVideo();
+    if (localStream) {
+      localStream.getTracks().forEach((t) => t.stop());
+      localStream = null;
+    }
+    localVideo.srcObject = null;
+    setAiPartnerBadge(false);
+    setChatCollapsed(false);
+  }
+}
+
+function setAiPartnerBadge(visible) {
+  if (!aiPartnerBadge) return;
+  aiPartnerBadge.style.display = visible ? 'inline-flex' : 'none';
+}
+
+function stopRandomMode({ notifyPartner = false, notifySearching = true, statusText = translate('statusReturnedPublic') } = {}) {
+  if (!isRunning) return;
+
+  if (notifyPartner && otherId) {
+    socket.emit('next');
+  }
+  if (notifySearching) {
+    socket.emit('stop-searching');
+  }
+
+  setRandomMode(false);
+  status(statusText === 'statusReturnedPublic' ? 'Back in public room' : statusText);
+}
+
 if (chatToggleBtn) {
   chatToggleBtn.onclick = () => {
     setChatCollapsed(!isChatCollapsed);
   };
 }
 
-toggleBtn.onclick = async () => {
-  if (!isRunning) {
-    // START: start camera and find partner
-    try {
-      otherId = null;
-      clearChat();
-      nextBtn.disabled = true;
-      chatInput.disabled = true;
-      sendBtn.disabled = true;
+if (goRandomBtn) {
+  goRandomBtn.onclick = async () => {
+    if (!isRunning) {
+      try {
+        otherId = null;
+        setRandomMode(true);
+        nextBtn.disabled = true;
+        reportBtn.disabled = false;
+        setChatCollapsed(true);
 
-      localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
-      localVideo.srcObject = localStream;
-      
-      // Ensure remote video is hidden when starting
-      remoteVideo.style.display = 'none';
-      if (remotePlaceholder) {
-        remotePlaceholder.style.display = 'block';
+        localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+        localVideo.srcObject = localStream;
+        
+        // Ensure remote video is hidden when starting
+        remoteVideo.style.display = 'none';
+        if (remotePlaceholder) {
+          remotePlaceholder.style.display = 'block';
+        }
+
+        status(translate('statusFindingPartner'));
+        socket.emit('find');
+      } catch (e) {
+        console.error(e);
+        setRandomMode(false);
+        status(translate('statusCameraError'));
       }
-      
-      isRunning = true;
-      toggleBtn.textContent = '⏹';
-      toggleBtn.setAttribute('aria-label', translate('stop'));
-      status(translate('statusFindingPartner'));
-      socket.emit('find');
-    } catch (e) {
-      console.error(e);
-      status(translate('statusCameraError'));
+    } else {
+      stopRandomMode({ notifyPartner: true, notifySearching: true, statusText: translate('statusReturnedPublic') });
     }
-  } else {
-    // STOP: close everything
-    console.log('>>> Stop button clicked, otherId:', otherId);
-    isRunning = false;
-    toggleBtn.textContent = '▶';
-    toggleBtn.setAttribute('aria-label', translate('start'));
-    nextBtn.disabled = true;
-    chatInput.disabled = true;
-    sendBtn.disabled = true;
-    
-    // Notify remote partner if connected
-    if (otherId) {
-      socket.emit('next');
-    }
-
-    // Remove from searching pool
-    socket.emit('stop-searching');
-    
-    // Stop local stream
-    if (localStream) {
-      localStream.getTracks().forEach(t => t.stop());
-      localStream = null;
-    }
-    
-    // Close peer connection
-    if (pc) pc.close();
-    pc = null;
-    otherId = null;
-    
-    // Clear videos
-    localVideo.srcObject = null;
-    clearRemoteVideo();
-    clearChat();
-    status(translate('statusStopped'));
-  }
-};
+  };
+}
 
 nextBtn.onclick = () => {
+  if (!isRunning) return;
   // Find next partner while already connected
   console.log('>>> Find Next button clicked, otherId:', otherId);
   status(translate('statusFindingNext'));
@@ -304,23 +313,36 @@ nextBtn.onclick = () => {
   otherId = null;
   nextBtn.disabled = true;
   clearRemoteVideo();
-  // immediately start a new find
   socket.emit('find');
 };
 
 
 socket.on('waiting', () => {
   if (!isRunning) {
-    status(translate('statusStopped'));
+    status(translate('statusPublicRoom'));
     return;
   }
+  setAiPartnerBadge(false);
   console.log('>>> waiting event received');
   status(translate('statusWaiting'));
 });
 
+socket.on('public-room-init', ({ events = [] } = {}) => {
+  clearChat();
+  events.forEach((event) => addPublicRoomEvent(event));
+});
+
+socket.on('public-room-event', (event) => {
+  addPublicRoomEvent(event);
+});
+
+socket.on('online-users', ({ users = [] } = {}) => {
+  renderOnlineUsers(users);
+});
+
 socket.on('matched', async ({ otherId: id, initiator, isBot, botProfile, partnerProfile }) => {
   if (!isRunning) {
-    status(translate('statusStopped'));
+    status(translate('statusPublicRoom'));
     return;
   }
   console.log('>>> Matched event received, otherId:', id, 'initiator:', initiator, 'isBot:', isBot);
@@ -348,21 +370,24 @@ socket.on('matched', async ({ otherId: id, initiator, isBot, botProfile, partner
   
   otherId = id;
   nextBtn.disabled = false;
-  chatInput.disabled = false;
-  sendBtn.disabled = false;
+  setAiPartnerBadge(!!isBot);
   console.log('>>> Setting status to Connected');
-  
-  if (partnerProfile) {
+
+  if (isBot) {
+    const source = partnerProfile || botProfile;
+    const details = source
+      ? translate('statusConnectedBot', {
+          name: source.name,
+          age: source.age,
+          country: source.country
+        })
+      : translate('statusConnected');
+    status(`${AI_PARTNER_LABEL} · ${details}`);
+  } else if (partnerProfile) {
     status(translate('statusConnectedBot', {
       name: partnerProfile.name,
       age: partnerProfile.age,
       country: partnerProfile.country
-    }));
-  } else if (isBot && botProfile) {
-    status(translate('statusConnectedBot', {
-      name: botProfile.name,
-      age: botProfile.age,
-      country: botProfile.country
     }));
   } else {
     status(translate('statusConnected'));
@@ -400,38 +425,21 @@ socket.on('signal', async ({ from, data }) => {
 
 socket.on('peer-disconnected', ({ id }) => {
   if (!isRunning) {
-    status(translate('statusStopped'));
+    status(translate('statusPublicRoom'));
     return;
   }
-  // partner was disconnected (or asked to leave) — always reset state
   console.log('*** peer-disconnected event received from', id, '***');
-  status(translate('statusWaiting'));
-  if (pc) pc.close();
-  pc = null;
-  clearRemoteVideo();
-  otherId = null;
-  nextBtn.disabled = true;
-  clearChat();
-  // automatically find next partner
-  socket.emit('find');
+  stopRandomMode({ notifyPartner: false, notifySearching: false, statusText: translate('statusReturnedPublic') });
 });
 
 // some server flows emit `peer-left` to ensure clients handle forced leaves
 socket.on('peer-left', ({ id, reason }) => {
   if (!isRunning) {
-    status(translate('statusStopped'));
+    status(translate('statusPublicRoom'));
     return;
   }
   console.log('*** peer-left event received *** id:', id, 'reason:', reason);
-  status(translate('statusWaiting'));
-  if (pc) pc.close();
-  pc = null;
-  clearRemoteVideo();
-  otherId = null;
-  nextBtn.disabled = true;
-  clearChat();
-  // automatically find next partner
-  socket.emit('find');
+  stopRandomMode({ notifyPartner: false, notifySearching: false, statusText: translate('statusReturnedPublic') });
 });
 
 // Chat events
@@ -456,9 +464,20 @@ reportBtn.onclick = () => {
 
 sendBtn.onclick = () => {
   const text = chatInput.value.trim();
-  if (text && otherId) {
+  if (!text) return;
+
+  if (isRunning && otherId) {
     socket.emit('chat-message', { to: otherId, text });
     addChatMessage(text, 'local');
+    chatInput.value = '';
+    return;
+  }
+
+  if (!isRunning) {
+    const clientMsgId = `msg_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+    pendingPublicMessageIds.add(clientMsgId);
+    addChatMessage(text, 'local');
+    socket.emit('public-chat-message', { text, clientMsgId });
     chatInput.value = '';
   }
 };
@@ -498,6 +517,7 @@ function clearRemoteVideo() {
     try { remoteVideo.pause(); remoteVideo.removeAttribute('src'); remoteVideo.removeAttribute('srcObject'); } catch (e) {}
     try { remoteVideo.style.display = 'none'; } catch (e) {}
     try { remoteVideo.style.backgroundColor = '#000'; } catch (e) {}
+    setAiPartnerBadge(false);
     if (remotePlaceholder) {
       try { remotePlaceholder.style.display = 'block'; } catch (e) {}
     }
@@ -546,6 +566,25 @@ function status(s) {
   statusEl.textContent = s;
 }
 
+function addPublicRoomEvent(event = {}) {
+  if (!event || !event.text) return;
+
+  if (event.clientMsgId && event.socketId === socket.id && pendingPublicMessageIds.has(event.clientMsgId)) {
+    pendingPublicMessageIds.delete(event.clientMsgId);
+    return;
+  }
+
+  if (event.type === 'system') {
+    addChatMessage(event.text, 'system');
+    return;
+  }
+
+  const isMine = event.socketId === socket.id;
+  const sender = isMine ? 'local' : 'remote';
+  const prefix = isMine ? '' : `${event.name || 'Guest'}: `;
+  addChatMessage(`${prefix}${event.text}`, sender);
+}
+
 function addChatMessage(text, sender) {
   const div = document.createElement('div');
   div.className = `chat-message ${sender}`;
@@ -557,4 +596,37 @@ function addChatMessage(text, sender) {
 function clearChat() {
   chatMessages.innerHTML = '';
   chatInput.value = '';
+}
+
+function renderOnlineUsers(users = []) {
+  if (!onlineUsersList) return;
+  onlineUsersList.innerHTML = '';
+
+  if (!users.length) {
+    const emptyItem = document.createElement('li');
+    emptyItem.className = 'online-user-item empty';
+    emptyItem.textContent = 'No users online';
+    onlineUsersList.appendChild(emptyItem);
+    return;
+  }
+
+  users.forEach((user) => {
+    const item = document.createElement('li');
+    item.className = 'online-user-item';
+
+    const nameEl = document.createElement('span');
+    nameEl.className = 'online-user-name';
+    const genderValue = String(user.gender || '').toLowerCase();
+    const genderEmoji = user.isBot ? '🤖' : (genderValue === 'male' ? '👨' : (genderValue === 'female' ? '👩' : '👤'));
+    const baseName = user.socketId === socket.id ? `${user.name} (You)` : user.name;
+    nameEl.textContent = `${genderEmoji} ${baseName}`;
+
+    const stateEl = document.createElement('span');
+    stateEl.className = 'online-user-state';
+    stateEl.textContent = user.paired ? 'In random' : (user.searching ? 'Searching' : 'In room');
+
+    item.appendChild(nameEl);
+    item.appendChild(stateEl);
+    onlineUsersList.appendChild(item);
+  });
 }
