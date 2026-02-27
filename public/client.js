@@ -218,6 +218,18 @@ function setChatCollapsed(collapsed) {
     chatToggleBtn.setAttribute('aria-label', collapsed ? 'Expand chat' : 'Collapse chat');
     chatToggleBtn.setAttribute('title', collapsed ? 'Expand Chat' : 'Collapse Chat');
   }
+  // Switch chat context: if in random mode, show match chat, else show public room
+  if (!collapsed) {
+    if (isRunning && otherId) {
+      // Show only private chat for current random session
+      chatMessages.innerHTML = privateChatHistory;
+      chatMessages.scrollTop = chatMessages.scrollHeight;
+    } else {
+      // Restore public chat history ONLY if not in random chat
+      chatMessages.innerHTML = publicChatHistory;
+      chatMessages.scrollTop = chatMessages.scrollHeight;
+    }
+  }
 }
 
 function setRandomMode(active) {
@@ -229,6 +241,17 @@ function setRandomMode(active) {
   }
   if (stopRandomBtn) {
     stopRandomBtn.style.display = active ? 'flex' : 'none';
+  }
+
+  if (active) {
+    // Entering random chat: clear chat area and private history
+    clearChat();
+    privateChatHistory = '';
+    // Ensure matchmaking is triggered
+    socket.emit('find');
+  } else {
+    // Leaving random chat: request latest public room events from server
+    socket.emit('get-public-room-events');
   }
 
   if (!active) {
@@ -341,6 +364,12 @@ socket.on('waiting', () => {
 socket.on('public-room-init', ({ events = [] } = {}) => {
   clearChat();
   events.forEach((event) => addPublicRoomEvent(event));
+  // Save the latest rendered public chat history
+  publicChatHistory = chatMessages.innerHTML;
+  // Force reflow/repaint for CSS rendering fix
+  chatMessages.style.display = 'none';
+  void chatMessages.offsetHeight;
+  chatMessages.style.display = '';
 });
 
 socket.on('public-room-event', (event) => {
@@ -463,7 +492,11 @@ socket.on('peer-left', ({ id, reason }) => {
 
 // Chat events
 socket.on('chat-message', ({ from, text }) => {
-  addChatMessage(text, 'remote');
+  if (isRunning && otherId) {
+    addChatMessage(text, 'remote');
+    // Save to private chat history
+    privateChatHistory = chatMessages.innerHTML;
+  }
 });
 
 socket.on('report-received', () => {
@@ -489,6 +522,8 @@ sendBtn.onclick = () => {
     socket.emit('chat-message', { to: otherId, text });
     addChatMessage(text, 'local');
     chatInput.value = '';
+    // Save to private chat history
+    privateChatHistory = chatMessages.innerHTML;
     return;
   }
 
@@ -498,6 +533,8 @@ sendBtn.onclick = () => {
     addChatMessage(text, 'local');
     socket.emit('public-chat-message', { text, clientMsgId });
     chatInput.value = '';
+    // Save to public chat history
+    publicChatHistory = chatMessages.innerHTML;
   }
 };
 
@@ -596,6 +633,13 @@ function addPublicRoomEvent(event = {}) {
 
   if (event.type === 'system') {
     addChatMessage(event.text, 'system');
+    // Save system messages to public chat history ONLY if not in random chat
+    if (!isRunning) publicChatHistory = chatMessages.innerHTML;
+    return;
+  }
+
+  if (isRunning && otherId) {
+    // Ignore public room events while in random chat
     return;
   }
 
@@ -603,6 +647,8 @@ function addPublicRoomEvent(event = {}) {
   const sender = isMine ? 'local' : 'remote';
   const prefix = isMine ? '' : `${event.name || 'Guest'}: `;
   addChatMessage(`${prefix}${event.text}`, sender);
+  // Save after adding ONLY if not in random chat
+  if (!isRunning) publicChatHistory = chatMessages.innerHTML;
 }
 
 function addChatMessage(text, sender) {

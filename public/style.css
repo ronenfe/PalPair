@@ -89,6 +89,10 @@ body.chat-active {
   max-width: 1200px;
   margin: 0 auto;
   animation: fadeIn 0.5s ease-in;
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  min-height: 0;
 }
 
 body:not(.chat-active) .container {
@@ -99,8 +103,6 @@ body:not(.chat-active) .container {
   display: flex;
   flex-direction: column;
   justify-content: center;
-rgin: 0 auto;
-  animation: fadeIn 0.5s ease-in;
 }
 
 body:not(.chat-active) .container {
@@ -651,13 +653,15 @@ body.chat-active .videos .video-wrap:nth-child(2) #status {
 }
 
 /* Chat Styles */
-.chat-container { 
+.chat-container {
   width: 100%;
   border-radius: 16px;
   background: rgba(255, 255, 255, 0.95);
   display: flex;
   flex-direction: column;
-  height: 400px;
+  flex: 1 1 0%;
+  min-height: 0;
+  max-height: 100%;
   box-shadow: 0 10px 40px rgba(0,0,0,0.2);
   overflow: hidden;
   transform-origin: top center;
@@ -668,8 +672,12 @@ body.chat-active .videos .video-wrap:nth-child(2) #status {
   width: min(100%, 1180px);
   margin: 12px auto 0;
   display: flex;
+  flex-direction: column;
   gap: 14px;
   align-items: stretch;
+  flex: 1 1 0%;
+  min-height: 0;
+  height: 100%;
 }
 
 .online-users-panel {
@@ -765,14 +773,16 @@ body.chat-active:not(.random-active) .chat-container {
   bottom: auto;
   width: auto;
   margin: 0;
-  flex: 1;
-  height: calc(var(--app-height) - var(--chat-safe-top) - var(--chat-safe-bottom) - 170px);
-  min-height: 320px;
+  flex: 1 1 0%;
+  min-height: 0;
   transform: none;
+  max-height: calc(var(--app-height) - var(--chat-safe-top) - var(--chat-safe-bottom) - 24px);
 }
 
-.chat-messages { 
-  flex: 1;
+.chat-messages {
+  flex: 1 1 0%;
+  min-height: 0;
+  max-height: 100%;
   overflow-y: auto;
   padding: 20px;
   background: #f8f9fa;
@@ -801,7 +811,10 @@ body.chat-active:not(.random-active) .chat-container {
   border-radius: 12px;
   word-wrap: break-word;
   max-width: 80%;
+  min-width: 60px;
   animation: slideIn 0.3s ease-out;
+  overflow: visible;
+  box-shadow: 0 2px 8px rgba(102, 126, 234, 0.08);
 }
 
 @keyframes slideIn {
@@ -839,12 +852,13 @@ body.chat-active:not(.random-active) .chat-container {
   font-weight: 500;
 }
 
-.chat-input-wrap { 
+.chat-input-wrap {
   display: flex;
   gap: 12px;
   padding: 20px;
   background: white;
   border-top: 1px solid #e0e0e0;
+  flex-shrink: 0;
 }
 
 #chatInput { 
