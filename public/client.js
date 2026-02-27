@@ -1,6 +1,21 @@
+// Chat elements
+const chatInput = document.getElementById('chatInput');
+const sendBtn = document.getElementById('sendBtn');
+const chatMessages = document.getElementById('chatMessages');
+const onlineUsersList = document.getElementById('onlineUsersList');
+const AI_PARTNER_LABEL = '🤖 AI Partner';
+
 // Chat histories for public and private (random) chat
 let publicChatHistory = '';
 let privateChatHistory = '';
+
+// Restore public chat history from localStorage on page load
+const savedPublicChat = localStorage.getItem('publicChatHistory');
+if (savedPublicChat) {
+  publicChatHistory = savedPublicChat;
+  chatMessages.innerHTML = publicChatHistory;
+}
+
 // Online users panel toggle logic (top bar)
 const usersPanelToggle = document.getElementById('usersPanelToggle');
 const onlineUsersPanel = document.getElementById('onlineUsersPanel');
@@ -98,13 +113,6 @@ const remotePlaceholder = document.getElementById('remotePlaceholder');
 const aiPartnerBadge = document.getElementById('aiPartnerBadge');
 const chatContainer = document.querySelector('.chat-container');
 
-// Chat elements
-const chatInput = document.getElementById('chatInput');
-const sendBtn = document.getElementById('sendBtn');
-const chatMessages = document.getElementById('chatMessages');
-const onlineUsersList = document.getElementById('onlineUsersList');
-const AI_PARTNER_LABEL = '🤖 AI Partner';
-
 function syncViewportHeight() {
   const viewportHeight = Math.round(window.visualViewport?.height || window.innerHeight || document.documentElement.clientHeight);
   document.documentElement.style.setProperty('--app-height', `${viewportHeight}px`);
@@ -130,7 +138,37 @@ if (remotePlaceholder) {
   remotePlaceholder.style.display = 'block';
 }
 
-// ...existing code...
+let localStream = null;
+let pc = null;
+let isActive = false;
+const pendingPublicMessageIds = new Set();
+
+// User profile and filters
+let userProfile = null;
+let userFilters = null;
+
+// Load saved form values from localStorage
+function loadSavedFormValues() {
+  const saved = localStorage.getItem('videochatProfile');
+  if (saved) {
+    try {
+      const data = JSON.parse(saved);
+      if (data.name) document.getElementById('userName').value = data.name;
+      if (data.age) document.getElementById('userAge').value = data.age;
+      if (data.gender) document.getElementById('userGender').value = data.gender;
+      if (data.country) document.getElementById('userCountry').value = data.country;
+      if (data.minAge) document.getElementById('minAge').value = data.minAge;
+      if (data.maxAge) document.getElementById('maxAge').value = data.maxAge;
+      if (data.filterGender) document.getElementById('filterGender').value = data.filterGender;
+      if (data.filterCountry) document.getElementById('filterCountry').value = data.filterCountry;
+    } catch (e) {
+      console.error('Error loading saved profile:', e);
+    }
+  }
+}
+
+// Load saved values when page loads
+loadSavedFormValues();
 
 // Profile form handler
 saveProfileBtn.addEventListener('click', () => {
@@ -217,14 +255,7 @@ if (remotePlaceholder) {
   remotePlaceholder.style.display = 'block';
 }
 
-let localStream = null;
-let pc = null;
-let isActive = false;
-const pendingPublicMessageIds = new Set();
 
-// User profile and filters
-let userProfile = null;
-let userFilters = null;
 
 // Load saved form values from localStorage
 function loadSavedFormValues() {
@@ -645,11 +676,9 @@ sendBtn.onclick = () => {
   if (!isRunning) {
     const clientMsgId = `msg_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
     pendingPublicMessageIds.add(clientMsgId);
-    addChatMessage(text, 'local');
     socket.emit('public-chat-message', { text, clientMsgId });
     chatInput.value = '';
-    // Save to public chat history
-    publicChatHistory = chatMessages.innerHTML;
+    // Save to public chat history will happen when event is received
   }
 };
 
@@ -740,25 +769,13 @@ function status(s) {
 
 function addPublicRoomEvent(event = {}) {
   if (!event || typeof event.text !== 'string' || !event.text.trim()) return;
-
-  if (event.clientMsgId && event.socketId === socket.id && pendingPublicMessageIds.has(event.clientMsgId)) {
-    pendingPublicMessageIds.delete(event.clientMsgId);
-    return;
-  }
-
-  if (event.type === 'system') {
-    addChatMessage(event.text, 'system');
-    // Save system messages to public chat history ONLY if not in random chat
-    if (!isRunning) publicChatHistory = chatMessages.innerHTML;
-    return;
-  }
-
   // Always add public room events to history, even if in private chat
   const isMine = event.socketId === socket.id;
   const sender = isMine ? 'local' : 'remote';
   const prefix = isMine ? '' : `${event.name || 'Guest'}: `;
   addChatMessage(`${prefix}${event.text}`, sender);
   publicChatHistory = chatMessages.innerHTML;
+  localStorage.setItem('publicChatHistory', publicChatHistory);
 }
 
 function addChatMessage(text, sender) {
