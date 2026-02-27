@@ -773,6 +773,7 @@ body.chat-active:not(.random-active) .chat-container {
 
 .chat-messages { 
   flex: 1;
+  max-height: 82vw;
   overflow-y: auto;
   padding: 20px;
   background: #f8f9fa;
