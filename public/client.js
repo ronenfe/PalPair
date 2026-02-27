@@ -1,37 +1,3 @@
-// Chat elements
-const chatInput = document.getElementById('chatInput');
-const sendBtn = document.getElementById('sendBtn');
-const chatMessages = document.getElementById('chatMessages');
-const onlineUsersList = document.getElementById('onlineUsersList');
-const AI_PARTNER_LABEL = '🤖 AI Partner';
-
-// Chat histories for public and private (random) chat
-let publicChatHistory = '';
-let privateChatHistory = '';
-
-// Restore public chat history from localStorage on page load
-const savedPublicChat = localStorage.getItem('publicChatHistory');
-if (savedPublicChat) {
-  publicChatHistory = savedPublicChat;
-  chatMessages.innerHTML = publicChatHistory;
-}
-
-// Online users panel toggle logic (top bar)
-const usersPanelToggle = document.getElementById('usersPanelToggle');
-const onlineUsersPanel = document.getElementById('onlineUsersPanel');
-if (usersPanelToggle && onlineUsersPanel) {
-  usersPanelToggle.addEventListener('click', (e) => {
-    e.stopPropagation();
-    const isOpen = onlineUsersPanel.classList.contains('open');
-    if (isOpen) {
-      onlineUsersPanel.classList.remove('open');
-      setTimeout(() => { onlineUsersPanel.style.display = 'none'; }, 180);
-    } else {
-      onlineUsersPanel.classList.add('open');
-      onlineUsersPanel.style.display = 'flex';
-    }
-  });
-}
 const socket = io();
 console.log('Socket.IO client initialized');
 
@@ -68,11 +34,11 @@ const matchSound = new Audio('data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAAB
 socket.on('connect', () => console.log('Connected to server'));
 socket.on('disconnect', (reason) => console.log('Disconnected from server:', reason));
 
-// Update connected users count in panel title
+// Update user counter (real users + bots)
 socket.on('user-count', ({ total = 0, humans = 0, bots = 0 }) => {
-  const connectedUsersCount = document.getElementById('connectedUsersCount');
-  if (connectedUsersCount) {
-    connectedUsersCount.textContent = total || (humans + bots);
+  const userCountEl = document.getElementById('userCount');
+  if (userCountEl) {
+    userCountEl.textContent = total || (humans + bots);
   }
 });
 
@@ -97,7 +63,6 @@ refreshUserCountFallback();
 // Profile form elements
 const profileForm = document.getElementById('profileForm');
 const chatInterface = document.getElementById('chatInterface');
-const videosUI = document.getElementById('videosUI');
 const saveProfileBtn = document.getElementById('saveProfileBtn');
 const userCounterWrap = document.getElementById('userCounter');
 
@@ -112,6 +77,13 @@ const remoteVideo = document.getElementById('remoteVideo');
 const remotePlaceholder = document.getElementById('remotePlaceholder');
 const aiPartnerBadge = document.getElementById('aiPartnerBadge');
 const chatContainer = document.querySelector('.chat-container');
+
+// Chat elements
+const chatInput = document.getElementById('chatInput');
+const sendBtn = document.getElementById('sendBtn');
+const chatMessages = document.getElementById('chatMessages');
+const onlineUsersList = document.getElementById('onlineUsersList');
+const AI_PARTNER_LABEL = '🤖 AI Partner';
 
 function syncViewportHeight() {
   const viewportHeight = Math.round(window.visualViewport?.height || window.innerHeight || document.documentElement.clientHeight);
@@ -221,8 +193,9 @@ saveProfileBtn.addEventListener('click', () => {
   // Send profile to server
   socket.emit('set-profile', { profile: userProfile, filters: userFilters });
 
-  // Show public chat page after profile is saved
-  showPublicChatPage();
+  // Show chat interface
+  profileForm.style.display = 'none';
+  chatInterface.style.display = 'block';
   document.body.classList.add('chat-active');
   setRandomMode(false);
   setChatCollapsed(false);
@@ -230,129 +203,6 @@ saveProfileBtn.addEventListener('click', () => {
   sendBtn.disabled = false;
   status(translate('statusPublicRoom'));
 });
-
-function showProfilePage() {
-  profilePage.style.display = 'block';
-  publicChatPage.style.display = 'none';
-  privateChatPage.style.display = 'none';
-}
-
-function showPublicChatPage() {
-  profilePage.style.display = 'none';
-  publicChatPage.style.display = 'block';
-  privateChatPage.style.display = 'none';
-}
-
-function showPrivateChatPage() {
-  profilePage.style.display = 'none';
-  publicChatPage.style.display = 'none';
-  privateChatPage.style.display = 'block';
-}
-
-// Initialize video display state
-remoteVideo.style.display = 'none';
-if (remotePlaceholder) {
-  remotePlaceholder.style.display = 'block';
-}
-
-
-
-// Load saved form values from localStorage
-function loadSavedFormValues() {
-  const saved = localStorage.getItem('videochatProfile');
-  if (saved) {
-    try {
-      const data = JSON.parse(saved);
-      if (data.name) document.getElementById('userName').value = data.name;
-      if (data.age) document.getElementById('userAge').value = data.age;
-      if (data.gender) document.getElementById('userGender').value = data.gender;
-      if (data.country) document.getElementById('userCountry').value = data.country;
-      if (data.minAge) document.getElementById('minAge').value = data.minAge;
-      if (data.maxAge) document.getElementById('maxAge').value = data.maxAge;
-      if (data.filterGender) document.getElementById('filterGender').value = data.filterGender;
-      if (data.filterCountry) document.getElementById('filterCountry').value = data.filterCountry;
-    } catch (e) {
-      console.error('Error loading saved profile:', e);
-    }
-  }
-}
-
-// Load saved values when page loads
-loadSavedFormValues();
-
-// Profile form handler
-saveProfileBtn.addEventListener('click', () => {
-  const name = document.getElementById('userName').value.trim();
-  const age = parseInt(document.getElementById('userAge').value);
-  const gender = document.getElementById('userGender').value;
-  const country = document.getElementById('userCountry').value;
-  const minAge = parseInt(document.getElementById('minAge').value);
-  const maxAge = parseInt(document.getElementById('maxAge').value);
-  const filterGender = document.getElementById('filterGender').value;
-  const filterCountry = document.getElementById('filterCountry').value;
-
-  // Validation
-  if (!name || !age || !gender || !country) {
-    alert(translate('alertFillProfile'));
-    return;
-  }
-
-  if (age < 18 || age > 100) {
-    alert(translate('alertAgeRange'));
-    return;
-  }
-
-  if (minAge > maxAge) {
-    alert(translate('alertMinMax'));
-    return;
-  }
-
-  // Save to localStorage
-  localStorage.setItem('videochatProfile', JSON.stringify({
-    name,
-    age,
-    gender,
-    country,
-    minAge,
-    maxAge,
-    filterGender,
-    filterCountry
-  }));
-
-  // Save profile
-  userProfile = { name, age, gender, country };
-  userFilters = {
-    minAge,
-    maxAge,
-    gender: filterGender,
-    country: filterCountry
-  };
-
-  // Send profile to server
-  socket.emit('set-profile', { profile: userProfile, filters: userFilters });
-
-  // Show public chat page after profile is saved
-  showPublicChatPage();
-  document.body.classList.add('chat-active');
-  setRandomMode(false);
-  setChatCollapsed(false);
-  chatInput.disabled = false;
-  sendBtn.disabled = false;
-  status(translate('statusPublicRoom'));
-});
-
-function showVideosUI() {
-  if (videosUI) videosUI.style.display = 'block';
-  if (chatInterface) chatInterface.style.display = 'none';
-  document.body.classList.add('chat-active');
-}
-
-function showChatInterface() {
-  if (chatInterface) chatInterface.style.display = 'block';
-  if (videosUI) videosUI.style.display = 'none';
-  document.body.classList.add('chat-active');
-}
-
 let otherId = null;
 let isRunning = false;
 let isChatCollapsed = false;
@@ -368,18 +218,6 @@ function setChatCollapsed(collapsed) {
     chatToggleBtn.setAttribute('aria-label', collapsed ? 'Expand chat' : 'Collapse chat');
     chatToggleBtn.setAttribute('title', collapsed ? 'Expand Chat' : 'Collapse Chat');
   }
-  // Switch chat context: if in random mode, show match chat, else show public room
-  if (!collapsed) {
-    if (isRunning && otherId) {
-      // Show only private chat for current random session
-      chatMessages.innerHTML = privateChatHistory;
-      chatMessages.scrollTop = chatMessages.scrollHeight;
-    } else {
-      // Restore public chat history ONLY if not in random chat
-      chatMessages.innerHTML = publicChatHistory;
-      chatMessages.scrollTop = chatMessages.scrollHeight;
-    }
-  }
 }
 
 function setRandomMode(active) {
@@ -391,19 +229,6 @@ function setRandomMode(active) {
   }
   if (stopRandomBtn) {
     stopRandomBtn.style.display = active ? 'flex' : 'none';
-  }
-
-  if (active) {
-    // Entering random chat: show private chat page, do NOT clear or overwrite chatMessages
-    showPrivateChatPage();
-    privateChatHistory = '';
-    // Ensure matchmaking is triggered
-    socket.emit('find');
-  } else {
-    // Leaving random chat: show public chat page, do NOT reload chatMessages
-    showPublicChatPage();
-    // Request latest public room events from server
-    socket.emit('get-public-room-events');
   }
 
   if (!active) {
@@ -421,7 +246,7 @@ function setRandomMode(active) {
     }
     localVideo.srcObject = null;
     setAiPartnerBadge(false);
-    // Do NOT call setChatCollapsed(false) here; it can clear chatMessages
+    setChatCollapsed(false);
   }
 }
 
@@ -455,15 +280,14 @@ if (goRandomBtn) {
     if (!isRunning) {
       try {
         otherId = null;
-        // Get local video stream FIRST
-        localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
-        localVideo.srcObject = localStream;
-
         setRandomMode(true);
         nextBtn.disabled = true;
         reportBtn.disabled = false;
         setChatCollapsed(true);
 
+        localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+        localVideo.srcObject = localStream;
+        
         // Ensure remote video is hidden when starting
         remoteVideo.style.display = 'none';
         if (remotePlaceholder) {
@@ -515,8 +339,8 @@ socket.on('waiting', () => {
 });
 
 socket.on('public-room-init', ({ events = [] } = {}) => {
-  // Do not modify chatMessages DOM. Only update publicChatHistory from current DOM.
-  publicChatHistory = chatMessages.innerHTML;
+  clearChat();
+  events.forEach((event) => addPublicRoomEvent(event));
 });
 
 socket.on('public-room-event', (event) => {
@@ -639,11 +463,7 @@ socket.on('peer-left', ({ id, reason }) => {
 
 // Chat events
 socket.on('chat-message', ({ from, text }) => {
-  if (isRunning && otherId) {
-    addChatMessage(text, 'remote');
-    // Save to private chat history
-    privateChatHistory = chatMessages.innerHTML;
-  }
+  addChatMessage(text, 'remote');
 });
 
 socket.on('report-received', () => {
@@ -669,17 +489,15 @@ sendBtn.onclick = () => {
     socket.emit('chat-message', { to: otherId, text });
     addChatMessage(text, 'local');
     chatInput.value = '';
-    // Save to private chat history
-    privateChatHistory = chatMessages.innerHTML;
     return;
   }
 
   if (!isRunning) {
     const clientMsgId = `msg_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
     pendingPublicMessageIds.add(clientMsgId);
+    addChatMessage(text, 'local');
     socket.emit('public-chat-message', { text, clientMsgId });
     chatInput.value = '';
-    // Save to public chat history will happen when event is received
   }
 };
 
@@ -740,26 +558,10 @@ async function createPeerConnection(targetId, initiator) {
   };
 
   pc.ontrack = (e) => {
-    console.log('>>> ontrack event received', e.streams);
-    if (e.streams && e.streams[0]) {
-      const videoTracks = e.streams[0].getVideoTracks();
-      console.log('Remote stream videoTracks:', videoTracks);
-      if (videoTracks.length > 0) {
-        remoteVideo.style.display = 'block';
-        if (remotePlaceholder) remotePlaceholder.style.display = 'none';
-        remoteVideo.srcObject = e.streams[0];
-      } else {
-        remoteVideo.style.display = 'none';
-        if (remotePlaceholder) remotePlaceholder.style.display = 'block';
-        remoteVideo.srcObject = null;
-        console.warn('No remote video track received');
-      }
-    } else {
-      remoteVideo.style.display = 'none';
-      if (remotePlaceholder) remotePlaceholder.style.display = 'block';
-      remoteVideo.srcObject = null;
-      console.warn('No remote stream received');
-    }
+    console.log('>>> ontrack event received');
+    remoteVideo.style.display = 'block';
+    if (remotePlaceholder) remotePlaceholder.style.display = 'none';
+    remoteVideo.srcObject = e.streams[0];
   };
 
   // Add local tracks FIRST
@@ -781,27 +583,34 @@ async function createPeerConnection(targetId, initiator) {
 
 function status(s) {
   console.log('>>> STATUS:', s);
-  if (statusEl) statusEl.textContent = s;
+  statusEl.textContent = s;
 }
 
 function addPublicRoomEvent(event = {}) {
-  if (!event || typeof event.text !== 'string' || !event.text.trim()) return;
-  // Always add public room events to history, even if in private chat
+  if (!event || !event.text) return;
+
+  if (event.clientMsgId && event.socketId === socket.id && pendingPublicMessageIds.has(event.clientMsgId)) {
+    pendingPublicMessageIds.delete(event.clientMsgId);
+    return;
+  }
+
+  if (event.type === 'system') {
+    addChatMessage(event.text, 'system');
+    return;
+  }
+
   const isMine = event.socketId === socket.id;
   const sender = isMine ? 'local' : 'remote';
   const prefix = isMine ? '' : `${event.name || 'Guest'}: `;
   addChatMessage(`${prefix}${event.text}`, sender);
-  publicChatHistory = chatMessages.innerHTML;
-  localStorage.setItem('publicChatHistory', publicChatHistory);
 }
 
 function addChatMessage(text, sender) {
-  if (typeof text !== 'string' || !text.trim()) return;
   const div = document.createElement('div');
   div.className = `chat-message ${sender}`;
   chatMessages.appendChild(div);
 
-  const messageText = text;
+  const messageText = String(text || '');
   const shouldType = sender === 'remote' && messageText.length > 0;
 
   if (!shouldType) {
