@@ -1,3 +1,22 @@
+// Chat histories for public and private (random) chat
+let publicChatHistory = '';
+let privateChatHistory = '';
+// Online users panel toggle logic (top bar)
+const usersPanelToggle = document.getElementById('usersPanelToggle');
+const onlineUsersPanel = document.getElementById('onlineUsersPanel');
+if (usersPanelToggle && onlineUsersPanel) {
+  usersPanelToggle.addEventListener('click', (e) => {
+    e.stopPropagation();
+    const isOpen = onlineUsersPanel.classList.contains('open');
+    if (isOpen) {
+      onlineUsersPanel.classList.remove('open');
+      setTimeout(() => { onlineUsersPanel.style.display = 'none'; }, 180);
+    } else {
+      onlineUsersPanel.classList.add('open');
+      onlineUsersPanel.style.display = 'flex';
+    }
+  });
+}
 const socket = io();
 console.log('Socket.IO client initialized');
 
@@ -34,11 +53,11 @@ const matchSound = new Audio('data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAAB
 socket.on('connect', () => console.log('Connected to server'));
 socket.on('disconnect', (reason) => console.log('Disconnected from server:', reason));
 
-// Update user counter (real users + bots)
+// Update connected users count in panel title
 socket.on('user-count', ({ total = 0, humans = 0, bots = 0 }) => {
-  const userCountEl = document.getElementById('userCount');
-  if (userCountEl) {
-    userCountEl.textContent = total || (humans + bots);
+  const connectedUsersCount = document.getElementById('connectedUsersCount');
+  if (connectedUsersCount) {
+    connectedUsersCount.textContent = total || (humans + bots);
   }
 });
 
@@ -620,7 +639,7 @@ async function createPeerConnection(targetId, initiator) {
 
 function status(s) {
   console.log('>>> STATUS:', s);
-  statusEl.textContent = s;
+  if (statusEl) statusEl.textContent = s;
 }
 
 function addPublicRoomEvent(event = {}) {

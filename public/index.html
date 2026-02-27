@@ -11,9 +11,7 @@
     <div class="container">
       <h1>Palpair</h1>
       <p class="subtitle" data-i18n="subtitle">Meet new people instantly • Video chat worldwide</p>
-      <div id="userCounter" class="user-counter-wrap">
-        <span class="counter-chip"><span id="userCount">0</span>&nbsp;<span data-i18n="peopleOnline">people online now</span></span>
-      </div>
+      <!-- userCounter removed -->
       
       <!-- Profile Form -->
       <div id="profileForm" class="profile-form">
@@ -467,11 +465,14 @@
       </div>
 
 
-      <button id="goRandomBtn" class="go-random-btn" aria-label="Go random">🎥 Go Random</button>
+      <div class="top-bar">
+        <div style="flex:1"></div>
+        <button id="goRandomBtn" class="go-random-btn" aria-label="Go random">🎥 Go Random</button>
+        <div class="users-panel-group">
+          <button id="usersPanelToggle" class="users-panel-toggle" aria-label="Show connected users" title="Show connected users">👥</button>
+        </div>
+      </div>
       <button id="stopRandomBtn" class="stop-random-btn" aria-label="Stop random" title="Stop Random" style="display:none;">⏹</button>
-
-      <p id="status" data-i18n="idle">Idle</p>
-
       <div class="room-layout">
         <!-- Chat Interface -->
         <div class="chat-container">
@@ -486,15 +487,13 @@
             <button id="sendBtn" data-i18n="send">Send</button>
           </div>
         </div>
-
-        <aside class="online-users-panel" aria-live="polite">
-          <h3 class="online-users-title">Connected users</h3>
-          <ul id="onlineUsersList" class="online-users-list"></ul>
-        </aside>
-        </div>
+        <!-- Users panel moved to body -->
+          <!-- Users panel moved outside for full width overlay -->
+          <aside class="online-users-panel" id="onlineUsersPanel" aria-live="polite" style="display:none;">
+            <h3 class="online-users-title">Connected users</h3>
+            <ul id="onlineUsersList" class="online-users-list"></ul>
+          </aside>
       </div>
-      </div>
-    </div>
 
     <script src="/socket.io/socket.io.js"></script>
     <script src="/i18n.js"></script>
