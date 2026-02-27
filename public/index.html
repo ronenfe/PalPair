@@ -13,8 +13,8 @@
       <p class="subtitle" data-i18n="subtitle">Meet new people instantly • Video chat worldwide</p>
       <!-- userCounter removed -->
       
-      <!-- Profile Form -->
-      <div id="profileForm" class="profile-form">
+      <!-- Profile Page -->
+      <div id="profilePage" class="profile-form">
         <h3 data-i18n="yourProfile">Your Profile</h3>
         <input id="userName" type="text" placeholder="Name" data-i18n-placeholder="namePlaceholder" required />
         <input id="userAge" type="number" placeholder="Age" data-i18n-placeholder="agePlaceholder" min="18" max="100" required />
@@ -447,52 +447,52 @@
       </div>
       
       <!-- Main Chat Interface (hidden initially) -->
-      <div id="chatInterface" style="display:none">
-      <div class="videos">
-        <div class="video-wrap">
-          <video id="localVideo" autoplay muted playsinline></video>
-        </div>
-        <div class="video-wrap">
-          <video id="remoteVideo" autoplay playsinline></video>
-          <div id="remotePlaceholder" class="video-placeholder"></div>
-          <div id="aiPartnerBadge" class="ai-partner-badge" aria-live="polite" style="display:none">🤖 AI Partner</div>
-        </div>
-        <div class="controls controls-overlay">
-          <button id="nextBtn" class="control-btn control-primary" disabled aria-label="Find next partner" title="Find Next">⏭</button>
-          <button id="reportBtn" class="control-btn control-danger" aria-label="Report concern" title="Report">⚑</button>
-          <button id="chatToggleBtn" class="control-btn control-secondary" aria-label="Collapse chat" title="Collapse Chat">💬</button>
-        </div>
-      </div>
-
-
-      <div class="top-bar">
-        <div style="flex:1"></div>
-        <button id="goRandomBtn" class="go-random-btn" aria-label="Go random">🎥 Go Random</button>
-        <div class="users-panel-group">
-          <button id="usersPanelToggle" class="users-panel-toggle" aria-label="Show connected users" title="Show connected users">👥</button>
-        </div>
-      </div>
-      <button id="stopRandomBtn" class="stop-random-btn" aria-label="Stop random" title="Stop Random" style="display:none;">⏹</button>
-      <div class="room-layout">
-        <!-- Chat Interface -->
-        <div class="chat-container">
-          <div id="chatMessages" class="chat-messages"></div>
-          <div class="chat-input-wrap">
-            <input 
-              id="chatInput" 
-              type="text" 
-              placeholder="Type a message..."
-              data-i18n-placeholder="typeMessage" 
-            />
-            <button id="sendBtn" data-i18n="send">Send</button>
+      <!-- Public Chat Page (hidden initially) -->
+      <div id="publicChatPage" style="display:none">
+        <div class="top-bar">
+          <button id="goRandomBtn" class="go-random-btn" aria-label="Go random">🎥 Go Random</button>
+          <div class="users-panel-group">
+            <button id="usersPanelToggle" class="users-panel-toggle" aria-label="Show connected users" title="Show connected users">👥</button>
           </div>
         </div>
-        <!-- Users panel moved to body -->
-          <!-- Users panel moved outside for full width overlay -->
+        <div class="room-layout">
+          <div class="chat-container">
+            <div id="chatMessages" class="chat-messages"></div>
+            <div class="chat-input-wrap">
+              <input 
+                id="chatInput" 
+                type="text" 
+                placeholder="Type a message..."
+                data-i18n-placeholder="typeMessage" 
+              />
+              <button id="sendBtn" data-i18n="send">Send</button>
+            </div>
+          </div>
           <aside class="online-users-panel" id="onlineUsersPanel" aria-live="polite" style="display:none;">
             <h3 class="online-users-title">Connected users</h3>
             <ul id="onlineUsersList" class="online-users-list"></ul>
           </aside>
+        </div>
+      </div>
+
+      <!-- Private Chat Page (hidden initially) -->
+      <div id="privateChatPage" style="display:none">
+        <div class="videos">
+          <div class="video-wrap">
+            <video id="localVideo" autoplay muted playsinline></video>
+          </div>
+          <div class="video-wrap">
+            <video id="remoteVideo" autoplay playsinline></video>
+            <div id="remotePlaceholder" class="video-placeholder"></div>
+            <div id="aiPartnerBadge" class="ai-partner-badge" aria-live="polite" style="display:none">🤖 AI Partner</div>
+          </div>
+          <div class="controls controls-overlay">
+            <button id="nextBtn" class="control-btn control-primary" disabled aria-label="Find next partner" title="Find Next">⏭</button>
+            <button id="reportBtn" class="control-btn control-danger" aria-label="Report concern" title="Report">⚑</button>
+            <button id="chatToggleBtn" class="control-btn control-secondary" aria-label="Collapse chat" title="Collapse Chat">💬</button>
+            <button id="stopRandomBtn" class="control-btn control-danger stop-bottom-right" aria-label="Stop random" title="Stop Random">⏹</button>
+          </div>
+        </div>
       </div>
 
     <script src="/socket.io/socket.io.js"></script>

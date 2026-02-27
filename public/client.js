@@ -82,6 +82,7 @@ refreshUserCountFallback();
 // Profile form elements
 const profileForm = document.getElementById('profileForm');
 const chatInterface = document.getElementById('chatInterface');
+const videosUI = document.getElementById('videosUI');
 const saveProfileBtn = document.getElementById('saveProfileBtn');
 const userCounterWrap = document.getElementById('userCounter');
 
@@ -122,6 +123,111 @@ window.addEventListener('resize', syncViewportHeight);
 window.addEventListener('orientationchange', () => {
   setTimeout(syncViewportHeight, 120);
 });
+
+// Initialize video display state
+remoteVideo.style.display = 'none';
+if (remotePlaceholder) {
+  remotePlaceholder.style.display = 'block';
+}
+
+// ...existing code...
+  const saved = localStorage.getItem('videochatProfile');
+  if (saved) {
+    try {
+      const data = JSON.parse(saved);
+      if (data.name) document.getElementById('userName').value = data.name;
+      if (data.age) document.getElementById('userAge').value = data.age;
+      if (data.gender) document.getElementById('userGender').value = data.gender;
+      if (data.country) document.getElementById('userCountry').value = data.country;
+      if (data.minAge) document.getElementById('minAge').value = data.minAge;
+      if (data.maxAge) document.getElementById('maxAge').value = data.maxAge;
+      if (data.filterGender) document.getElementById('filterGender').value = data.filterGender;
+      if (data.filterCountry) document.getElementById('filterCountry').value = data.filterCountry;
+    } catch (e) {
+      console.error('Error loading saved profile:', e);
+    }
+  }
+// Load saved values when page loads
+loadSavedFormValues();
+
+// Profile form handler
+saveProfileBtn.addEventListener('click', () => {
+  const name = document.getElementById('userName').value.trim();
+  const age = parseInt(document.getElementById('userAge').value);
+  const gender = document.getElementById('userGender').value;
+  const country = document.getElementById('userCountry').value;
+  const minAge = parseInt(document.getElementById('minAge').value);
+  const maxAge = parseInt(document.getElementById('maxAge').value);
+  const filterGender = document.getElementById('filterGender').value;
+  const filterCountry = document.getElementById('filterCountry').value;
+
+  // Validation
+  if (!name || !age || !gender || !country) {
+    alert(translate('alertFillProfile'));
+    return;
+  }
+
+  if (age < 18 || age > 100) {
+    alert(translate('alertAgeRange'));
+    return;
+  }
+
+  if (minAge > maxAge) {
+    alert(translate('alertMinMax'));
+    return;
+  }
+
+  // Save to localStorage
+  localStorage.setItem('videochatProfile', JSON.stringify({
+    name,
+    age,
+    gender,
+    country,
+    minAge,
+    maxAge,
+    filterGender,
+    filterCountry
+  }));
+
+  // Save profile
+  userProfile = { name, age, gender, country };
+  userFilters = {
+    minAge,
+    maxAge,
+    gender: filterGender,
+    country: filterCountry
+  };
+
+  // Send profile to server
+  socket.emit('set-profile', { profile: userProfile, filters: userFilters });
+
+  // Show public chat page after profile is saved
+  showPublicChatPage();
+  document.body.classList.add('chat-active');
+  setRandomMode(false);
+  setChatCollapsed(false);
+  chatInput.disabled = false;
+  sendBtn.disabled = false;
+  status(translate('statusPublicRoom'));
+});
+
+function showProfilePage() {
+  profilePage.style.display = 'block';
+  publicChatPage.style.display = 'none';
+  privateChatPage.style.display = 'none';
+}
+
+function showPublicChatPage() {
+  profilePage.style.display = 'none';
+  publicChatPage.style.display = 'block';
+  privateChatPage.style.display = 'none';
+}
+
+function showPrivateChatPage() {
+  profilePage.style.display = 'none';
+  publicChatPage.style.display = 'none';
+  privateChatPage.style.display = 'block';
+}
 
 // Initialize video display state
 remoteVideo.style.display = 'none';
@@ -212,9 +318,8 @@ saveProfileBtn.addEventListener('click', () => {
   // Send profile to server
   socket.emit('set-profile', { profile: userProfile, filters: userFilters });
 
-  // Show chat interface
-  profileForm.style.display = 'none';
-  chatInterface.style.display = 'block';
+  // Show public chat page after profile is saved
+  showPublicChatPage();
   document.body.classList.add('chat-active');
   setRandomMode(false);
   setChatCollapsed(false);
@@ -222,6 +327,19 @@ saveProfileBtn.addEventListener('click', () => {
   sendBtn.disabled = false;
   status(translate('statusPublicRoom'));
 });
+
+function showVideosUI() {
+  if (videosUI) videosUI.style.display = 'block';
+  if (chatInterface) chatInterface.style.display = 'none';
+  document.body.classList.add('chat-active');
+}
+
+function showChatInterface() {
+  if (chatInterface) chatInterface.style.display = 'block';
+  if (videosUI) videosUI.style.display = 'none';
+  document.body.classList.add('chat-active');
+}
+
 let otherId = null;
 let isRunning = false;
 let isChatCollapsed = false;
