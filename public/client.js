@@ -131,24 +131,6 @@ if (remotePlaceholder) {
 }
 
 // ...existing code...
-  const saved = localStorage.getItem('videochatProfile');
-  if (saved) {
-    try {
-      const data = JSON.parse(saved);
-      if (data.name) document.getElementById('userName').value = data.name;
-      if (data.age) document.getElementById('userAge').value = data.age;
-      if (data.gender) document.getElementById('userGender').value = data.gender;
-      if (data.country) document.getElementById('userCountry').value = data.country;
-      if (data.minAge) document.getElementById('minAge').value = data.minAge;
-      if (data.maxAge) document.getElementById('maxAge').value = data.maxAge;
-      if (data.filterGender) document.getElementById('filterGender').value = data.filterGender;
-      if (data.filterCountry) document.getElementById('filterCountry').value = data.filterCountry;
-    } catch (e) {
-      console.error('Error loading saved profile:', e);
-    }
-  }
-// Load saved values when page loads
-loadSavedFormValues();
 
 // Profile form handler
 saveProfileBtn.addEventListener('click', () => {
@@ -381,16 +363,16 @@ function setRandomMode(active) {
   }
 
   if (active) {
-    // Entering random chat: clear chat area and private history
-    clearChat();
+    // Entering random chat: show private chat page, do NOT clear or overwrite chatMessages
     showPrivateChatPage();
     privateChatHistory = '';
     // Ensure matchmaking is triggered
     socket.emit('find');
   } else {
-    // Leaving random chat: request latest public room events from server
-    socket.emit('get-public-room-events');
+    // Leaving random chat: show public chat page, do NOT reload chatMessages
     showPublicChatPage();
+    // Request latest public room events from server
+    socket.emit('get-public-room-events');
   }
 
   if (!active) {
@@ -408,7 +390,7 @@ function setRandomMode(active) {
     }
     localVideo.srcObject = null;
     setAiPartnerBadge(false);
-    setChatCollapsed(false);
+    // Do NOT call setChatCollapsed(false) here; it can clear chatMessages
   }
 }
 
@@ -501,14 +483,8 @@ socket.on('waiting', () => {
 });
 
 socket.on('public-room-init', ({ events = [] } = {}) => {
-  clearChat();
-  events.forEach((event) => addPublicRoomEvent(event));
-  // Save the latest rendered public chat history
+  // Do not modify chatMessages DOM. Only update publicChatHistory from current DOM.
   publicChatHistory = chatMessages.innerHTML;
-  // Force reflow/repaint for CSS rendering fix
-  chatMessages.style.display = 'none';
-  void chatMessages.offsetHeight;
-  chatMessages.style.display = '';
 });
 
 socket.on('public-room-event', (event) => {
@@ -763,7 +739,7 @@ function status(s) {
 }
 
 function addPublicRoomEvent(event = {}) {
-  if (!event || !event.text) return;
+  if (!event || typeof event.text !== 'string' || !event.text.trim()) return;
 
   if (event.clientMsgId && event.socketId === socket.id && pendingPublicMessageIds.has(event.clientMsgId)) {
     pendingPublicMessageIds.delete(event.clientMsgId);
@@ -777,25 +753,21 @@ function addPublicRoomEvent(event = {}) {
     return;
   }
 
-  if (isRunning && otherId) {
-    // Ignore public room events while in random chat
-    return;
-  }
-
+  // Always add public room events to history, even if in private chat
   const isMine = event.socketId === socket.id;
   const sender = isMine ? 'local' : 'remote';
   const prefix = isMine ? '' : `${event.name || 'Guest'}: `;
   addChatMessage(`${prefix}${event.text}`, sender);
-  // Save after adding ONLY if not in random chat
-  if (!isRunning) publicChatHistory = chatMessages.innerHTML;
+  publicChatHistory = chatMessages.innerHTML;
 }
 
 function addChatMessage(text, sender) {
+  if (typeof text !== 'string' || !text.trim()) return;
   const div = document.createElement('div');
   div.className = `chat-message ${sender}`;
   chatMessages.appendChild(div);
 
-  const messageText = String(text || '');
+  const messageText = text;
   const shouldType = sender === 'remote' && messageText.length > 0;
 
   if (!shouldType) {
