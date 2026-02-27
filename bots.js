@@ -1,6 +1,7 @@
 const puppeteer = require('puppeteer');
 
-const BOT_COUNT = 5;
+const requestedBotCount = Number.parseInt(process.env.NUM_BOTS || '5', 10);
+const BOT_COUNT = Number.isFinite(requestedBotCount) ? Math.max(1, Math.min(20, requestedBotCount)) : 5;
 let browser = null;
 const botPages = [];
 

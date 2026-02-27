@@ -377,10 +377,12 @@ body.chat-active .videos .video-wrap:nth-child(2) {
   height: 100%;
   display: block;
   object-fit: cover;
+  object-position: center top;
 }
 
 #remoteVideo {
-  object-fit: cover;
+  object-fit: contain;
+  object-position: center center;
   background: #000;
 }
 

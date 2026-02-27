@@ -82,8 +82,10 @@ process.on('SIGTERM', () => {
 
 // Environment variables
 const PORT = process.env.PORT || 3000;
-const OLLAMA_URL = process.env.OLLAMA_URL || 'http://localhost:11434';
-const OLLAMA_TIMEOUT = parseInt(process.env.OLLAMA_TIMEOUT || '10000'); // 10 seconds (was 5)
+const GROQ_AI_URL = (process.env.GROQ_BASE_URL || process.env.GROQ_API_URL || 'https://api.groq.com/openai/v1/chat/completions').trim();
+const GROQ_API_KEY = (process.env.GROQ_API_KEY || '').trim();
+const GROQ_MODEL = (process.env.GROQ_MODEL || 'llama-3.1-8b-instant').trim();
+const GROQ_TIMEOUT = parseInt(process.env.GROQ_TIMEOUT || '12000');
 const NUM_BOTS = parseInt(process.env.NUM_BOTS || '5');
 const CLEANUP_INTERVAL = parseInt(process.env.CLEANUP_INTERVAL || '60000'); // 1 minute
 const ADMIN_KEY = process.env.ADMIN_KEY || '';
@@ -291,108 +293,109 @@ function getPersonaByBotId(botId) {
   return botPersonas[0];
 }
 
-// Fallback responses when Ollama is unavailable - organized by common user inputs
-const fallbackResponses = {
-  greetings: ["Hey! How are you?", "Hi there! What's up?", "Hello! Nice to meet you!", "Hey! How's it going?"],
-  questions: {
-    name: "I'm {name}. What about you?",
-    age: "I'm {age}. How old are you?",
-    location: "I'm from {location}. Where are you from?",
-    hobbies: "I like chatting with new people, watching movies, and hanging out with friends. What about you?",
-  },
-  generic: [
-    "That's interesting! Tell me more.",
-    "Oh really? I've never thought about it that way.",
-    "Haha, I like that! What else?",
-    "That's cool! How did that happen?",
-    "Wow, you seem interesting!",
-    "Ha, that made me laugh. You're funny!",
-    "I totally agree with you on that.",
-    "That's a good point.",
-    "Tell me more about yourself!"
-  ]
-};
-
-function getFallbackResponse(userMessage, profile) {
-  const msg = userMessage.toLowerCase().trim();
-  
-  // Detect greetings
-  if (/^(hi|hey|hello|yo|sup|hola|what's up|whats up)/.test(msg)) {
-    return fallbackResponses.greetings[Math.floor(Math.random() * fallbackResponses.greetings.length)];
+async function getPublicRoomBotReply(userMessage, botProfile) {
+  const msg = String(userMessage || '').trim();
+  if (!msg) {
+    throw new Error('public room message is empty');
   }
-  
-  // Detect name questions
-  if (/(your name|who are you|what.*name)/.test(msg)) {
-    return fallbackResponses.questions.name
-      .replace('{name}', profile?.name || 'Sarah');
-  }
-  
-  // Detect age questions  
-  if (/(how old|your age|age are you)/.test(msg)) {
-    return fallbackResponses.questions.age
-      .replace('{age}', profile?.age || '25');
-  }
-  
-  // Detect location questions
-  if (/(where.*from|where.*live|your location)/.test(msg)) {
-    return fallbackResponses.questions.location
-      .replace('{location}', profile?.countryName || 'United States');
-  }
-  
-  // Detect hobby/interest questions
-  if (/(hobby|hobbies|interests|do for fun|like to do)/.test(msg)) {
-    return fallbackResponses.questions.hobbies;
-  }
-  
-  // Generic response
-  return fallbackResponses.generic[Math.floor(Math.random() * fallbackResponses.generic.length)];
+  return getGroqResponse(msg, botProfile);
 }
 
-// Ollama helper function with timeout and fallback
-async function getOllamaResponse(userMessage, profile) {
-  try {
-    const personaName = profile?.name || 'Sarah';
-    const personaAge = profile?.age || 25;
-    const personaLocation = profile?.countryName || 'United States';
-    const personaStyle = profile?.style || 'Warm and friendly.';
-    
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), OLLAMA_TIMEOUT);
-    
-    const response = await fetch(`${OLLAMA_URL}/api/generate`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        model: 'dolphin-mistral',
-        prompt: `You are ${personaName}, a ${personaAge}-year-old woman from ${personaLocation}. You're having a casual video chat with a stranger. Respond naturally as ${personaName} would.
+function normalizeBotReply(text) {
+  const raw = String(text || '').trim();
+  if (!raw) return raw;
+
+  const mapped = raw
+    .replace(/\*(big\s+smile|smiles?|smiling)\*/gi, '😊')
+    .replace(/\*(laughs?|chuckles?)\*/gi, '😂')
+    .replace(/\*(winks?)\*/gi, '😉')
+    .replace(/\*(blush(?:es)?)\*/gi, '😊')
+    .replace(/\*(shrugs?)\*/gi, '🤷')
+    .replace(/\*(sighs?)\*/gi, '😮‍💨')
+    .replace(/\*(nods?)\*/gi, '🙂')
+    .replace(/\*(grins?)\*/gi, '😁')
+    .replace(/\*(facepalm)\*/gi, '🤦')
+    .replace(/\*(thinking)\*/gi, '🤔')
+    .replace(/\*(hugs?)\*/gi, '🤗');
+
+  return mapped.replace(/\s{2,}/g, ' ').trim();
+}
+
+// Groq helper function with strict no-fallback behavior
+async function getGroqResponse(userMessage, profile) {
+  if (!GROQ_API_KEY) {
+    throw new Error('GROQ_API_KEY is not set');
+  }
+
+  const personaName = profile?.name || 'Sarah';
+  const personaAge = profile?.age || 25;
+  const personaLocation = profile?.countryName || 'United States';
+  const personaStyle = profile?.style || 'Warm and friendly.';
+
+  const systemPrompt = `You are ${personaName}, a ${personaAge}-year-old woman from ${personaLocation}. You're having a casual video chat with a stranger. Respond naturally as ${personaName} would.
 
 Your personality: ${personaStyle}
 
 Rules:
 - Keep responses brief (1-2 sentences)
 - Sound like a real person having a natural conversation
+- Use clear, neutral conversational English
+- Avoid dialect, heavy slang, or regional expressions unless the user uses them first
+- If expressing emotion, use Unicode emoji (like 😊) and do not use roleplay actions like *smiles*
 - Answer questions about yourself using your character info
 - If asked if you're real/AI/bot, be honest but casual about it
-- Match the vibe - if they're casual, be casual; if friendly, be friendly
+- If asked what model you are, state the exact model as ${GROQ_MODEL}
+- Match the vibe - if they're casual, be casual; if friendly, be friendly`;
 
-User just said: "${userMessage}"
+  const runAttempt = async () => {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), GROQ_TIMEOUT);
 
-Respond as ${personaName}:`,
-        stream: false,
-      }),
-      signal: controller.signal
-    });
-    
-    clearTimeout(timeoutId);
-    const data = await response.json();
-    if (!data.response) {
-      console.warn('Empty response from Ollama, using fallback');
-      return getFallbackResponse(userMessage, profile);
+    try {
+      const response = await fetch(GROQ_AI_URL, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${GROQ_API_KEY}`
+        },
+        body: JSON.stringify({
+          model: GROQ_MODEL,
+          messages: [
+            { role: 'system', content: systemPrompt },
+            { role: 'user', content: userMessage }
+          ],
+            temperature: 0.45,
+          max_tokens: 120
+        }),
+        signal: controller.signal
+      });
+
+      if (!response.ok) {
+        const errorBody = await response.text();
+        throw new Error(`Groq HTTP ${response.status}: ${errorBody.slice(0, 200)}`);
+      }
+
+      const data = await response.json();
+      const output = data?.choices?.[0]?.message?.content?.trim?.();
+      if (!output) {
+        throw new Error('Groq returned an empty response');
+      }
+
+      return normalizeBotReply(output);
+    } finally {
+      clearTimeout(timeoutId);
     }
-    return data.response.trim();
-  } catch (err) {
-    console.warn('Ollama error:', err.message, '- using fallback response');
-    return getFallbackResponse(userMessage, profile);
+  };
+
+  try {
+    return await runAttempt();
+  } catch (firstError) {
+    await new Promise((resolve) => setTimeout(resolve, 250));
+    try {
+      return await runAttempt();
+    } catch {
+      throw firstError;
+    }
   }
 }
 
@@ -478,10 +481,10 @@ app.post('/api/ai-response', express.json(), async (req, res) => {
       botProfiles.set(socketId, profile);
     }
     
-    const response = await getOllamaResponse(message, profile);
+    const response = await getGroqResponse(message, profile);
     res.json({ response });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    res.status(502).json({ error: `groq_error: ${err.message}` });
   }
 });
 
@@ -497,6 +500,7 @@ const notifiedJoins = new Set(); // prevent duplicate join webhooks per socket
 const activeLoginSessions = new Map(); // socketId -> { socketId, name, loginAt, lastSeenAt }
 const completedLoginSessions = []; // recent ended login sessions
 const publicRoomEvents = []; // recent public room system/user messages
+let publicRoomSpeakerBotId = null; // exactly one bot that replies in public room chat
 const joinWebhookStats = {
   configured: Boolean(JOIN_WEBHOOK_URL),
   attempts: 0,
@@ -830,27 +834,50 @@ function getPublicRoomBotSocketIds() {
   return botSocketIds;
 }
 
-function maybeEmitBotReplyToHumanPublicMessage(fromSocketId, text) {
+function getPublicRoomSpeakerBotSocketId() {
   const botSocketIds = getPublicRoomBotSocketIds();
-  if (botSocketIds.length < 1) return;
+  if (botSocketIds.length < 1) {
+    publicRoomSpeakerBotId = null;
+    return null;
+  }
+
+  if (publicRoomSpeakerBotId && botSocketIds.includes(publicRoomSpeakerBotId)) {
+    return publicRoomSpeakerBotId;
+  }
+
+  publicRoomSpeakerBotId = botSocketIds[0];
+  return publicRoomSpeakerBotId;
+}
+
+function maybeEmitBotReplyToHumanPublicMessage(fromSocketId, text) {
+  const speakerId = getPublicRoomSpeakerBotSocketId();
+  if (!speakerId) return;
 
   const humanName = getSocketDisplayName(fromSocketId);
-  const speakerId = botSocketIds[Math.floor(Math.random() * botSocketIds.length)];
   const botProfile = botProfiles.get(speakerId) || userProfiles.get(speakerId)?.profile || {};
   const speakerName = getSocketDisplayName(speakerId);
-  const replyBody = getFallbackResponse(text, botProfile);
-  const replyText = `${humanName}, ${replyBody}`;
 
-  setTimeout(() => {
+  setTimeout(async () => {
     const speakerSocket = io.sockets.sockets.get(speakerId);
     if (!speakerSocket || !speakerSocket.data?.publicRoomJoined) return;
 
-    pushPublicRoomEvent(buildPublicRoomEvent({
-      type: 'message',
-      text: replyText,
-      socketId: speakerId,
-      name: speakerName
-    }));
+    try {
+      const replyBody = await getPublicRoomBotReply(text, botProfile);
+      const replyText = `${humanName}, ${replyBody}`;
+
+      pushPublicRoomEvent(buildPublicRoomEvent({
+        type: 'message',
+        text: replyText,
+        socketId: speakerId,
+        name: speakerName
+      }));
+    } catch (error) {
+      console.warn('Skipping public room bot reply:', error.message);
+      pushPublicRoomEvent(buildPublicRoomEvent({
+        type: 'system',
+        text: `${speakerName} couldn't reply right now (Groq temporarily unavailable).`
+      }));
+    }
   }, 900);
 }
 
@@ -1101,6 +1128,9 @@ io.on('connection', (socket) => {
     
     botProfiles.set(socket.id, profile);
     socket.data.publicRoomName = profile.name;
+    if (!publicRoomSpeakerBotId) {
+      publicRoomSpeakerBotId = socket.id;
+    }
     
     // Set bot profile in userProfiles so it can be matched
     userProfiles.set(socket.id, {
@@ -1457,6 +1487,9 @@ io.on('connection', (socket) => {
     }
     
     // Clean up all traces of this user
+    if (socket.id === publicRoomSpeakerBotId) {
+      publicRoomSpeakerBotId = null;
+    }
     bots.delete(socket.id);
     botProfiles.delete(socket.id);
     userProfiles.delete(socket.id);
@@ -1489,8 +1522,10 @@ server.listen(PORT, '0.0.0.0', () => {
   console.log(`Server listening on port ${PORT}`);
   console.log(`Local: http://localhost:${PORT}`);
   console.log(`Network: http://10.100.102.18:${PORT}`);
-  console.log(`Ollama URL: ${OLLAMA_URL}`);
-  console.log(`Ollama timeout: ${OLLAMA_TIMEOUT}ms`);
+  console.log(`Groq URL: ${GROQ_AI_URL}`);
+  console.log(`Groq model: ${GROQ_MODEL}`);
+  console.log(`Groq timeout: ${GROQ_TIMEOUT}ms`);
+  console.log(`Groq key configured: ${Boolean(GROQ_API_KEY)}`);
   console.log(`Number of bots: ${NUM_BOTS}`);
   console.log(`Cleanup interval: ${CLEANUP_INTERVAL}ms`);
   

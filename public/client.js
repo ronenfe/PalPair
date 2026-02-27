@@ -205,6 +205,7 @@ saveProfileBtn.addEventListener('click', () => {
 let otherId = null;
 let isRunning = false;
 let isChatCollapsed = false;
+let localNextInProgress = false;
 
 function setChatCollapsed(collapsed) {
   isChatCollapsed = collapsed;
@@ -306,6 +307,7 @@ nextBtn.onclick = () => {
   if (!isRunning) return;
   // Find next partner while already connected
   console.log('>>> Find Next button clicked, otherId:', otherId);
+  localNextInProgress = true;
   status(translate('statusFindingNext'));
   socket.emit('next');
   if (pc) pc.close();
@@ -318,6 +320,7 @@ nextBtn.onclick = () => {
 
 
 socket.on('waiting', () => {
+  localNextInProgress = false;
   if (!isRunning) {
     status(translate('statusPublicRoom'));
     return;
@@ -341,6 +344,7 @@ socket.on('online-users', ({ users = [] } = {}) => {
 });
 
 socket.on('matched', async ({ otherId: id, initiator, isBot, botProfile, partnerProfile }) => {
+  localNextInProgress = false;
   if (!isRunning) {
     status(translate('statusPublicRoom'));
     return;
@@ -371,6 +375,7 @@ socket.on('matched', async ({ otherId: id, initiator, isBot, botProfile, partner
   otherId = id;
   nextBtn.disabled = false;
   setAiPartnerBadge(!!isBot);
+  remoteVideo.muted = !!isBot;
   console.log('>>> Setting status to Connected');
 
   if (isBot) {
@@ -424,6 +429,9 @@ socket.on('signal', async ({ from, data }) => {
 });
 
 socket.on('peer-disconnected', ({ id }) => {
+  if (localNextInProgress) {
+    return;
+  }
   if (!isRunning) {
     status(translate('statusPublicRoom'));
     return;
@@ -434,6 +442,9 @@ socket.on('peer-disconnected', ({ id }) => {
 
 // some server flows emit `peer-left` to ensure clients handle forced leaves
 socket.on('peer-left', ({ id, reason }) => {
+  if (localNextInProgress) {
+    return;
+  }
   if (!isRunning) {
     status(translate('statusPublicRoom'));
     return;
@@ -514,6 +525,7 @@ function clearRemoteVideo() {
 
     // hide video element and show black placeholder to avoid frozen frame
     try { remoteVideo.srcObject = null; } catch (e) {}
+    try { remoteVideo.muted = false; } catch (e) {}
     try { remoteVideo.pause(); remoteVideo.removeAttribute('src'); remoteVideo.removeAttribute('srcObject'); } catch (e) {}
     try { remoteVideo.style.display = 'none'; } catch (e) {}
     try { remoteVideo.style.backgroundColor = '#000'; } catch (e) {}
@@ -588,9 +600,32 @@ function addPublicRoomEvent(event = {}) {
 function addChatMessage(text, sender) {
   const div = document.createElement('div');
   div.className = `chat-message ${sender}`;
-  div.textContent = text;
   chatMessages.appendChild(div);
-  chatMessages.scrollTop = chatMessages.scrollHeight;
+
+  const messageText = String(text || '');
+  const shouldType = sender === 'remote' && messageText.length > 0;
+
+  if (!shouldType) {
+    div.textContent = messageText;
+    chatMessages.scrollTop = chatMessages.scrollHeight;
+    return;
+  }
+
+  const maxTypingDurationMs = 1400;
+  const perCharDelay = Math.max(12, Math.min(36, Math.floor(maxTypingDurationMs / messageText.length)));
+  let currentIndex = 0;
+
+  const step = () => {
+    currentIndex += 1;
+    div.textContent = messageText.slice(0, currentIndex);
+    chatMessages.scrollTop = chatMessages.scrollHeight;
+
+    if (currentIndex < messageText.length) {
+      setTimeout(step, perCharDelay);
+    }
+  };
+
+  setTimeout(step, 80);
 }
 
 function clearChat() {
