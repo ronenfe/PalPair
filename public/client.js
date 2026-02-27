@@ -383,12 +383,14 @@ function setRandomMode(active) {
   if (active) {
     // Entering random chat: clear chat area and private history
     clearChat();
+    showPrivateChatPage();
     privateChatHistory = '';
     // Ensure matchmaking is triggered
     socket.emit('find');
   } else {
     // Leaving random chat: request latest public room events from server
     socket.emit('get-public-room-events');
+    showPublicChatPage();
   }
 
   if (!active) {
