@@ -67,6 +67,7 @@ const saveProfileBtn = document.getElementById('saveProfileBtn');
 const userCounterWrap = document.getElementById('userCounter');
 
 const goRandomBtn = document.getElementById('goRandomBtn');
+const stopRandomBtn = document.getElementById('stopRandomBtn');
 const nextBtn = document.getElementById('nextBtn');
 const reportBtn = document.getElementById('reportBtn');
 const chatToggleBtn = document.getElementById('chatToggleBtn');
@@ -224,7 +225,10 @@ function setRandomMode(active) {
   document.body.classList.toggle('random-active', active);
 
   if (goRandomBtn) {
-    goRandomBtn.textContent = active ? '⏹ Stop Random' : '🎥 Go Random';
+    goRandomBtn.style.display = active ? 'none' : 'block';
+  }
+  if (stopRandomBtn) {
+    stopRandomBtn.style.display = active ? 'flex' : 'none';
   }
 
   if (!active) {
@@ -297,9 +301,13 @@ if (goRandomBtn) {
         setRandomMode(false);
         status(translate('statusCameraError'));
       }
-    } else {
-      stopRandomMode({ notifyPartner: true, notifySearching: true, statusText: translate('statusReturnedPublic') });
     }
+  };
+}
+
+if (stopRandomBtn) {
+  stopRandomBtn.onclick = () => {
+    stopRandomMode({ notifyPartner: true, notifySearching: true, statusText: translate('statusReturnedPublic') });
   };
 }
 

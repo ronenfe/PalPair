@@ -1,3 +1,29 @@
+.stop-random-btn {
+  position: fixed;
+  right: 18px;
+  bottom: 18px;
+  z-index: 40;
+  background: linear-gradient(135deg, #ef4444 0%, #b91c1c 100%);
+  color: #fff;
+  border: none;
+  border-radius: 50%;
+  width: 44px;
+  height: 44px;
+  font-size: 20px;
+  font-weight: bold;
+  box-shadow: 0 4px 16px rgba(185, 28, 28, 0.25);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background 0.2s, transform 0.2s;
+  text-transform: none;
+  letter-spacing: 0;
+}
+.stop-random-btn:hover {
+  background: linear-gradient(135deg, #b91c1c 0%, #ef4444 100%);
+  transform: translateY(-2px) scale(1.08);
+}
 * {
   margin: 0;
   padding: 0;
@@ -62,6 +88,18 @@ body.chat-active {
 .container { 
   max-width: 1200px;
   margin: 0 auto;
+  animation: fadeIn 0.5s ease-in;
+}
+
+body:not(.chat-active) .container {
+  margin: 0;
+  width: min(96vw, 960px);
+  padding-top: 0;
+  min-height: calc(var(--app-height) - var(--home-safe-top) - var(--home-safe-bottom) - var(--home-bottom-gap));
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+rgin: 0 auto;
   animation: fadeIn 0.5s ease-in;
 }
 
