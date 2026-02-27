@@ -455,14 +455,15 @@ if (goRandomBtn) {
     if (!isRunning) {
       try {
         otherId = null;
+        // Get local video stream FIRST
+        localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+        localVideo.srcObject = localStream;
+
         setRandomMode(true);
         nextBtn.disabled = true;
         reportBtn.disabled = false;
         setChatCollapsed(true);
 
-        localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
-        localVideo.srcObject = localStream;
-        
         // Ensure remote video is hidden when starting
         remoteVideo.style.display = 'none';
         if (remotePlaceholder) {
@@ -739,10 +740,26 @@ async function createPeerConnection(targetId, initiator) {
   };
 
   pc.ontrack = (e) => {
-    console.log('>>> ontrack event received');
-    remoteVideo.style.display = 'block';
-    if (remotePlaceholder) remotePlaceholder.style.display = 'none';
-    remoteVideo.srcObject = e.streams[0];
+    console.log('>>> ontrack event received', e.streams);
+    if (e.streams && e.streams[0]) {
+      const videoTracks = e.streams[0].getVideoTracks();
+      console.log('Remote stream videoTracks:', videoTracks);
+      if (videoTracks.length > 0) {
+        remoteVideo.style.display = 'block';
+        if (remotePlaceholder) remotePlaceholder.style.display = 'none';
+        remoteVideo.srcObject = e.streams[0];
+      } else {
+        remoteVideo.style.display = 'none';
+        if (remotePlaceholder) remotePlaceholder.style.display = 'block';
+        remoteVideo.srcObject = null;
+        console.warn('No remote video track received');
+      }
+    } else {
+      remoteVideo.style.display = 'none';
+      if (remotePlaceholder) remotePlaceholder.style.display = 'block';
+      remoteVideo.srcObject = null;
+      console.warn('No remote stream received');
+    }
   };
 
   // Add local tracks FIRST
