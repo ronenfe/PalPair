@@ -1,3 +1,7 @@
+#status[style*="display: none"] {
+  display: none !important;
+}
+
 .stop-random-btn {
   position: fixed;
   right: 18px;

@@ -79,9 +79,13 @@ const aiPartnerBadge = document.getElementById('aiPartnerBadge');
 const chatContainer = document.querySelector('.chat-container');
 
 // Chat elements
+// Chat history buffers
+let publicChatHistory = '';
+let privateChatHistory = '';
 const chatInput = document.getElementById('chatInput');
 const sendBtn = document.getElementById('sendBtn');
 const chatMessages = document.getElementById('chatMessages');
+const privateChatMessages = document.getElementById('privateChatMessages');
 const onlineUsersList = document.getElementById('onlineUsersList');
 const AI_PARTNER_LABEL = '🤖 AI Partner';
 
@@ -209,6 +213,11 @@ let isChatCollapsed = false;
 let localNextInProgress = false;
 
 function setChatCollapsed(collapsed) {
+    // Always enable send button when chat is visible
+    if (chatInterface && chatInterface.style.display !== 'none') {
+      sendBtn.disabled = false;
+      chatInput.disabled = false;
+    }
   isChatCollapsed = collapsed;
   if (chatInterface) {
     chatInterface.classList.toggle('chat-collapsed', collapsed);
@@ -217,6 +226,20 @@ function setChatCollapsed(collapsed) {
     chatToggleBtn.textContent = '💬';
     chatToggleBtn.setAttribute('aria-label', collapsed ? 'Expand chat' : 'Collapse chat');
     chatToggleBtn.setAttribute('title', collapsed ? 'Expand Chat' : 'Collapse Chat');
+  }
+  // Switch chat context: show/hide correct chat div
+  if (!collapsed) {
+    if (isRunning && otherId) {
+      chatMessages.style.display = 'none';
+      privateChatMessages.style.display = 'block';
+      privateChatMessages.innerHTML = privateChatHistory;
+      privateChatMessages.scrollTop = privateChatMessages.scrollHeight;
+    } else {
+      chatMessages.style.display = 'block';
+      if (privateChatMessages) privateChatMessages.style.display = 'none';
+      chatMessages.innerHTML = publicChatHistory;
+      chatMessages.scrollTop = chatMessages.scrollHeight;
+    }
   }
 }
 
@@ -583,7 +606,13 @@ async function createPeerConnection(targetId, initiator) {
 
 function status(s) {
   console.log('>>> STATUS:', s);
-  statusEl.textContent = s;
+  // Hide the whole status element when in public room
+  if (s === translate('statusPublicRoom') || s === 'Back in public room') {
+    statusEl.style.display = 'none';
+  } else {
+    statusEl.style.display = '';
+    statusEl.textContent = s;
+  }
 }
 
 function addPublicRoomEvent(event = {}) {
@@ -608,14 +637,23 @@ function addPublicRoomEvent(event = {}) {
 function addChatMessage(text, sender) {
   const div = document.createElement('div');
   div.className = `chat-message ${sender}`;
-  chatMessages.appendChild(div);
+  // Use correct chat div
+  const targetDiv = (isRunning && otherId) ? privateChatMessages : chatMessages;
+  targetDiv.appendChild(div);
 
   const messageText = String(text || '');
   const shouldType = sender === 'remote' && messageText.length > 0;
 
+  // Update chat history buffer
+  if (targetDiv === chatMessages) {
+    publicChatHistory += div.outerHTML;
+  } else {
+    privateChatHistory += div.outerHTML;
+  }
+
   if (!shouldType) {
     div.textContent = messageText;
-    chatMessages.scrollTop = chatMessages.scrollHeight;
+    targetDiv.scrollTop = targetDiv.scrollHeight;
     return;
   }
 
@@ -626,7 +664,13 @@ function addChatMessage(text, sender) {
   const step = () => {
     currentIndex += 1;
     div.textContent = messageText.slice(0, currentIndex);
-    chatMessages.scrollTop = chatMessages.scrollHeight;
+    targetDiv.scrollTop = targetDiv.scrollHeight;
+    // Update buffer for typing effect
+    if (targetDiv === chatMessages) {
+      publicChatHistory = targetDiv.innerHTML;
+    } else {
+      privateChatHistory = targetDiv.innerHTML;
+    }
 
     if (currentIndex < messageText.length) {
       setTimeout(step, perCharDelay);
@@ -638,6 +682,9 @@ function addChatMessage(text, sender) {
 
 function clearChat() {
   chatMessages.innerHTML = '';
+  privateChatMessages.innerHTML = '';
+  publicChatHistory = '';
+  privateChatHistory = '';
   chatInput.value = '';
 }
 
