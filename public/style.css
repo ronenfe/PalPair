@@ -3,26 +3,30 @@
 }
 
 .stop-random-btn {
-  position: fixed;
-  right: 18px;
-  bottom: 18px;
+  display: inline-flex;
+  position: absolute;
+  right: 0;
+  bottom: 0;
   z-index: 40;
   background: linear-gradient(135deg, #ef4444 0%, #b91c1c 100%);
   color: #fff;
   border: none;
-  border-radius: 50%;
-  width: 44px;
-  height: 44px;
-  font-size: 20px;
-  font-weight: bold;
+  border-radius: 10px;
+  width: 38px;
+  height: 38px;
+  min-height: 38px;
+  font-size: 16px;
+  font-weight: 600;
   box-shadow: 0 4px 16px rgba(185, 28, 28, 0.25);
-  display: flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
   transition: background 0.2s, transform 0.2s;
   text-transform: none;
   letter-spacing: 0;
+  line-height: 1;
+  backdrop-filter: blur(6px);
+  pointer-events: auto;
 }
 .stop-random-btn:hover {
   background: linear-gradient(135deg, #b91c1c 0%, #ef4444 100%);
