@@ -55,28 +55,22 @@ html,
 body {
   width: 100%;
   height: 100%;
+  overflow-x: hidden;
 }
 
 body { 
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  color: #fff;
+  background: #1C1B1F;
+  color: #E6E1E5;
   min-height: 100vh;
   margin: 0;
 }
 
 body:not(.chat-active) {
-  --home-safe-top: max(6px, env(safe-area-inset-top));
-  --home-safe-right: max(6px, env(safe-area-inset-right));
-  --home-safe-bottom: max(6px, env(safe-area-inset-bottom));
-  --home-safe-left: max(6px, env(safe-area-inset-left));
-  --home-bottom-gap: 28px;
   display: flex;
   justify-content: center;
-  align-items: center;
-  padding: var(--home-safe-top) var(--home-safe-right) calc(var(--home-safe-bottom) + var(--home-bottom-gap)) var(--home-safe-left);
+  align-items: flex-start;
   box-sizing: border-box;
-  height: var(--app-height);
   min-height: var(--app-height);
   overflow-y: auto;
 }
@@ -101,9 +95,9 @@ body.chat-active {
 
 body:not(.chat-active) .container {
   margin: 0 auto;
-  width: min(96vw, 960px);
-  padding-top: 32px;
-  padding-bottom: 32px;
+  width: min(92vw, 480px);
+  max-height: calc(var(--app-height));
+  overflow-y: auto;
 }
 
 body:not(.chat-active) h1 {
@@ -156,7 +150,7 @@ h1 {
   font-size: 2.5em;
   margin-bottom: 10px;
   font-weight: 700;
-  text-shadow: 0 2px 10px rgba(0,0,0,0.2);
+  color: #E6E1E5;
 }
 
 body.chat-active h1,
@@ -184,16 +178,15 @@ body.chat-active .profile-form label {
 .counter-chip {
   display: inline-flex;
   align-items: center;
-  background: rgba(255, 255, 255, 0.2);
+  background: #2B2930;
   padding: 8px 14px;
   border-radius: 999px;
-  backdrop-filter: blur(10px);
   font-weight: 600;
   animation: pulse 2s ease-in-out infinite;
 }
 
 #userCount {
-  color: #fff;
+  color: #D0BCFF;
   font-weight: 700;
   font-size: 1.2em;
 }
@@ -205,16 +198,10 @@ body.chat-active .profile-form label {
 
 /* Profile screen + form */
 .profile-screen {
-  background: rgba(15, 23, 42, 0.9);
-  border-radius: 24px;
-  box-shadow: 0 24px 80px rgba(15, 23, 42, 0.75);
-  padding: 20px 22px 24px;
   display: flex;
   flex-direction: column;
-  gap: 16px;
   width: 100%;
-  max-width: 820px;
-  margin: 0 auto;
+  gap: 0px;
 }
 
 .profile-header {
@@ -234,7 +221,7 @@ body.chat-active .profile-form label {
 .profile-form h3 {
   margin-top: 16px;
   margin-bottom: 12px;
-  color: #e5e7eb;
+  color: #E6E1E5;
   font-size: 1.2em;
   font-weight: 600;
 }
@@ -248,10 +235,10 @@ body.chat-active .profile-form label {
   width: 100%;
   padding: 14px 16px;
   margin-bottom: 16px;
-  border: 1px solid rgba(148, 163, 184, 0.5);
+  border: 1px solid #49454F;
   border-radius: 12px;
-  background: rgba(15, 23, 42, 0.9);
-  color: #e5e7eb;
+  background: #2B2930;
+  color: #E6E1E5;
   font-size: 16px;
   transition: all 0.3s ease;
 }
@@ -259,14 +246,14 @@ body.chat-active .profile-form label {
 .profile-form input:focus,
 .profile-form select:focus {
   outline: none;
-  border-color: #818cf8;
-  box-shadow: 0 0 0 2px rgba(129, 140, 248, 0.45);
+  border-color: #D0BCFF;
+  box-shadow: 0 0 0 2px rgba(208, 188, 255, 0.3);
 }
 
 .profile-form label {
   display: block;
   margin-bottom: 8px;
-  color: #cbd5f5;
+  color: #CAC4D0;
   font-size: 14px;
   font-weight: 500;
 }
@@ -284,15 +271,15 @@ body.chat-active .profile-form label {
 }
 
 .range-inputs span {
-  color: #999;
+  color: #CAC4D0;
   font-weight: 500;
 }
 
 #saveProfileBtn {
   width: 100%;
   padding: 18px;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  color: white;
+  background: #D0BCFF;
+  color: #381E72;
   border: none;
   border-radius: 12px;
   font-size: 18px;
@@ -301,12 +288,12 @@ body.chat-active .profile-form label {
   transition: all 0.3s ease;
   text-transform: uppercase;
   letter-spacing: 1px;
-  box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
 }
 
 #saveProfileBtn:hover {
   transform: translateY(-2px);
-  box-shadow: 0 6px 20px rgba(102, 126, 234, 0.6);
+  box-shadow: 0 4px 12px rgba(208, 188, 255, 0.4);
 }
 
 #saveProfileBtn:active {

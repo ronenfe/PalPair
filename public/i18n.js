@@ -25,7 +25,7 @@
   const translations = {
     en: {
       title: 'Palpair - Random Video Chat',
-      subtitle: 'Meet new people instantly • Video chat worldwide',
+      subtitle: 'Meet new people instantly',
       peopleOnline: 'people online now',
       safetyNote: 'Palpair - Random Video Chat allows users to report child safety concerns in-app. To learn more about reporting requirements, visit the <a href="/help-center.html" target="_blank" rel="noopener">Help center</a>.',
       yourProfile: 'Your Profile',

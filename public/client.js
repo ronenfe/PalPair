@@ -96,8 +96,7 @@ const AI_PARTNER_LABEL = '🤖 AI Partner';
 
 function syncViewportHeight() {
   const viewportHeight = Math.round(window.visualViewport?.height || window.innerHeight || document.documentElement.clientHeight);
-  // Shrink app height to 70% of viewport
-  const appHeight = Math.round(viewportHeight * 0.9);
+  const appHeight = viewportHeight;
   document.documentElement.style.setProperty('--app-height', `${appHeight}px`);
 
   let chatScale = 0.9;
