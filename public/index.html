@@ -9,15 +9,18 @@
   </head>
   <body>
     <div class="container">
-      <h1>Palpair</h1>
-      <p class="subtitle" data-i18n="subtitle">Meet new people instantly • Video chat worldwide</p>
-      <div id="userCounter" class="user-counter-wrap">
-        <span class="counter-chip"><span id="userCount">0</span>&nbsp;<span data-i18n="peopleOnline">people online now</span></span>
-      </div>
-      
-      <!-- Profile Form -->
-      <div id="profileForm" class="profile-form">
-        <h3 data-i18n="yourProfile">Your Profile</h3>
+      <!-- Profile view -->
+      <div id="profileContainer" class="profile-screen">
+        <header class="profile-header">
+          <h1>Palpair</h1>
+          <p class="subtitle" data-i18n="subtitle">Meet new people instantly • Video chat worldwide</p>
+          <div id="userCounter" class="user-counter-wrap">
+            <span class="counter-chip"><span id="userCount">0</span>&nbsp;<span data-i18n="peopleOnline">people online now</span></span>
+          </div>
+        </header>
+
+        <div id="profileForm" class="profile-form">
+          <h3 data-i18n="yourProfile">Your Profile</h3>
         <input id="userName" type="text" placeholder="Name" data-i18n-placeholder="namePlaceholder" required />
         <input id="userAge" type="number" placeholder="Age" data-i18n-placeholder="agePlaceholder" min="18" max="100" required />
         <select id="userGender" required>
@@ -446,54 +449,69 @@
         </select>
         
         <button id="saveProfileBtn" data-i18n="saveContinue">Save & Continue</button>
+        </div>
       </div>
-      
-      <!-- Main Chat Interface (hidden initially) -->
+
+      <!-- Main Chat Interface (hidden until profile is saved) -->
       <div id="chatInterface" style="display:none">
-      <div class="videos">
-        <div class="video-wrap">
-          <video id="localVideo" autoplay muted playsinline></video>
-        </div>
-        <div class="video-wrap">
-          <video id="remoteVideo" autoplay playsinline></video>
-          <div id="remotePlaceholder" class="video-placeholder"></div>
-          <div id="aiPartnerBadge" class="ai-partner-badge" aria-live="polite" style="display:none">🤖 AI Partner</div>
-        </div>
-        <div class="controls controls-overlay">
-          <button id="nextBtn" class="control-btn control-primary" disabled aria-label="Find next partner" title="Find Next">⏭</button>
-          <button id="reportBtn" class="control-btn control-danger" aria-label="Report concern" title="Report">⚑</button>
-          <button id="chatToggleBtn" class="control-btn control-secondary" aria-label="Collapse chat" title="Collapse Chat">💬</button>
-          <button id="stopRandomBtn" class="stop-random-btn" aria-label="Stop random" title="Stop Random">⏹</button>
-        </div>
-      </div>
-
-
-      <button id="goRandomBtn" class="go-random-btn" aria-label="Go random">🎥 Go Random</button>
-      <p id="status" data-i18n="idle">Idle</p>
-
-      <div class="room-layout">
-        <!-- Chat Interface -->
-        <div class="chat-container">
-          <div id="chatMessages" class="chat-messages"></div>
-          <div id="privateChatMessages" class="chat-messages" style="display:none;"></div>
-          <div class="chat-input-wrap">
-            <input 
-              id="chatInput" 
-              type="text" 
-              placeholder="Type a message..."
-              data-i18n-placeholder="typeMessage" 
-              disabled
-            />
-            <button id="sendBtn" data-i18n="send" disabled>Send</button>
+        <header class="chat-header">
+          <div class="chat-header-main">
+            <div class="chat-mode-label" id="chatModeLabel" data-i18n="publicChatTitle">Public chat</div>
+            <div class="chat-mode-sub" id="chatModeSub" data-i18n="publicChatSubtitle">Chat with everyone in the lobby</div>
           </div>
-        </div>
+          <button id="goRandomBtn" class="go-random-btn" aria-label="Go random">🎥 Go Random</button>
+        </header>
 
-        <aside class="online-users-panel" aria-live="polite">
-          <h3 class="online-users-title">Connected users</h3>
-          <ul id="onlineUsersList" class="online-users-list"></ul>
-        </aside>
+        <!-- Public chat view -->
+        <section id="publicChatSection" class="chat-view">
+          <div class="room-layout">
+            <div class="chat-container">
+              <div id="chatMessages" class="chat-messages"></div>
+            </div>
+            <aside class="online-users-panel" aria-live="polite">
+              <h3 class="online-users-title">Connected users</h3>
+              <ul id="onlineUsersList" class="online-users-list"></ul>
+            </aside>
+          </div>
+        </section>
+
+        <!-- Private random chat view -->
+        <section id="privateChatSection" class="chat-view" style="display:none">
+          <div class="videos">
+            <div class="video-wrap">
+              <video id="localVideo" autoplay muted playsinline></video>
+            </div>
+            <div class="video-wrap">
+              <video id="remoteVideo" autoplay playsinline></video>
+              <div id="remotePlaceholder" class="video-placeholder"></div>
+              <div id="aiPartnerBadge" class="ai-partner-badge" aria-live="polite" style="display:none">🤖 AI Partner</div>
+            </div>
+            <div class="controls controls-overlay">
+              <button id="nextBtn" class="control-btn control-primary" disabled aria-label="Find next partner" title="Find Next">⏭</button>
+              <button id="reportBtn" class="control-btn control-danger" aria-label="Report concern" title="Report">⚑</button>
+              <button id="chatToggleBtn" class="control-btn control-secondary" aria-label="Collapse chat" title="Collapse Chat">💬</button>
+              <button id="stopRandomBtn" class="stop-random-btn" aria-label="Stop random" title="Stop Random">⏹</button>
+            </div>
+          </div>
+
+          <p id="status" data-i18n="idle">Idle</p>
+
+          <div class="chat-container">
+            <div id="privateChatMessages" class="chat-messages" style="display:none;"></div>
+          </div>
+        </section>
+
+        <!-- Shared input for both public + private chat -->
+        <div class="chat-input-wrap">
+          <input 
+            id="chatInput" 
+            type="text" 
+            placeholder="Type a message..."
+            data-i18n-placeholder="typeMessage" 
+            disabled
+          />
+          <button id="sendBtn" data-i18n="send" disabled>Send</button>
         </div>
-      </div>
       </div>
     </div>
 

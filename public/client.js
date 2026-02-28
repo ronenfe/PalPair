@@ -61,6 +61,7 @@ setInterval(refreshUserCountFallback, 3000);
 refreshUserCountFallback();
 
 // Profile form elements
+const profileContainer = document.getElementById('profileContainer');
 const profileForm = document.getElementById('profileForm');
 const chatInterface = document.getElementById('chatInterface');
 const saveProfileBtn = document.getElementById('saveProfileBtn');
@@ -87,6 +88,10 @@ const sendBtn = document.getElementById('sendBtn');
 const chatMessages = document.getElementById('chatMessages');
 const privateChatMessages = document.getElementById('privateChatMessages');
 const onlineUsersList = document.getElementById('onlineUsersList');
+const publicChatSection = document.getElementById('publicChatSection');
+const privateChatSection = document.getElementById('privateChatSection');
+const chatModeLabel = document.getElementById('chatModeLabel');
+const chatModeSub = document.getElementById('chatModeSub');
 const AI_PARTNER_LABEL = '🤖 AI Partner';
 
 function syncViewportHeight() {
@@ -199,8 +204,12 @@ saveProfileBtn.addEventListener('click', () => {
   // Send profile to server
   socket.emit('set-profile', { profile: userProfile, filters: userFilters });
 
-  // Show chat interface
-  profileForm.style.display = 'none';
+  // Show chat interface and hide profile view
+  if (profileContainer) {
+    profileContainer.style.display = 'none';
+  } else if (profileForm) {
+    profileForm.style.display = 'none';
+  }
   chatInterface.style.display = 'block';
   document.body.classList.add('chat-active');
   setRandomMode(false);
@@ -249,8 +258,23 @@ function setRandomMode(active) {
   isRunning = active;
   document.body.classList.toggle('random-active', active);
 
+  // Switch between public chat view and private random chat view
+  if (publicChatSection && privateChatSection) {
+    if (active) {
+      publicChatSection.style.display = 'none';
+      privateChatSection.style.display = 'block';
+      if (chatModeLabel) chatModeLabel.textContent = 'Private random chat';
+      if (chatModeSub) chatModeSub.textContent = '1:1 video chat with a random partner';
+    } else {
+      publicChatSection.style.display = 'block';
+      privateChatSection.style.display = 'none';
+      if (chatModeLabel) chatModeLabel.textContent = 'Public chat';
+      if (chatModeSub) chatModeSub.textContent = 'Chat with everyone in the lobby';
+    }
+  }
+
   if (goRandomBtn) {
-    goRandomBtn.style.display = active ? 'none' : 'block';
+    goRandomBtn.style.display = active ? 'none' : 'inline-flex';
   }
   if (stopRandomBtn) {
     stopRandomBtn.style.display = active ? 'flex' : 'none';
