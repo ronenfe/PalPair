@@ -476,8 +476,22 @@
           </div>
         </section>
 
-        <!-- Private random chat view -->
-        <section id="privateChatSection" class="chat-view" style="display:none">
+        <!-- Shared input for public chat -->
+        <div class="chat-input-wrap">
+          <input 
+            id="chatInput" 
+            type="text" 
+            placeholder="Type a message..."
+            data-i18n-placeholder="typeMessage" 
+            disabled
+          />
+          <button id="sendBtn" data-i18n="send" disabled>Send</button>
+        </div>
+      </div>
+
+      <!-- Private random chat interface (separate div, hidden until Go Random) -->
+      <div id="privateChatInterface" style="display:none">
+        <section id="privateChatSection" class="chat-view">
           <div class="videos">
             <div class="video-wrap">
               <video id="localVideo" autoplay muted playsinline></video>
@@ -497,24 +511,21 @@
 
           <p id="status" data-i18n="idle">Idle</p>
 
-          <div class="chat-container">
+          <div class="private-chat-panel" id="privateChatPanel">
             <div id="privateChatMessages" class="chat-messages"></div>
+            <div class="private-chat-input-wrap">
+              <input 
+                id="privateChatInput" 
+                type="text" 
+                placeholder="Type a message..."
+                data-i18n-placeholder="typeMessage" 
+                disabled
+              />
+              <button id="privateSendBtn" data-i18n="send" disabled>Send</button>
+            </div>
           </div>
         </section>
-
-        <!-- Shared input for both public + private chat -->
-        <div class="chat-input-wrap">
-          <input 
-            id="chatInput" 
-            type="text" 
-            placeholder="Type a message..."
-            data-i18n-placeholder="typeMessage" 
-            disabled
-          />
-          <button id="sendBtn" data-i18n="send" disabled>Send</button>
-        </div>
       </div>
-    </div>
 
     <script src="/socket.io/socket.io.js"></script>
     <script src="/i18n.js"></script>

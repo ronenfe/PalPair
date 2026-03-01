@@ -64,6 +64,7 @@ refreshUserCountFallback();
 const profileContainer = document.getElementById('profileContainer');
 const profileForm = document.getElementById('profileForm');
 const chatInterface = document.getElementById('chatInterface');
+const privateChatInterface = document.getElementById('privateChatInterface');
 const saveProfileBtn = document.getElementById('saveProfileBtn');
 const userCounterWrap = document.getElementById('userCounter');
 
@@ -94,6 +95,8 @@ const publicChatSection = document.getElementById('publicChatSection');
 const privateChatSection = document.getElementById('privateChatSection');
 const chatModeLabel = document.getElementById('chatModeLabel');
 const chatModeSub = document.getElementById('chatModeSub');
+const privateChatInput = document.getElementById('privateChatInput');
+const privateSendBtn = document.getElementById('privateSendBtn');
 const AI_PARTNER_LABEL = '🤖 AI Partner';
 
 // Online users panel toggle
@@ -218,7 +221,7 @@ saveProfileBtn.addEventListener('click', () => {
   } else if (profileForm) {
     profileForm.style.display = 'none';
   }
-  chatInterface.style.display = 'block';
+  chatInterface.style.display = 'flex';
   document.body.classList.add('chat-active');
   setRandomMode(false);
   setChatCollapsed(false);
@@ -238,11 +241,14 @@ function setChatCollapsed(collapsed) {
       chatInput.disabled = false;
     }
   isChatCollapsed = collapsed;
-  if (chatInterface) {
+  // Toggle collapsed class on the correct interface
+  if (isRunning && privateChatInterface) {
+    privateChatInterface.classList.toggle('chat-collapsed', collapsed);
+  } else if (chatInterface) {
     chatInterface.classList.toggle('chat-collapsed', collapsed);
   }
   if (chatToggleBtn) {
-    chatToggleBtn.textContent = '💬';
+    chatToggleBtn.textContent = collapsed ? '💬' : '✕';
     chatToggleBtn.setAttribute('aria-label', collapsed ? 'Expand chat' : 'Collapse chat');
     chatToggleBtn.setAttribute('title', collapsed ? 'Expand Chat' : 'Collapse Chat');
   }
@@ -264,30 +270,34 @@ function setRandomMode(active) {
   isRunning = active;
   document.body.classList.toggle('random-active', active);
 
-  // Switch between public chat view and private random chat view
-  if (publicChatSection && privateChatSection) {
-    if (active) {
-      publicChatSection.style.display = 'none';
-      privateChatSection.style.display = 'block';
-      // Show private messages, hide public
-      chatMessages.style.display = 'none';
-      if (privateChatMessages) privateChatMessages.style.display = 'block';
-      // Clear private chat for fresh start
-      privateChatHistory = '';
-      if (privateChatMessages) privateChatMessages.innerHTML = '';
-      if (chatModeLabel) chatModeLabel.textContent = 'Private random chat';
-      if (chatModeSub) chatModeSub.textContent = '1:1 video chat with a random partner';
-    } else {
-      publicChatSection.style.display = 'block';
-      privateChatSection.style.display = 'none';
-      // Show public messages, hide private
-      chatMessages.style.display = 'block';
-      if (privateChatMessages) privateChatMessages.style.display = 'none';
-      chatMessages.innerHTML = publicChatHistory;
-      chatMessages.scrollTop = chatMessages.scrollHeight;
-      if (chatModeLabel) chatModeLabel.textContent = 'Public chat';
-      if (chatModeSub) chatModeSub.textContent = 'Chat with everyone in the lobby';
-    }
+  // Switch between public chat interface and private chat interface
+  if (active) {
+    chatInterface.style.display = 'none';
+    if (privateChatInterface) privateChatInterface.style.display = 'flex';
+    // Show private messages, hide public
+    chatMessages.style.display = 'none';
+    if (privateChatMessages) privateChatMessages.style.display = 'block';
+    // Clear private chat for fresh start
+    privateChatHistory = '';
+    if (privateChatMessages) privateChatMessages.innerHTML = '';
+    // Enable private chat input
+    if (privateChatInput) privateChatInput.disabled = false;
+    if (privateSendBtn) privateSendBtn.disabled = false;
+    if (chatModeLabel) chatModeLabel.textContent = 'Private random chat';
+    if (chatModeSub) chatModeSub.textContent = '1:1 video chat with a random partner';
+  } else {
+    chatInterface.style.display = 'flex';
+    if (privateChatInterface) privateChatInterface.style.display = 'none';
+    // Show public messages, hide private
+    chatMessages.style.display = 'block';
+    if (privateChatMessages) privateChatMessages.style.display = 'none';
+    chatMessages.innerHTML = publicChatHistory;
+    chatMessages.scrollTop = chatMessages.scrollHeight;
+    // Disable private chat input
+    if (privateChatInput) { privateChatInput.disabled = true; privateChatInput.value = ''; }
+    if (privateSendBtn) privateSendBtn.disabled = true;
+    if (chatModeLabel) chatModeLabel.textContent = 'Public chat';
+    if (chatModeSub) chatModeSub.textContent = 'Chat with everyone in the lobby';
   }
 
   if (goRandomBtn) {
@@ -455,6 +465,7 @@ socket.on('matched', async ({ otherId: id, initiator, isBot, botProfile, partner
   
   otherId = id;
   nextBtn.disabled = false;
+  setChatCollapsed(false);
   setAiPartnerBadge(!!isBot);
   remoteVideo.muted = !!isBot;
   console.log('>>> Setting status to Connected');
@@ -558,13 +569,6 @@ sendBtn.onclick = () => {
   const text = chatInput.value.trim();
   if (!text) return;
 
-  if (isRunning && otherId) {
-    socket.emit('chat-message', { to: otherId, text });
-    addChatMessage(text, 'local');
-    chatInput.value = '';
-    return;
-  }
-
   if (!isRunning) {
     const clientMsgId = `msg_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
     pendingPublicMessageIds.add(clientMsgId);
@@ -579,6 +583,26 @@ chatInput.onkeypress = (e) => {
     sendBtn.onclick();
   }
 };
+
+// Private chat send
+function sendPrivateMessage() {
+  if (!privateChatInput) return;
+  const text = privateChatInput.value.trim();
+  if (!text || !isRunning || !otherId) return;
+  socket.emit('chat-message', { to: otherId, text });
+  addChatMessage(text, 'local');
+  privateChatInput.value = '';
+}
+
+if (privateSendBtn) {
+  privateSendBtn.onclick = sendPrivateMessage;
+}
+
+if (privateChatInput) {
+  privateChatInput.onkeypress = (e) => {
+    if (e.key === 'Enter') sendPrivateMessage();
+  };
+}
 
 
 function cancelAutoReconnect() {
@@ -736,6 +760,7 @@ function clearChat() {
   publicChatHistory = '';
   privateChatHistory = '';
   chatInput.value = '';
+  if (privateChatInput) privateChatInput.value = '';
 }
 
 function renderOnlineUsers(users = []) {
