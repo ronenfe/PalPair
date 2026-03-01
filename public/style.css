@@ -1005,6 +1005,14 @@ body.chat-active:not(.random-active) .chat-container {
   font-weight: 500;
 }
 
+.chat-timestamp {
+  display: block;
+  font-size: 0.7em;
+  opacity: 0.55;
+  margin-top: 4px;
+  text-align: right;
+}
+
 .chat-input-wrap { 
   display: flex;
   gap: 10px;

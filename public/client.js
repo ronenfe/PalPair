@@ -717,6 +717,13 @@ function addChatMessage(text, sender) {
   const messageText = String(text || '');
   const shouldType = sender === 'remote' && messageText.length > 0;
 
+  // Timestamp
+  const now = new Date();
+  const timeStr = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  const timeSpan = document.createElement('span');
+  timeSpan.className = 'chat-timestamp';
+  timeSpan.textContent = timeStr;
+
   // Update chat history buffer
   if (targetDiv === chatMessages) {
     publicChatHistory += div.outerHTML;
@@ -726,6 +733,7 @@ function addChatMessage(text, sender) {
 
   if (!shouldType) {
     div.textContent = messageText;
+    div.appendChild(timeSpan);
     targetDiv.scrollTop = targetDiv.scrollHeight;
     return;
   }
@@ -737,6 +745,7 @@ function addChatMessage(text, sender) {
   const step = () => {
     currentIndex += 1;
     div.textContent = messageText.slice(0, currentIndex);
+    div.appendChild(timeSpan);
     targetDiv.scrollTop = targetDiv.scrollHeight;
     // Update buffer for typing effect
     if (targetDiv === chatMessages) {
