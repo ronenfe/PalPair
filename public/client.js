@@ -88,11 +88,20 @@ const sendBtn = document.getElementById('sendBtn');
 const chatMessages = document.getElementById('chatMessages');
 const privateChatMessages = document.getElementById('privateChatMessages');
 const onlineUsersList = document.getElementById('onlineUsersList');
+const onlineUsersPanel = document.getElementById('onlineUsersPanel');
+const usersToggleBtn = document.getElementById('usersToggleBtn');
 const publicChatSection = document.getElementById('publicChatSection');
 const privateChatSection = document.getElementById('privateChatSection');
 const chatModeLabel = document.getElementById('chatModeLabel');
 const chatModeSub = document.getElementById('chatModeSub');
 const AI_PARTNER_LABEL = '🤖 AI Partner';
+
+// Online users panel toggle
+if (usersToggleBtn && onlineUsersPanel) {
+  usersToggleBtn.addEventListener('click', () => {
+    onlineUsersPanel.classList.toggle('open');
+  });
+}
 
 function syncViewportHeight() {
   const viewportHeight = Math.round(window.visualViewport?.height || window.innerHeight || document.documentElement.clientHeight);
@@ -239,11 +248,9 @@ function setChatCollapsed(collapsed) {
   }
   // Switch chat context: show/hide correct chat div
   if (!collapsed) {
-    if (isRunning && otherId) {
+    if (isRunning) {
       chatMessages.style.display = 'none';
       privateChatMessages.style.display = 'block';
-      privateChatMessages.innerHTML = privateChatHistory;
-      privateChatMessages.scrollTop = privateChatMessages.scrollHeight;
     } else {
       chatMessages.style.display = 'block';
       if (privateChatMessages) privateChatMessages.style.display = 'none';
@@ -262,11 +269,22 @@ function setRandomMode(active) {
     if (active) {
       publicChatSection.style.display = 'none';
       privateChatSection.style.display = 'block';
+      // Show private messages, hide public
+      chatMessages.style.display = 'none';
+      if (privateChatMessages) privateChatMessages.style.display = 'block';
+      // Clear private chat for fresh start
+      privateChatHistory = '';
+      if (privateChatMessages) privateChatMessages.innerHTML = '';
       if (chatModeLabel) chatModeLabel.textContent = 'Private random chat';
       if (chatModeSub) chatModeSub.textContent = '1:1 video chat with a random partner';
     } else {
       publicChatSection.style.display = 'block';
       privateChatSection.style.display = 'none';
+      // Show public messages, hide private
+      chatMessages.style.display = 'block';
+      if (privateChatMessages) privateChatMessages.style.display = 'none';
+      chatMessages.innerHTML = publicChatHistory;
+      chatMessages.scrollTop = chatMessages.scrollHeight;
       if (chatModeLabel) chatModeLabel.textContent = 'Public chat';
       if (chatModeSub) chatModeSub.textContent = 'Chat with everyone in the lobby';
     }
@@ -364,6 +382,9 @@ nextBtn.onclick = () => {
   // Find next partner while already connected
   console.log('>>> Find Next button clicked, otherId:', otherId);
   localNextInProgress = true;
+  // Clear private chat for new match
+  privateChatHistory = '';
+  if (privateChatMessages) privateChatMessages.innerHTML = '';
   status(translate('statusFindingNext'));
   socket.emit('next');
   if (pc) pc.close();
@@ -406,6 +427,10 @@ socket.on('matched', async ({ otherId: id, initiator, isBot, botProfile, partner
     return;
   }
   console.log('>>> Matched event received, otherId:', id, 'initiator:', initiator, 'isBot:', isBot);
+  
+  // Clear private chat for fresh conversation
+  privateChatHistory = '';
+  if (privateChatMessages) privateChatMessages.innerHTML = '';
   
   // Play sound notification
   try {

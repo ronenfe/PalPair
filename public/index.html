@@ -468,7 +468,8 @@
             <div class="chat-container">
               <div id="chatMessages" class="chat-messages"></div>
             </div>
-            <aside class="online-users-panel" aria-live="polite">
+            <button id="usersToggleBtn" class="users-toggle-btn" aria-label="Toggle users list" title="Connected users">👥</button>
+            <aside class="online-users-panel" id="onlineUsersPanel" aria-live="polite">
               <h3 class="online-users-title">Connected users</h3>
               <ul id="onlineUsersList" class="online-users-list"></ul>
             </aside>
@@ -497,7 +498,7 @@
           <p id="status" data-i18n="idle">Idle</p>
 
           <div class="chat-container">
-            <div id="privateChatMessages" class="chat-messages" style="display:none;"></div>
+            <div id="privateChatMessages" class="chat-messages"></div>
           </div>
         </section>
 
