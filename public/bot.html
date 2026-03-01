@@ -17,7 +17,13 @@
     
     // Load video file for this bot
     video.src = `/videos/bot${botId}.mp4`;
+    video.loop = false; // ensure no looping
     video.play();
+
+    // Stop at end — don't loop
+    video.onended = () => {
+      video.pause();
+    };
     
     // Get video stream from video element
     let stream = null;
@@ -45,6 +51,9 @@
       socket.on('matched', async ({ otherId: id, initiator }) => {
         console.log(`[${botName}] Matched with ${id}, initiator: ${initiator}`);
         otherId = id;
+        // Restart video from beginning on each new match
+        video.currentTime = 0;
+        video.play();
         await createPeerConnection(id, initiator);
       });
       

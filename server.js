@@ -803,6 +803,8 @@ function buildPublicOnlineUsersSnapshot() {
     const profile = userProfiles.get(socketId)?.profile || {};
     const botProfile = botProfiles.get(socketId) || {};
     const profileName = profile.name || botProfile.name;
+    // Skip sockets that haven't set a profile (no name) and aren't bots
+    if (!profileName && !isBot) continue;
     const fallbackName = `Guest-${socketId.substring(0, 4)}`;
     users.push({
       socketId,
