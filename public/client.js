@@ -108,7 +108,7 @@ if (usersToggleBtn && onlineUsersPanel) {
 
 function syncViewportHeight() {
   const viewportHeight = Math.round(window.visualViewport?.height || window.innerHeight || document.documentElement.clientHeight);
-  const appHeight = viewportHeight;
+  const appHeight = Math.round(viewportHeight * 0.95);
   document.documentElement.style.setProperty('--app-height', `${appHeight}px`);
 
   let chatScale = 0.9;
@@ -231,7 +231,7 @@ saveProfileBtn.addEventListener('click', () => {
 });
 let otherId = null;
 let isRunning = false;
-let isChatCollapsed = false;
+let isChatCollapsed = true;
 let localNextInProgress = false;
 
 function setChatCollapsed(collapsed) {
@@ -248,7 +248,7 @@ function setChatCollapsed(collapsed) {
     chatInterface.classList.toggle('chat-collapsed', collapsed);
   }
   if (chatToggleBtn) {
-    chatToggleBtn.textContent = collapsed ? '💬' : '✕';
+    chatToggleBtn.textContent = '💬';
     chatToggleBtn.setAttribute('aria-label', collapsed ? 'Expand chat' : 'Collapse chat');
     chatToggleBtn.setAttribute('title', collapsed ? 'Expand Chat' : 'Collapse Chat');
   }
@@ -273,7 +273,10 @@ function setRandomMode(active) {
   // Switch between public chat interface and private chat interface
   if (active) {
     chatInterface.style.display = 'none';
-    if (privateChatInterface) privateChatInterface.style.display = 'flex';
+    if (privateChatInterface) {
+      privateChatInterface.style.display = 'flex';
+      privateChatInterface.classList.toggle('chat-collapsed', isChatCollapsed);
+    }
     // Show private messages, hide public
     chatMessages.style.display = 'none';
     if (privateChatMessages) privateChatMessages.style.display = 'block';
@@ -359,7 +362,6 @@ if (goRandomBtn) {
         setRandomMode(true);
         nextBtn.disabled = true;
         reportBtn.disabled = false;
-        setChatCollapsed(true);
 
         localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
         localVideo.srcObject = localStream;
@@ -465,7 +467,6 @@ socket.on('matched', async ({ otherId: id, initiator, isBot, botProfile, partner
   
   otherId = id;
   nextBtn.disabled = false;
-  setChatCollapsed(false);
   setAiPartnerBadge(!!isBot);
   remoteVideo.muted = !!isBot;
   console.log('>>> Setting status to Connected');

@@ -491,6 +491,12 @@
 
       <!-- Private random chat interface (separate div, hidden until Go Random) -->
       <div id="privateChatInterface" style="display:none">
+          <div class="controls controls-overlay">
+              <button id="nextBtn" class="control-btn control-primary" disabled aria-label="Find next partner" title="Find Next">⏭</button>
+              <button id="reportBtn" class="control-btn control-danger" aria-label="Report concern" title="Report">⚑</button>
+              <button id="chatToggleBtn" class="control-btn control-secondary" aria-label="Collapse chat" title="Collapse Chat">💬</button>
+              <button id="stopRandomBtn" class="stop-random-btn" aria-label="Stop random" title="Stop Random">⏹</button>
+          </div>
         <section id="privateChatSection" class="chat-view">
           <div class="videos">
             <div class="video-wrap">
@@ -499,13 +505,6 @@
             <div class="video-wrap">
               <video id="remoteVideo" autoplay playsinline></video>
               <div id="remotePlaceholder" class="video-placeholder"></div>
-              <div id="aiPartnerBadge" class="ai-partner-badge" aria-live="polite" style="display:none">🤖 AI Partner</div>
-            </div>
-            <div class="controls controls-overlay">
-              <button id="nextBtn" class="control-btn control-primary" disabled aria-label="Find next partner" title="Find Next">⏭</button>
-              <button id="reportBtn" class="control-btn control-danger" aria-label="Report concern" title="Report">⚑</button>
-              <button id="chatToggleBtn" class="control-btn control-secondary" aria-label="Collapse chat" title="Collapse Chat">💬</button>
-              <button id="stopRandomBtn" class="stop-random-btn" aria-label="Stop random" title="Stop Random">⏹</button>
             </div>
           </div>
 
