@@ -466,7 +466,6 @@ socket.on('matched', async ({ otherId: id, initiator, isBot, botProfile, partner
   otherId = id;
   nextBtn.disabled = false;
   setAiPartnerBadge(!!isBot);
-  remoteVideo.muted = !!isBot;
   console.log('>>> Setting status to Connected');
 
   if (isBot) {
