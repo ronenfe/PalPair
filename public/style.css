@@ -403,7 +403,6 @@ body.chat-active .videos {
   min-height: calc(((var(--app-height) - var(--chat-safe-top) - var(--chat-safe-bottom) - (var(--chat-bottom-gap) * 2))) * var(--video-height-scale));
   height: calc(((var(--app-height) - var(--chat-safe-top) - var(--chat-safe-bottom) - (var(--chat-bottom-gap) * 2))) * var(--video-height-scale));
   width: calc(100% - (var(--stage-side-gap) * 2));
-  margin: var(--chat-bottom-gap) auto;
   max-height: calc(((var(--app-height) - var(--chat-safe-top) - var(--chat-safe-bottom) - (var(--chat-bottom-gap) * 2))) * var(--video-height-scale));
   transform: none;
 }
@@ -1110,7 +1109,6 @@ body.chat-active:not(.random-active) .chat-container {
 
   body.chat-active .videos {
     width: calc(100% - (var(--stage-side-gap) * 2));
-    margin: var(--chat-bottom-gap) auto;
     min-height: calc(((var(--app-height) - var(--chat-safe-top) - var(--chat-safe-bottom) - (var(--chat-bottom-gap) * 2))) * var(--video-height-scale));
     height: calc(((var(--app-height) - var(--chat-safe-top) - var(--chat-safe-bottom) - (var(--chat-bottom-gap) * 2))) * var(--video-height-scale));
     max-height: calc(((var(--app-height) - var(--chat-safe-top) - var(--chat-safe-bottom) - (var(--chat-bottom-gap) * 2))) * var(--video-height-scale));
@@ -1253,7 +1251,6 @@ body.chat-active:not(.random-active) .chat-container {
 @media (max-height: 760px) {
   body.chat-active .videos {
     width: calc(100% - (var(--stage-side-gap) * 2));
-    margin: var(--chat-bottom-gap) auto;
     min-height: calc(((var(--app-height) - var(--chat-safe-top) - var(--chat-safe-bottom) - (var(--chat-bottom-gap) * 2))) * var(--video-height-scale));
     height: calc(((var(--app-height) - var(--chat-safe-top) - var(--chat-safe-bottom) - (var(--chat-bottom-gap) * 2))) * var(--video-height-scale));
     max-height: calc(((var(--app-height) - var(--chat-safe-top) - var(--chat-safe-bottom) - (var(--chat-bottom-gap) * 2))) * var(--video-height-scale));
