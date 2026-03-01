@@ -224,7 +224,6 @@ saveProfileBtn.addEventListener('click', () => {
   chatInterface.style.display = 'flex';
   document.body.classList.add('chat-active');
   setRandomMode(false);
-  setChatCollapsed(false);
   chatInput.disabled = false;
   sendBtn.disabled = false;
   status(translate('statusPublicRoom'));
@@ -325,7 +324,6 @@ function setRandomMode(active) {
     }
     localVideo.srcObject = null;
     setAiPartnerBadge(false);
-    setChatCollapsed(false);
   }
 }
 

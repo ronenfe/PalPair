@@ -27,6 +27,7 @@
   line-height: 1;
   backdrop-filter: blur(6px);
   pointer-events: auto;
+  padding: 0;
 }
 .stop-random-btn:hover {
   background: linear-gradient(135deg, #b91c1c 0%, #ef4444 100%);
@@ -405,6 +406,7 @@ body.chat-active .videos {
   width: calc(100% - (var(--stage-side-gap) * 2));
   max-height: calc(((var(--app-height) - var(--chat-safe-top) - var(--chat-safe-bottom) - (var(--chat-bottom-gap) * 2))) * var(--video-height-scale));
   transform: none;
+  align-self: center;
 }
 
 .video-wrap { 
@@ -420,6 +422,9 @@ body.chat-active .videos {
   width: 100%;
   height: clamp(360px, 74vh, 860px);
   border-radius: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 body.chat-active .videos .video-wrap:nth-child(2) {
@@ -893,9 +898,7 @@ body.chat-active.random-active .chat-container {
 
 #chatInterface.chat-collapsed .private-chat-panel,
 #privateChatInterface.chat-collapsed .private-chat-panel {
-  opacity: 0;
-  pointer-events: none;
-  transform: translateY(12px) scaleY(0.15);
+  display: none;
 }
 
 /* Hide shared input when in random mode */
