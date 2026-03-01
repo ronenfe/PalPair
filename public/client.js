@@ -696,21 +696,28 @@ function addPublicRoomEvent(event = {}) {
   }
 
   if (event.type === 'system') {
-    addChatMessage(event.text, 'system');
+    addChatMessage(event.text, 'system', 'public');
     return;
   }
 
   const isMine = event.socketId === socket.id;
   const sender = isMine ? 'local' : 'remote';
   const prefix = isMine ? '' : `${event.name || 'Guest'}: `;
-  addChatMessage(`${prefix}${event.text}`, sender);
+  addChatMessage(`${prefix}${event.text}`, sender, 'public');
 }
 
-function addChatMessage(text, sender) {
+function addChatMessage(text, sender, target) {
   const div = document.createElement('div');
   div.className = `chat-message ${sender}`;
   // Use correct chat div
-  const targetDiv = (isRunning && otherId) ? privateChatMessages : chatMessages;
+  let targetDiv;
+  if (target === 'public') {
+    targetDiv = chatMessages;
+  } else if (target === 'private') {
+    targetDiv = privateChatMessages;
+  } else {
+    targetDiv = (isRunning && otherId) ? privateChatMessages : chatMessages;
+  }
   targetDiv.appendChild(div);
 
   const messageText = String(text || '');

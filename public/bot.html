@@ -5,7 +5,7 @@
   <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
 </head>
 <body>
-  <video id="botVideo" autoplay playsinline style="display:none"></video>
+  <video id="botVideo" autoplay muted playsinline style="display:none"></video>
   <script src="/socket.io/socket.io.js"></script>
   <script src="/ai-responses.js"></script>
   <script>
@@ -19,11 +19,6 @@
     video.src = `/videos/bot${botId}.mp4`;
     video.loop = false; // ensure no looping
     video.play();
-
-    // Stop at end — don't loop
-    video.onended = () => {
-      video.pause();
-    };
     
     // Get video stream from video element
     let stream = null;
@@ -54,6 +49,8 @@
         // Restart video from beginning on each new match
         video.currentTime = 0;
         video.play();
+        // Re-capture stream in case tracks ended
+        stream = video.captureStream();
         await createPeerConnection(id, initiator);
       });
       
