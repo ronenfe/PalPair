@@ -696,17 +696,17 @@ function addPublicRoomEvent(event = {}) {
   }
 
   if (event.type === 'system') {
-    addChatMessage(event.text, 'system', 'public');
+    addChatMessage(event.text, 'system', 'public', event.timestamp);
     return;
   }
 
   const isMine = event.socketId === socket.id;
   const sender = isMine ? 'local' : 'remote';
   const prefix = isMine ? '' : `${event.name || 'Guest'}: `;
-  addChatMessage(`${prefix}${event.text}`, sender, 'public');
+  addChatMessage(`${prefix}${event.text}`, sender, 'public', event.timestamp);
 }
 
-function addChatMessage(text, sender, target) {
+function addChatMessage(text, sender, target, serverTimestamp) {
   const div = document.createElement('div');
   div.className = `chat-message ${sender}`;
   // Use correct chat div
@@ -723,9 +723,9 @@ function addChatMessage(text, sender, target) {
   const messageText = String(text || '');
   const shouldType = sender === 'remote' && messageText.length > 0;
 
-  // Timestamp
-  const now = new Date();
-  const timeStr = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  // Timestamp — use server timestamp if available, else current time
+  const ts = serverTimestamp ? new Date(serverTimestamp) : new Date();
+  const timeStr = ts.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   const timeSpan = document.createElement('span');
   timeSpan.className = 'chat-timestamp';
   timeSpan.textContent = timeStr;
