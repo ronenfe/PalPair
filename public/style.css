@@ -802,6 +802,12 @@ body.chat-active .videos .video-wrap:nth-child(2) #status {
   white-space: nowrap;
 }
 
+.online-user-state.state-broadcasting {
+  color: #ff4444;
+  font-weight: 600;
+  animation: livePulse 1.5s ease-in-out infinite;
+}
+
 body.chat-active.random-active .chat-container {
   position: absolute;
   left: 10px;

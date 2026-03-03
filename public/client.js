@@ -832,7 +832,16 @@ function renderOnlineUsers(users = []) {
 
     const stateEl = document.createElement('span');
     stateEl.className = 'online-user-state';
-    stateEl.textContent = user.paired ? 'In random' : (user.searching ? 'Searching' : 'In room');
+    if (user.streaming) {
+      stateEl.textContent = '📡 Broadcasting';
+      stateEl.classList.add('state-broadcasting');
+    } else if (user.paired) {
+      stateEl.textContent = 'In random';
+    } else if (user.searching) {
+      stateEl.textContent = 'Searching';
+    } else {
+      stateEl.textContent = 'In room';
+    }
 
     item.appendChild(nameEl);
     item.appendChild(stateEl);

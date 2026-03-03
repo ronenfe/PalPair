@@ -837,7 +837,8 @@ function buildPublicOnlineUsersSnapshot() {
       isBot,
       gender: (profile.gender || botProfile.gender || '').toString().toLowerCase(),
       searching: searching.has(socketId),
-      paired: pairs.has(socketId)
+      paired: pairs.has(socketId),
+      streaming: publicStreamers.includes(socketId)
     });
   }
 
@@ -1348,6 +1349,7 @@ io.on('connection', (socket) => {
     console.log(`>>> ${socket.id} started public stream (${streamerName})`);
     // Notify all clients that a new streamer is available
     io.emit('public-stream-update', { streamers: getPublicStreamersList() });
+    emitPublicOnlineUsers();
   });
 
   socket.on('stop-public-stream', () => {
@@ -1357,6 +1359,7 @@ io.on('connection', (socket) => {
     console.log(`>>> ${socket.id} stopped public stream`);
     // Notify viewers who were watching this streamer
     io.emit('public-stream-update', { streamers: getPublicStreamersList() });
+    emitPublicOnlineUsers();
     // Disconnect all viewers watching this streamer
     for (const [viewerId, viewerIdx] of viewerStreamIndex.entries()) {
       if (viewerIdx === idx) {
