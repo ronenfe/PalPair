@@ -1,0 +1,271 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Support Admin — Conversations</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'Segoe UI', system-ui, sans-serif; background: #0f1117; color: #e0e0e0; display: flex; height: 100vh; }
+
+    /* ── Sidebar ── */
+    .sidebar { width: 320px; background: #16181f; border-right: 1px solid #2a2d3a; display: flex; flex-direction: column; }
+    .sidebar-header { padding: 16px; border-bottom: 1px solid #2a2d3a; }
+    .sidebar-header h2 { font-size: 1.1rem; color: #6c5ce7; }
+    .sidebar-header .badge { background: #6c5ce7; color: #fff; font-size: .7rem; padding: 2px 8px; border-radius: 12px; margin-left: 8px; vertical-align: middle; }
+
+    .conversation-list { flex: 1; overflow-y: auto; }
+    .conversation-item { padding: 14px 16px; border-bottom: 1px solid #1e2029; cursor: pointer; transition: background .15s; }
+    .conversation-item:hover { background: #1e2029; }
+    .conversation-item.active { background: #1e2233; border-left: 3px solid #6c5ce7; }
+    .conversation-item .conv-session { font-size: .7rem; color: #888; margin-bottom: 4px; }
+    .conversation-item .conv-preview { font-size: .85rem; color: #bbb; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .conversation-item .conv-time { font-size: .7rem; color: #666; margin-top: 4px; }
+    .conversation-item .conv-unread { display: block; background: #e74c3c; color: #fff; font-size: .65rem; padding: 1px 7px; border-radius: 10px; float: right; margin-top: -18px; }
+    .no-conversations { padding: 40px 16px; text-align: center; color: #666; }
+
+    /* ── Chat Panel ── */
+    .chat-panel { flex: 1; display: flex; flex-direction: column; }
+    .chat-panel-header { padding: 16px 20px; border-bottom: 1px solid #2a2d3a; background: #16181f; }
+    .chat-panel-header h3 { font-size: 1rem; }
+    .chat-panel-header .session-id { font-size: .75rem; color: #888; margin-top: 2px; }
+
+    .chat-messages { flex: 1; overflow-y: auto; padding: 20px; display: flex; flex-direction: column; gap: 10px; }
+    .chat-messages .msg { max-width: 70%; padding: 10px 14px; border-radius: 12px; font-size: .9rem; line-height: 1.4; word-break: break-word; }
+    .chat-messages .msg.user { background: #1e2233; align-self: flex-start; border-bottom-left-radius: 4px; }
+    .chat-messages .msg.admin { background: #6c5ce7; color: #fff; align-self: flex-end; border-bottom-right-radius: 4px; }
+    .chat-messages .msg .ts { display: block; font-size: .65rem; opacity: .6; margin-top: 4px; text-align: right; }
+
+    .empty-chat { flex: 1; display: flex; align-items: center; justify-content: center; color: #555; font-size: 1.1rem; }
+
+    .reply-bar { padding: 12px 20px; border-top: 1px solid #2a2d3a; background: #16181f; display: none; }
+    .reply-bar form { display: flex; gap: 10px; }
+    .reply-bar input { flex: 1; background: #0f1117; border: 1px solid #2a2d3a; border-radius: 8px; padding: 10px 14px; color: #e0e0e0; font-size: .9rem; outline: none; }
+    .reply-bar input:focus { border-color: #6c5ce7; }
+    .reply-bar button { background: #6c5ce7; color: #fff; border: none; border-radius: 8px; padding: 10px 20px; cursor: pointer; font-weight: 600; transition: background .15s; }
+    .reply-bar button:hover { background: #5a4bd1; }
+
+    /* ── Notifications ── */
+    .notification-bar { padding: 8px 16px; background: #e74c3c22; color: #e74c3c; font-size: .8rem; text-align: center; cursor: pointer; display: none; }
+
+    /* ── Scrollbar ── */
+    ::-webkit-scrollbar { width: 6px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: #333; border-radius: 3px; }
+
+    /* ── Mobile ── */
+    @media (max-width: 700px) {
+      .sidebar { width: 100%; position: absolute; z-index: 10; height: 100%; }
+      .sidebar.hidden { display: none; }
+      .chat-panel-header .back-btn { display: inline-block; }
+    }
+    .back-btn { display: none; background: none; border: none; color: #6c5ce7; cursor: pointer; font-size: 1.1rem; margin-right: 10px; }
+  </style>
+</head>
+<body>
+
+  <div class="sidebar" id="sidebar">
+    <div class="sidebar-header">
+      <h2>Support Chats <span class="badge" id="convCount">0</span></h2>
+    </div>
+    <div class="notification-bar" id="notifBar">🔔 Enable browser notifications</div>
+    <div class="conversation-list" id="convList">
+      <div class="no-conversations" id="emptyMsg">No conversations yet. Waiting for messages…</div>
+    </div>
+  </div>
+
+  <div class="chat-panel" id="chatPanel">
+    <div class="chat-panel-header" id="chatHeader" style="display:none;">
+      <button class="back-btn" id="backBtn" onclick="showSidebar()">← </button>
+      <h3 id="chatTitle">Conversation</h3>
+      <div class="session-id" id="chatSessionId"></div>
+    </div>
+    <div class="empty-chat" id="emptyChatPlaceholder">Select a conversation from the sidebar</div>
+    <div class="chat-messages" id="chatMessages" style="display:none;"></div>
+    <div class="reply-bar" id="replyBar">
+      <form id="replyForm">
+        <input type="text" id="replyInput" placeholder="Type a reply…" autocomplete="off" required />
+        <button type="submit">Send</button>
+      </form>
+    </div>
+  </div>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script>
+  (function () {
+    // ── Auth ──
+    const params = new URLSearchParams(location.search);
+    const adminKey = params.get('key') || '';
+
+    const socket = io('/support-admin', {
+      auth: { key: adminKey },
+      query: { key: adminKey },
+      transports: ['websocket', 'polling']
+    });
+
+    // ── State ──
+    const conversations = new Map(); // sessionId → { messages: [], lastActivity }
+    let activeConv = null;
+
+    // ── DOM refs ──
+    const convList = document.getElementById('convList');
+    const emptyMsg = document.getElementById('emptyMsg');
+    const convCount = document.getElementById('convCount');
+    const chatMessages = document.getElementById('chatMessages');
+    const chatHeader = document.getElementById('chatHeader');
+    const chatTitle = document.getElementById('chatTitle');
+    const chatSessionId = document.getElementById('chatSessionId');
+    const emptyChatPlaceholder = document.getElementById('emptyChatPlaceholder');
+    const replyBar = document.getElementById('replyBar');
+    const replyForm = document.getElementById('replyForm');
+    const replyInput = document.getElementById('replyInput');
+    const notifBar = document.getElementById('notifBar');
+
+    // ── Browser notifications ──
+    if ('Notification' in window && Notification.permission === 'default') {
+      notifBar.style.display = 'block';
+      notifBar.onclick = () => {
+        Notification.requestPermission().then((p) => {
+          notifBar.style.display = 'none';
+        });
+      };
+    }
+
+    function desktopNotify(title, body) {
+      if ('Notification' in window && Notification.permission === 'granted') {
+        new Notification(title, { body, icon: '💬' });
+      }
+    }
+
+    // ── Socket events ──
+    socket.on('support-conversations', (convs) => {
+      // Initial load of all conversations
+      conversations.clear();
+      for (const c of convs) {
+        conversations.set(c.sessionId, { messages: c.messages || [], lastActivity: c.lastActivity || Date.now() });
+      }
+      renderSidebar();
+    });
+
+    socket.on('support-new-message', ({ sessionId, message }) => {
+      if (!conversations.has(sessionId)) {
+        conversations.set(sessionId, { messages: [], lastActivity: Date.now() });
+      }
+      const conv = conversations.get(sessionId);
+      conv.messages.push(message);
+      conv.lastActivity = Date.now();
+      renderSidebar();
+
+      if (activeConv === sessionId) {
+        appendMsg(message);
+        scrollToBottom();
+      } else {
+        desktopNotify('New support message', message.text);
+      }
+    });
+
+    // ── Send reply ──
+    replyForm.addEventListener('submit', (e) => {
+      e.preventDefault();
+      const text = replyInput.value.trim();
+      if (!text || !activeConv) return;
+
+      socket.emit('admin-reply', { sessionId: activeConv, text });
+
+      const msg = { from: 'admin', text, timestamp: new Date().toISOString() };
+      const conv = conversations.get(activeConv);
+      if (conv) conv.messages.push(msg);
+      appendMsg(msg);
+      scrollToBottom();
+      replyInput.value = '';
+    });
+
+    // ── Render sidebar ──
+    function renderSidebar() {
+      const sorted = [...conversations.entries()].sort((a, b) => b[1].lastActivity - a[1].lastActivity);
+      convCount.textContent = sorted.length;
+
+      if (sorted.length === 0) {
+        emptyMsg.style.display = 'block';
+        convList.querySelectorAll('.conversation-item').forEach(el => el.remove());
+        return;
+      }
+      emptyMsg.style.display = 'none';
+
+      // Rebuild list
+      convList.innerHTML = '';
+      for (const [sessionId, conv] of sorted) {
+        const div = document.createElement('div');
+        div.className = 'conversation-item' + (sessionId === activeConv ? ' active' : '');
+        const lastMsg = conv.messages[conv.messages.length - 1];
+        const preview = lastMsg ? lastMsg.text.slice(0, 60) : '(empty)';
+        const time = lastMsg ? new Date(lastMsg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '';
+        const shortId = sessionId.length > 16 ? sessionId.slice(0, 16) + '…' : sessionId;
+
+        div.innerHTML = `
+          <div class="conv-session">${shortId}</div>
+          <div class="conv-preview">${escapeHtml(preview)}</div>
+          <div class="conv-time">${time}</div>
+        `;
+        div.addEventListener('click', () => openConversation(sessionId));
+        convList.appendChild(div);
+      }
+    }
+
+    // ── Open conversation ──
+    function openConversation(sessionId) {
+      activeConv = sessionId;
+      const conv = conversations.get(sessionId);
+      if (!conv) return;
+
+      chatHeader.style.display = 'block';
+      chatMessages.style.display = 'flex';
+      emptyChatPlaceholder.style.display = 'none';
+      replyBar.style.display = 'block';
+
+      const shortId = sessionId.length > 20 ? sessionId.slice(0, 20) + '…' : sessionId;
+      chatTitle.textContent = 'Conversation';
+      chatSessionId.textContent = sessionId;
+
+      chatMessages.innerHTML = '';
+      for (const msg of conv.messages) {
+        appendMsg(msg);
+      }
+      scrollToBottom();
+      renderSidebar(); // update active state
+
+      // Mobile: hide sidebar
+      document.getElementById('sidebar').classList.add('hidden');
+      replyInput.focus();
+    }
+
+    function appendMsg(msg) {
+      const div = document.createElement('div');
+      div.className = 'msg ' + (msg.from === 'admin' ? 'admin' : 'user');
+      div.textContent = msg.text;
+
+      const ts = document.createElement('span');
+      ts.className = 'ts';
+      ts.textContent = new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+      div.appendChild(ts);
+
+      chatMessages.appendChild(div);
+    }
+
+    function scrollToBottom() {
+      chatMessages.scrollTop = chatMessages.scrollHeight;
+    }
+
+    function escapeHtml(str) {
+      const d = document.createElement('div');
+      d.textContent = str;
+      return d.innerHTML;
+    }
+
+    window.showSidebar = function () {
+      document.getElementById('sidebar').classList.remove('hidden');
+    };
+  })();
+  </script>
+</body>
+</html>

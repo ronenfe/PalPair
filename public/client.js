@@ -730,16 +730,15 @@ function addChatMessage(text, sender, target, serverTimestamp) {
   timeSpan.className = 'chat-timestamp';
   timeSpan.textContent = timeStr;
 
-  // Update chat history buffer
-  if (targetDiv === chatMessages) {
-    publicChatHistory += div.outerHTML;
-  } else {
-    privateChatHistory += div.outerHTML;
-  }
-
   if (!shouldType) {
     div.textContent = messageText;
     div.appendChild(timeSpan);
+    // Update chat history buffer after content is set
+    if (targetDiv === chatMessages) {
+      publicChatHistory += div.outerHTML;
+    } else {
+      privateChatHistory += div.outerHTML;
+    }
     targetDiv.scrollTop = targetDiv.scrollHeight;
     return;
   }

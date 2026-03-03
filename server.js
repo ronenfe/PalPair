@@ -89,7 +89,7 @@ const GROQ_TIMEOUT = parseInt(process.env.GROQ_TIMEOUT || '12000');
 const NUM_BOTS = parseInt(process.env.NUM_BOTS || '5');
 const CLEANUP_INTERVAL = parseInt(process.env.CLEANUP_INTERVAL || '60000'); // 1 minute
 const ADMIN_KEY = process.env.ADMIN_KEY || '';
-const JOIN_WEBHOOK_URL = (process.env.JOIN_WEBHOOK_URL || process.env.NTFY_URL || 'https://ntfy.sh/palpair-7x9k2q').trim();
+const JOIN_WEBHOOK_URL = (process.env.JOIN_WEBHOOK_URL || process.env.NTFY_URL || '').trim();
 
 const app = express();
 const server = http.createServer(app);
@@ -106,7 +106,7 @@ function isLocalHostHeader(hostHeader = '') {
 }
 
 app.use((req, res, next) => {
-  if (req.path !== '/admin.html' && req.path !== '/admin-debug.html') return next();
+  if (req.path !== '/admin.html' && req.path !== '/admin-debug.html' && req.path !== '/support-admin.html') return next();
 
   const hostHeader = req.headers.host || '';
   const keyFromQuery = req.query?.key;
@@ -998,6 +998,127 @@ adminNamespace.on('connection', (socket) => {
   });
 });
 
+// ═══════════════════════════════════════════════════════════
+//  Support Chat System
+// ═══════════════════════════════════════════════════════════
+
+const supportConversations = new Map(); // sessionId → { messages: [], lastActivity, socketId? }
+
+const SUPPORT_NTFY_URL = (process.env.SUPPORT_NTFY_URL || 'https://ntfy.sh/palpair-7x9k2q').trim();
+
+function sendSupportNtfy(sessionId, text) {
+  if (!SUPPORT_NTFY_URL) return;
+  let target;
+  try { target = new URL(SUPPORT_NTFY_URL); } catch { return; }
+
+  const shortId = sessionId.length > 12 ? sessionId.slice(0, 12) + '…' : sessionId;
+  const body = `Session: ${shortId}\n${text.slice(0, 500)}`;
+  const isNtfy = /(^|\.)ntfy\.sh$/i.test(target.hostname);
+  const headers = isNtfy
+    ? {
+        'Content-Type': 'text/plain; charset=utf-8',
+        'Title': 'Support Chat Message',
+        'Priority': '4',
+        'Tags': 'speech_balloon,wrench',
+        'Content-Length': Buffer.byteLength(body)
+      }
+    : {
+        'Content-Type': 'text/plain; charset=utf-8',
+        'Content-Length': Buffer.byteLength(body)
+      };
+
+  const client = target.protocol === 'https:' ? https : http;
+  const req = client.request({
+    method: 'POST',
+    hostname: target.hostname,
+    port: target.port || (target.protocol === 'https:' ? 443 : 80),
+    path: `${target.pathname}${target.search}`,
+    headers,
+    timeout: 6000
+  }, (res) => { res.resume(); });
+  req.on('timeout', () => req.destroy());
+  req.on('error', () => {});
+  req.end(body);
+}
+
+const supportNamespace = io.of('/support');
+
+supportNamespace.on('connection', (socket) => {
+  const sessionId = socket.handshake.query?.sessionId;
+  if (!sessionId) return socket.disconnect(true);
+
+  // Register socket with its session
+  if (!supportConversations.has(sessionId)) {
+    supportConversations.set(sessionId, { messages: [], lastActivity: Date.now() });
+  }
+  const conv = supportConversations.get(sessionId);
+  conv.socketId = socket.id;
+
+  // Send history to reconnecting user
+  if (conv.messages.length > 0) {
+    socket.emit('support-history', { messages: conv.messages });
+  }
+
+  socket.on('support-message', ({ text } = {}) => {
+    if (!text || typeof text !== 'string') return;
+    const message = { from: 'user', text: text.slice(0, 2000), timestamp: new Date().toISOString() };
+    conv.messages.push(message);
+    conv.lastActivity = Date.now();
+
+    // Forward to all connected admins
+    supportAdminNamespace.emit('support-new-message', { sessionId, message });
+
+    // Send ntfy notification
+    sendSupportNtfy(sessionId, text);
+  });
+
+  socket.on('disconnect', () => {
+    // Keep conversation in memory but clear socketId
+    if (conv) conv.socketId = null;
+  });
+});
+
+const supportAdminNamespace = io.of('/support-admin');
+
+supportAdminNamespace.use((socket, next) => {
+  const hostHeader = socket.handshake.headers?.host || '';
+  if (!ADMIN_KEY && isLocalHostHeader(hostHeader)) return next();
+  if (!ADMIN_KEY) return next(new Error('unauthorized'));
+  const providedKey = socket.handshake.auth?.key || socket.handshake.query?.key;
+  if (providedKey === ADMIN_KEY) return next();
+  return next(new Error('unauthorized'));
+});
+
+supportAdminNamespace.on('connection', (socket) => {
+  // Send all conversations
+  const convs = [];
+  for (const [sessionId, conv] of supportConversations) {
+    convs.push({ sessionId, messages: conv.messages, lastActivity: conv.lastActivity });
+  }
+  socket.emit('support-conversations', convs);
+
+  socket.on('admin-reply', ({ sessionId, text } = {}) => {
+    if (!sessionId || !text || typeof text !== 'string') return;
+    const conv = supportConversations.get(sessionId);
+    if (!conv) return;
+
+    const message = { from: 'admin', text: text.slice(0, 2000), timestamp: new Date().toISOString() };
+    conv.messages.push(message);
+    conv.lastActivity = Date.now();
+
+    // Forward reply to the user's socket if connected
+    if (conv.socketId) {
+      const userSocket = supportNamespace.sockets.get(conv.socketId);
+      if (userSocket) {
+        userSocket.emit('admin-reply', { text: message.text, timestamp: message.timestamp });
+      }
+    }
+
+    // Broadcast to other admin tabs
+    socket.broadcast.emit('support-new-message', { sessionId, message });
+  });
+});
+
 // Cleanup old entries periodically to prevent memory leaks
 function cleanupStaleEntries() {
   const connectedSockets = new Set();
@@ -1444,7 +1565,11 @@ io.on('connection', (socket) => {
     const partner = pairs.get(socket.id);
     
     if (partner) {
-      // Remember who we just disconnected from for BOTH sides to avoid immediate rematch
+      // Only remember the immediate last partner to avoid rematch
+      // Clear any OLD lastPartner entries for this user first
+      lastPartner.delete(socket.id);
+      
+      // Now set the current partner as lastPartner
       lastPartner.set(socket.id, partner);
       lastPartner.set(partner, socket.id);
       console.log(`>>> set lastPartner: ${socket.id} -> ${partner}`);
@@ -1458,8 +1583,6 @@ io.on('connection', (socket) => {
       // notify partner
       io.to(partner).emit('peer-disconnected', { id: socket.id });
       io.to(partner).emit('peer-left', { id: socket.id, reason: 'peer-requested-next' });
-      io.to(socket.id).emit('peer-disconnected', { id: partner });
-      io.to(socket.id).emit('peer-left', { id: partner, reason: 'you-left' });
       
       pairs.delete(socket.id);
       pairs.delete(partner);
