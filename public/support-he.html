@@ -1,0 +1,270 @@
+<!doctype html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>תיקון מחשבים — ₪200 מחיר קבוע</title>
+  <meta name="description" content="תיקון מחשבים מקצועי — מרחוק או במעבדה ברעננה. הסרת וירוסים, שדרוג ביצועים, פתרון תקלות ועוד. ₪200 מחיר קבוע." />
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+  <link rel="stylesheet" href="/support-style.css" />
+  <style>
+    /* RTL overrides */
+    body { direction: rtl; text-align: right; }
+    .expert-card { flex-direction: row-reverse; }
+    .trust-item { flex-direction: row-reverse; text-align: right; }
+    .conversation-item .conv-unread { float: left; }
+    .chat-widget { left: 20px; right: auto; }
+    .chat-fab { left: 24px; right: auto; }
+    .stat-label { letter-spacing: 0; }
+    .ja-link::after { content: ' ←'; }
+    .ja-link { direction: ltr; unicode-bidi: embed; }
+    .whatsapp-section { text-align: center; padding: 40px 24px; }
+    .whatsapp-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      background: #25D366;
+      color: #fff;
+      font-size: 1.1rem;
+      font-weight: 700;
+      padding: 14px 32px;
+      border-radius: 50px;
+      text-decoration: none;
+      transition: background .2s, transform .15s;
+    }
+    .whatsapp-btn:hover { background: #1ebe57; transform: scale(1.03); }
+    .whatsapp-btn svg { flex-shrink: 0; }
+    .service-options { padding: 60px 24px; max-width: var(--max-w); margin: 0 auto; }
+    .options-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 24px; margin-top: 32px; }
+    .option-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 32px 24px;
+      text-align: center;
+      transition: border-color .2s, transform .15s;
+    }
+    .option-card:hover { border-color: var(--primary); transform: translateY(-3px); }
+    .option-icon { font-size: 2.2rem; margin-bottom: 12px; }
+    .option-card h3 { margin-bottom: 8px; }
+    .option-card p { color: var(--text-muted); font-size: .9rem; }
+    @media (max-width: 640px) {
+      .expert-card { flex-direction: column; text-align: center; }
+      .trust-item { flex-direction: column; text-align: center; }
+      .chat-widget { left: 10px; right: 10px; width: auto; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- ───── Hero ───── -->
+  <header class="hero">
+    <div class="hero-inner">
+      <span class="badge">תמיכה טכנית מקצועית</span>
+      <h1>תיקון מחשבים<br><span class="accent">₪200 מחיר קבוע</span></h1>
+      <p class="tagline">מהיר, מאובטח ופשוט. אתחבר למחשב שלך מרחוק ואפתור את הבעיה — או שתביא אותו למעבדה ברעננה. בלי הפתעות, בלי חיובים נוספים.</p>
+      <a href="#pay" class="cta-btn">קבל תמיכה עכשיו</a>
+    </div>
+  </header>
+
+  <!-- ───── How It Works ───── -->
+  <section class="steps" id="how">
+    <h2>איך זה עובד?</h2>
+    <div class="steps-grid">
+      <div class="step-card">
+        <div class="step-num">1</div>
+        <h3>תאר את הבעיה</h3>
+        <p>שלח הודעה בצ'אט בעמוד הזה, בוואטסאפ או באימייל. ספר מה קורה ונתאם זמן.</p>
+      </div>
+      <div class="step-card">
+        <div class="step-num">2</div>
+        <h3>שלם ₪200</h3>
+        <p>תשלום מאובטח דרך PayPal. אתה מוגן על ידי הגנת הקונה של PayPal — החזר כספי אם אתה לא מרוצה.</p>
+      </div>
+      <div class="step-card">
+        <div class="step-num">3</div>
+        <h3>אני מתקן</h3>
+        <p>אתחבר למחשב שלך מרחוק ואפתור את הבעיה בזמן שאתה צופה — או שתביא את המחשב למעבדה ברעננה.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ───── Service Options ───── -->
+  <section class="service-options">
+    <h2>אפשרויות שירות</h2>
+    <div class="options-grid">
+      <div class="option-card">
+        <div class="option-icon">🖥️</div>
+        <h3>תמיכה מרחוק</h3>
+        <p>אתחבר למחשב שלך דרך כלי גישה מרחוק מאובטח. אתה רואה הכל ויכול לנתק בכל רגע. מתאים לרוב הבעיות.</p>
+      </div>
+      <div class="option-card">
+        <div class="option-icon">🏠</div>
+        <h3>הבאת מחשב לרעננה</h3>
+        <p>מעדיף שירות פנים אל פנים? הבא את המחשב למעבדה ברעננה ואטפל בו. מתאים לבעיות חומרה או תקלות מורכבות.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ───── Services ───── -->
+  <section class="services" id="services">
+    <h2>במה אני יכול לעזור?</h2>
+    <div class="services-grid">
+      <div class="service-card">
+        <span class="service-icon">🛡️</span>
+        <h3>הסרת וירוסים ותוכנות זדוניות</h3>
+        <p>סריקה יסודית והסרת וירוסים, תוכנות ריגול, פרסומות זדוניות ואיומים נוספים.</p>
+      </div>
+      <div class="service-card">
+        <span class="service-icon">⚡</span>
+        <h3>שדרוג ביצועים</h3>
+        <p>האצת מחשב איטי — ניקוי הפעלה, כוונון משאבים, הסרת תוכנות מיותרות.</p>
+      </div>
+      <div class="service-card">
+        <span class="service-icon">🔧</span>
+        <h3>פתרון תקלות</h3>
+        <p>מסכים כחולים, קריסות, הודעות שגיאה, בעיות דרייברים — אני מאבחן ומתקן.</p>
+      </div>
+      <div class="service-card">
+        <span class="service-icon">📦</span>
+        <h3>התקנת תוכנות</h3>
+        <p>התקנה, הגדרה או עדכון של כל תוכנה — Office, אנטי-וירוס, מדפסות ועוד.</p>
+      </div>
+      <div class="service-card">
+        <span class="service-icon">🌐</span>
+        <h3>רשת ו-Wi-Fi</h3>
+        <p>פתרון בעיות קישוריות, הגדרת נתבים, הקמת VPN ושיפור ביצועי Wi-Fi.</p>
+      </div>
+      <div class="service-card">
+        <span class="service-icon">💾</span>
+        <h3>גיבוי ושחזור מידע</h3>
+        <p>הקמת גיבויים אוטומטיים ועזרה בשחזור קבצים שנמחקו או אבדו.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ───── Expert Credentials ───── -->
+  <section class="expert-section" id="about">
+    <div class="expert-card">
+      <img src="https://www.justanswer.co.uk/uploads/RO/ronenf/2025-12-4_225516_ronen.200x200.jpg" alt="רונן פסטינגר" class="expert-photo" />
+      <div class="expert-info">
+        <h2>הכירו את המומחה</h2>
+        <h3>רונן — מהנדס חשמל ומחשבים</h3>
+        <p class="expert-title">טכנאי מחשבים ומהנדס תוכנה · תואר ראשון בהנדסת חשמל ומחשבים</p>
+        <p class="expert-desc">מומחה מאומת ב-<strong>JustAnswer</strong> מאז נובמבר 2025 עם <strong>82 דירוגים מצוינים</strong> ו-<strong>13 דירוגים טובים</strong> מלקוחות מרוצים.</p>
+        <div class="expert-stats">
+          <div class="stat"><span class="stat-num">82</span><span class="stat-label">מצוין</span></div>
+          <div class="stat"><span class="stat-num">13</span><span class="stat-label">טוב</span></div>
+          <div class="stat"><span class="stat-num">13</span><span class="stat-label">לקוחות מרוצים</span></div>
+        </div>
+        <a href="https://www.justanswer.co.uk/computer/expert-eng-ronen-festinger/" target="_blank" rel="noopener" class="ja-link">לפרופיל שלי ב-JustAnswer</a>
+      </div>
+    </div>
+  </section>
+
+  <!-- ───── Trust Signals ───── -->
+  <section class="trust">
+    <div class="trust-items">
+      <div class="trust-item">
+        <span class="trust-icon">✅</span>
+        <div>
+          <strong>החזר כספי מלא</strong>
+          <p>אם לא אצליח לתקן — תקבל החזר מלא. בלי שאלות.</p>
+        </div>
+      </div>
+      <div class="trust-item">
+        <span class="trust-icon">🔒</span>
+        <div>
+          <strong>חיבור מאובטח</strong>
+          <p>אני משתמש בכלים מקצועיים לגישה מרחוק. אתה רואה הכל על המסך ויכול לנתק בכל רגע.</p>
+        </div>
+      </div>
+      <div class="trust-item">
+        <span class="trust-icon">⏱️</span>
+        <div>
+          <strong>מחיר קבוע — בלי הפתעות</strong>
+          <p>₪200 מכסה את כל הטיפול, לא משנה כמה זמן לוקח. בלי חיוב לפי שעה.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ───── WhatsApp ───── -->
+  <section class="whatsapp-section">
+    <h2>מעדיף וואטסאפ?</h2>
+    <p style="color: var(--text-muted); margin-bottom: 20px;">שלח הודעה ישירות ואחזור אליך בהקדם</p>
+    <a href="https://wa.me/972528797224?text=%D7%94%D7%99%D7%99%2C%20%D7%90%D7%A0%D7%99%20%D7%A6%D7%A8%D7%99%D7%9A%20%D7%A2%D7%96%D7%A8%D7%94%20%D7%A2%D7%9D%20%D7%94%D7%9E%D7%97%D7%A9%D7%91" target="_blank" rel="noopener" class="whatsapp-btn">
+      <svg viewBox="0 0 24 24" width="24" height="24" fill="#fff"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
+      שלח הודעה בוואטסאפ
+    </a>
+  </section>
+
+  <!-- ───── Payment ───── -->
+  <section class="payment" id="pay">
+    <h2>מוכן להתחיל?</h2>
+    <p class="payment-sub">לחץ למטה כדי לשלם ₪200 דרך PayPal, ואז שלח לי הודעה לתיאום.</p>
+    <a href="https://www.paypal.com/paypalme/ronenfes/200ILS" target="_blank" rel="noopener" class="paypal-btn">
+      <svg class="paypal-logo" viewBox="0 0 24 24" width="24" height="24"><path fill="#fff" d="M7.076 21.337H2.47a.641.641 0 0 1-.633-.74L4.944 2.56a.765.765 0 0 1 .757-.644h6.313c2.091 0 3.592.556 4.456 1.65.39.493.646 1.039.77 1.623.13.614.13 1.347-.002 2.24l-.01.06v.54l.424.24c.36.189.646.402.867.646.37.41.609.923.71 1.525.103.622.068 1.355-.104 2.174-.197.96-.517 1.795-.95 2.478a5.09 5.09 0 0 1-1.524 1.599c-.594.412-1.3.72-2.1.917-.775.19-1.658.287-2.623.287H11.48a.944.944 0 0 0-.934.8l-.038.2-.637 4.039-.03.145a.944.944 0 0 1-.932.8H7.076Z"/><path fill="#e0e0e0" d="M18.467 7.7c-.018.115-.038.233-.06.355-.771 3.958-3.412 5.325-6.786 5.325H9.908a.834.834 0 0 0-.824.706l-.9 5.672-.254 1.613a.439.439 0 0 0 .433.509h3.037a.732.732 0 0 0 .723-.618l.03-.151.572-3.63.037-.2a.732.732 0 0 1 .723-.618h.455c2.946 0 5.254-1.198 5.929-4.661.283-1.446.136-2.654-.611-3.503a2.905 2.905 0 0 0-.834-.599Z"/></svg>
+      שלם ₪200 עם PayPal
+    </a>
+    <p class="payment-note">מוגן על ידי הגנת הקונה של PayPal</p>
+  </section>
+
+  <!-- ───── FAQ ───── -->
+  <section class="faq" id="faq">
+    <h2>שאלות נפוצות</h2>
+    <details>
+      <summary>איך עובדת תמיכה מרחוק?</summary>
+      <p>אחרי התשלום, אשלח לך קישור להורדת כלי גישה מרחוק קטן (כמו AnyDesk או TeamViewer). תריץ אותו, תשתף איתי את קוד הגישה ואני אתחבר למסך שלך. אתה רואה הכל בזמן אמת ויכול לנתק מתי שרוצה.</p>
+    </details>
+    <details>
+      <summary>זה בטוח לתת למישהו גישה למחשב?</summary>
+      <p>בהחלט. הכלי דורש את האישור המפורש שלך. אתה רואה הכל על המסך ויכול לסיים את החיבור ברגע. אני לעולם לא שומר סיסמאות או מידע אישי.</p>
+    </details>
+    <details>
+      <summary>מה קורה אם הבעיה לא נפתרת?</summary>
+      <p>אם לא אצליח לפתור את הבעיה, תקבל החזר כספי מלא — בלי שאלות.</p>
+    </details>
+    <details>
+      <summary>כמה זמן לוקח טיפול?</summary>
+      <p>רוב הבעיות נפתרות תוך 30–60 דקות. בעיות מורכבות עשויות לקחת יותר זמן, אבל המחיר נשאר אותו דבר — ₪200 קבוע.</p>
+    </details>
+    <details>
+      <summary>אפשר להביא מחשב פיזית?</summary>
+      <p>בוודאי! אתה מוזמן להביא את המחשב למעבדה שלי ברעננה. מתאים במיוחד לבעיות חומרה או כשמעדיפים שירות פנים אל פנים. צור קשר לתיאום.</p>
+    </details>
+    <details>
+      <summary>אתה תומך גם ב-Mac / Linux?</summary>
+      <p>אני בעיקר תומך ב-Windows, אבל אני יכול לעזור גם עם בעיות Mac ו-Linux. שלח הודעה ונבדוק ביחד.</p>
+    </details>
+  </section>
+
+  <!-- ───── Footer ───── -->
+  <footer>
+    <p>&copy; 2026 תיקון מחשבים — רונן פסטינגר. כל הזכויות שמורות.</p>
+    <p class="footer-links">
+      <a href="mailto:ronenfes@gmail.com">ronenfes@gmail.com</a> · 
+      <a href="https://wa.me/972528797224" target="_blank" rel="noopener">וואטסאפ</a>
+    </p>
+  </footer>
+
+  <!-- ───── Chat Widget ───── -->
+  <button class="chat-fab" id="chatFab" aria-label="פתח צ'אט">💬</button>
+  <div class="chat-widget" id="chatWidget">
+    <div class="chat-widget-header">
+      <span>צ'אט עם תמיכה</span>
+      <button class="chat-close" id="chatClose" aria-label="סגור צ'אט">✕</button>
+    </div>
+    <div class="chat-widget-messages" id="chatWidgetMessages">
+      <div class="chat-message system">היי! תאר את הבעיה שלך ואחזור אליך בהקדם.</div>
+    </div>
+    <form class="chat-widget-input" id="chatForm">
+      <input type="text" id="chatMsgInput" placeholder="כתוב הודעה..." autocomplete="off" required />
+      <button type="submit">שלח</button>
+    </form>
+  </div>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="/support-chat.js"></script>
+</body>
+</html>
