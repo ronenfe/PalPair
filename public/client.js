@@ -99,6 +99,13 @@ const privateChatInput = document.getElementById('privateChatInput');
 const privateSendBtn = document.getElementById('privateSendBtn');
 const AI_PARTNER_LABEL = '🤖 AI Partner';
 
+// Public stream elements
+const goLiveBtn = document.getElementById('goLiveBtn');
+const publicStreamArea = document.getElementById('publicStreamArea');
+const publicStreamVideo = document.getElementById('publicStreamVideo');
+const publicStreamName = document.getElementById('publicStreamName');
+const nextStreamerBtn = document.getElementById('nextStreamerBtn');
+
 // Online users panel toggle
 if (usersToggleBtn && onlineUsersPanel) {
   usersToggleBtn.addEventListener('click', () => {
@@ -136,6 +143,13 @@ let localStream = null;
 let pc = null;
 let isActive = false;
 const pendingPublicMessageIds = new Set();
+
+// Public stream state
+let isStreaming = false;
+let publicStreamLocalStream = null;
+const publicStreamPCs = new Map(); // viewerId → RTCPeerConnection (streamer-side)
+let publicStreamViewerPC = null;    // single PC for viewer-side
+let currentWatchingStreamerId = null;
 
 // User profile and filters
 let userProfile = null;
@@ -271,6 +285,16 @@ function setRandomMode(active) {
 
   // Switch between public chat interface and private chat interface
   if (active) {
+    // Stop public stream if active
+    if (isStreaming) stopPublicStream();
+    // Stop watching if viewing
+    if (currentWatchingStreamerId) {
+      socket.emit('stop-watching-public-stream');
+      currentWatchingStreamerId = null;
+      if (publicStreamViewerPC) { publicStreamViewerPC.close(); publicStreamViewerPC = null; }
+    }
+    if (publicStreamArea) publicStreamArea.style.display = 'none';
+
     chatInterface.style.display = 'none';
     if (privateChatInterface) {
       privateChatInterface.style.display = 'flex';
@@ -299,11 +323,15 @@ function setRandomMode(active) {
     if (privateChatInput) { privateChatInput.disabled = true; privateChatInput.value = ''; }
     if (privateSendBtn) privateSendBtn.disabled = true;
     if (chatModeLabel) chatModeLabel.textContent = 'Public chat';
-    if (chatModeSub) chatModeSub.textContent = 'Chat with everyone in the lobby';
+    // Re-check for active public streamers when returning to public room
+    socket.emit('request-public-streamers');
   }
 
   if (goRandomBtn) {
     goRandomBtn.style.display = active ? 'none' : 'inline-flex';
+  }
+  if (goLiveBtn) {
+    goLiveBtn.style.display = active ? 'none' : 'inline-flex';
   }
   if (stopRandomBtn) {
     stopRandomBtn.style.display = active ? 'flex' : 'none';
@@ -807,4 +835,189 @@ function renderOnlineUsers(users = []) {
     item.appendChild(stateEl);
     onlineUsersList.appendChild(item);
   });
+}
+
+// ═══════════════════════════════════
+//  Public Stream — Go Live / Watch
+// ═══════════════════════════════════
+
+// ── Go Live button ──
+if (goLiveBtn) {
+  goLiveBtn.onclick = async () => {
+    if (isStreaming) {
+      stopPublicStream();
+    } else {
+      await startPublicStream();
+    }
+  };
+}
+
+async function startPublicStream() {
+  try {
+    publicStreamLocalStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+    isStreaming = true;
+    goLiveBtn.textContent = '⏹ Stop Live';
+    goLiveBtn.classList.add('is-live');
+    // Show own stream
+    if (publicStreamArea) publicStreamArea.style.display = 'flex';
+    if (publicStreamVideo) {
+      publicStreamVideo.srcObject = publicStreamLocalStream;
+      publicStreamVideo.muted = true; // mute own playback
+    }
+    if (publicStreamName) publicStreamName.textContent = 'You (Live)';
+    socket.emit('start-public-stream');
+  } catch (e) {
+    console.error('Failed to start public stream:', e);
+  }
+}
+
+function stopPublicStream() {
+  isStreaming = false;
+  goLiveBtn.textContent = '📡 Go Live';
+  goLiveBtn.classList.remove('is-live');
+  socket.emit('stop-public-stream');
+  // Close all viewer peer connections
+  for (const [viewerId, viewerPC] of publicStreamPCs) {
+    viewerPC.close();
+  }
+  publicStreamPCs.clear();
+  // Stop local stream tracks
+  if (publicStreamLocalStream) {
+    publicStreamLocalStream.getTracks().forEach((t) => t.stop());
+    publicStreamLocalStream = null;
+  }
+  // If not watching anyone, hide stream area
+  if (!currentWatchingStreamerId) {
+    if (publicStreamArea) publicStreamArea.style.display = 'none';
+    if (publicStreamVideo) publicStreamVideo.srcObject = null;
+  }
+}
+
+// ── Streamer: handle new viewer joining ──
+socket.on('public-stream-viewer-joined', async ({ viewerId }) => {
+  if (!isStreaming || !publicStreamLocalStream) return;
+  // Create a peer connection for this viewer
+  const viewerPC = new RTCPeerConnection({
+    iceServers: [{ urls: 'stun:stun.l.google.com:19302' }]
+  });
+  publicStreamPCs.set(viewerId, viewerPC);
+
+  viewerPC.onicecandidate = (e) => {
+    if (e.candidate) {
+      socket.emit('public-stream-signal', { to: viewerId, data: { type: 'candidate', candidate: e.candidate } });
+    }
+  };
+
+  // Add local stream tracks
+  publicStreamLocalStream.getTracks().forEach((t) => {
+    viewerPC.addTrack(t, publicStreamLocalStream);
+  });
+
+  // Create offer
+  const offer = await viewerPC.createOffer();
+  await viewerPC.setLocalDescription(offer);
+  socket.emit('public-stream-signal', { to: viewerId, data: { type: 'offer', sdp: viewerPC.localDescription } });
+});
+
+// ── Streamer: viewer left ──
+socket.on('public-stream-viewer-left', ({ viewerId }) => {
+  const viewerPC = publicStreamPCs.get(viewerId);
+  if (viewerPC) {
+    viewerPC.close();
+    publicStreamPCs.delete(viewerId);
+  }
+});
+
+// ── Viewer: server tells us which streamer to connect to ──
+socket.on('public-stream-ready', ({ streamerId, streamerName, streamerIndex }) => {
+  // Close existing viewer PC
+  if (publicStreamViewerPC) {
+    publicStreamViewerPC.close();
+    publicStreamViewerPC = null;
+  }
+  currentWatchingStreamerId = streamerId;
+  if (publicStreamArea) publicStreamArea.style.display = 'flex';
+  if (publicStreamName) publicStreamName.textContent = streamerName;
+  if (publicStreamVideo && !isStreaming) publicStreamVideo.muted = false;
+
+  // Create viewer peer connection (receive only)
+  publicStreamViewerPC = new RTCPeerConnection({
+    iceServers: [{ urls: 'stun:stun.l.google.com:19302' }]
+  });
+
+  publicStreamViewerPC.onicecandidate = (e) => {
+    if (e.candidate) {
+      socket.emit('public-stream-signal', { to: streamerId, data: { type: 'candidate', candidate: e.candidate } });
+    }
+  };
+
+  publicStreamViewerPC.ontrack = (e) => {
+    if (publicStreamVideo) {
+      publicStreamVideo.srcObject = e.streams[0];
+      if (!isStreaming) publicStreamVideo.muted = false;
+    }
+  };
+});
+
+socket.on('watch-public-stream-redirect', ({ streamerIndex }) => {
+  socket.emit('watch-public-stream', { streamerIndex });
+});
+
+// ── Viewer: stream ended ──
+socket.on('public-stream-ended', () => {
+  currentWatchingStreamerId = null;
+  if (publicStreamViewerPC) {
+    publicStreamViewerPC.close();
+    publicStreamViewerPC = null;
+  }
+  // If we're streaming ourselves, show own stream; otherwise hide
+  if (isStreaming) {
+    if (publicStreamVideo) {
+      publicStreamVideo.srcObject = publicStreamLocalStream;
+      publicStreamVideo.muted = true;
+    }
+    if (publicStreamName) publicStreamName.textContent = 'You (Live)';
+  } else {
+    if (publicStreamArea) publicStreamArea.style.display = 'none';
+    if (publicStreamVideo) publicStreamVideo.srcObject = null;
+  }
+});
+
+// ── WebRTC signaling for public stream ──
+socket.on('public-stream-signal', async ({ from, data }) => {
+  // Determine if we're the streamer or viewer
+  if (isStreaming && publicStreamPCs.has(from)) {
+    // We're the streamer, this signal is from a viewer
+    const viewerPC = publicStreamPCs.get(from);
+    if (data.type === 'answer') {
+      await viewerPC.setRemoteDescription(new RTCSessionDescription(data.sdp));
+    } else if (data.type === 'candidate') {
+      try { await viewerPC.addIceCandidate(new RTCIceCandidate(data.candidate)); } catch (e) { console.warn(e); }
+    }
+  } else if (publicStreamViewerPC && from === currentWatchingStreamerId) {
+    // We're the viewer, this signal is from the streamer
+    if (data.type === 'offer') {
+      await publicStreamViewerPC.setRemoteDescription(new RTCSessionDescription(data.sdp));
+      const answer = await publicStreamViewerPC.createAnswer();
+      await publicStreamViewerPC.setLocalDescription(answer);
+      socket.emit('public-stream-signal', { to: from, data: { type: 'answer', sdp: publicStreamViewerPC.localDescription } });
+    } else if (data.type === 'candidate') {
+      try { await publicStreamViewerPC.addIceCandidate(new RTCIceCandidate(data.candidate)); } catch (e) { console.warn(e); }
+    }
+  }
+});
+
+// ── Stream update: new streamer list from server ──
+socket.on('public-stream-update', ({ streamers }) => {
+  // If not currently watching and not streaming, and there are streamers, auto-watch first
+  if (!isStreaming && !currentWatchingStreamerId && streamers.length > 0) {
+    socket.emit('watch-public-stream', { streamerIndex: 0 });
+  }
+});
+
+// ── Next streamer button ──
+if (nextStreamerBtn) {
+  nextStreamerBtn.onclick = () => {
+    socket.emit('next-public-streamer');
+  };
 }

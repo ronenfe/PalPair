@@ -457,13 +457,23 @@
         <header class="chat-header">
           <div class="chat-header-main">
             <div class="chat-mode-label" id="chatModeLabel" data-i18n="publicChatTitle">Public chat</div>
-            <div class="chat-mode-sub" id="chatModeSub" data-i18n="publicChatSubtitle">Chat with everyone in the lobby</div>
           </div>
+          <button id="goLiveBtn" class="go-live-btn" aria-label="Go live">📡 Go Live</button>
           <button id="goRandomBtn" class="go-random-btn" aria-label="Go random">🎥 Go Random</button>
         </header>
 
         <!-- Public chat view -->
         <section id="publicChatSection" class="chat-view">
+          <!-- Public Stream Area -->
+          <div id="publicStreamArea" class="public-stream-area" style="display:none;">
+            <div class="public-stream-header">
+              <span class="stream-live-badge">🔴 LIVE</span>
+              <span id="publicStreamName" class="stream-name">—</span>
+              <button id="nextStreamerBtn" class="next-streamer-btn" title="Next streamer">⏭ Next</button>
+            </div>
+            <video id="publicStreamVideo" class="public-stream-video" autoplay playsinline></video>
+          </div>
+
           <div class="room-layout">
             <div class="chat-container">
               <div id="chatMessages" class="chat-messages"></div>

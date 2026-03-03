@@ -1389,3 +1389,115 @@ body.chat-active:not(.random-active) .chat-container {
   }
 }
 
+/* ═══════════════════════════════════
+   Public Stream
+   ═══════════════════════════════════ */
+.public-stream-area {
+  background: #2B2930;
+  border-radius: 12px;
+  overflow: hidden;
+  margin: 8px;
+  display: flex;
+  flex-direction: column;
+  border: 1px solid #3d3a45;
+}
+
+.public-stream-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  background: #1C1B1F;
+  border-bottom: 1px solid #3d3a45;
+}
+
+.stream-live-badge {
+  font-size: 12px;
+  font-weight: 700;
+  color: #ff4444;
+  letter-spacing: 0.05em;
+  animation: livePulse 1.5s ease-in-out infinite;
+}
+
+@keyframes livePulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+.stream-name {
+  flex: 1;
+  font-size: 13px;
+  font-weight: 600;
+  color: #E6E1E5;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.next-streamer-btn {
+  padding: 5px 14px !important;
+  border-radius: 999px !important;
+  background: #4A4458 !important;
+  color: #E6E1E5 !important;
+  font-size: 12px !important;
+  font-weight: 600 !important;
+  min-width: auto !important;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.next-streamer-btn:hover {
+  background: #D0BCFF !important;
+  color: #381E72 !important;
+}
+
+.public-stream-video {
+  width: 100%;
+  max-height: 280px;
+  object-fit: contain;
+  background: #000;
+  display: block;
+}
+
+.go-live-btn {
+  position: relative;
+  z-index: 10;
+  min-width: 130px;
+  padding: 10px 18px;
+  border-radius: 999px;
+  background: #ff4444;
+  color: #fff;
+  text-transform: none;
+  letter-spacing: 0;
+  font-size: 14px;
+  font-weight: 700;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+  transition: all 0.3s ease;
+}
+
+.go-live-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(255, 68, 68, 0.4);
+}
+
+.go-live-btn.is-live {
+  background: #4A4458;
+  color: #E6E1E5;
+}
+
+.go-live-btn.is-live:hover {
+  background: #5d5574;
+  box-shadow: 0 4px 12px rgba(74, 68, 88, 0.4);
+}
+
+@media (max-width: 600px) {
+  .public-stream-video {
+    max-height: 200px;
+  }
+  .go-live-btn {
+    min-width: 100px;
+    font-size: 12px;
+    padding: 8px 12px;
+  }
+}
+

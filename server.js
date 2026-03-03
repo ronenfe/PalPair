@@ -501,6 +501,17 @@ const activeLoginSessions = new Map(); // socketId -> { socketId, name, loginAt,
 const completedLoginSessions = []; // recent ended login sessions
 const publicRoomEvents = []; // recent public room system/user messages
 let publicRoomSpeakerBotId = null; // exactly one bot that replies in public room chat
+
+// ── Public Stream ──
+const publicStreamers = []; // ordered list of socket IDs currently streaming
+const viewerStreamIndex = new Map(); // viewerSocketId → index in publicStreamers they're watching
+
+function getPublicStreamersList() {
+  return publicStreamers.map((id) => ({
+    socketId: id,
+    name: getSocketDisplayName(id)
+  }));
+}
 const joinWebhookStats = {
   configured: Boolean(JOIN_WEBHOOK_URL),
   attempts: 0,
@@ -1225,6 +1236,11 @@ io.on('connection', (socket) => {
         events: publicRoomEvents.slice(-150)
       });
 
+      // Send current public streamers to new joiner
+      if (publicStreamers.length > 0) {
+        socket.emit('public-stream-update', { streamers: getPublicStreamersList() });
+      }
+
       if (!socket.data.publicRoomJoined) {
         socket.data.publicRoomJoined = true;
         pushPublicRoomEvent(buildPublicRoomEvent({
@@ -1303,6 +1319,122 @@ io.on('connection', (socket) => {
     }));
 
     maybeEmitBotReplyToHumanPublicMessage(socket.id, safeText);
+  });
+
+  // ── Public Stream handlers ──
+  socket.on('start-public-stream', () => {
+    if (socket.data.isBot) return;
+    if (publicStreamers.includes(socket.id)) return; // already streaming
+    publicStreamers.push(socket.id);
+    const streamerName = getSocketDisplayName(socket.id);
+    console.log(`>>> ${socket.id} started public stream (${streamerName})`);
+    // Notify all clients that a new streamer is available
+    io.emit('public-stream-update', { streamers: getPublicStreamersList() });
+  });
+
+  socket.on('stop-public-stream', () => {
+    const idx = publicStreamers.indexOf(socket.id);
+    if (idx === -1) return;
+    publicStreamers.splice(idx, 1);
+    console.log(`>>> ${socket.id} stopped public stream`);
+    // Notify viewers who were watching this streamer
+    io.emit('public-stream-update', { streamers: getPublicStreamersList() });
+    // Disconnect all viewers watching this streamer
+    for (const [viewerId, viewerIdx] of viewerStreamIndex.entries()) {
+      if (viewerIdx === idx) {
+        viewerStreamIndex.delete(viewerId);
+        const viewerSocket = io.sockets.sockets.get(viewerId);
+        if (viewerSocket) viewerSocket.emit('public-stream-ended');
+      } else if (viewerIdx > idx) {
+        // Shift indexes down
+        viewerStreamIndex.set(viewerId, viewerIdx - 1);
+      }
+    }
+  });
+
+  socket.on('watch-public-stream', ({ streamerIndex } = {}) => {
+    // Viewer wants to watch a specific streamer by index
+    const idx = typeof streamerIndex === 'number' ? streamerIndex : 0;
+    if (idx < 0 || idx >= publicStreamers.length) {
+      socket.emit('public-stream-ended');
+      return;
+    }
+    const streamerId = publicStreamers[idx];
+    if (streamerId === socket.id) {
+      // Skip self — go to next
+      const nextIdx = (idx + 1) % publicStreamers.length;
+      if (nextIdx === idx || publicStreamers[nextIdx] === socket.id) {
+        socket.emit('public-stream-ended');
+        return;
+      }
+      return socket.emit('watch-public-stream-redirect', { streamerIndex: nextIdx });
+    }
+    viewerStreamIndex.set(socket.id, idx);
+    const streamerName = getSocketDisplayName(streamerId);
+    // Tell the viewer to connect to this streamer
+    socket.emit('public-stream-ready', { streamerId, streamerName, streamerIndex: idx });
+    // Tell the streamer to send an offer to this viewer
+    const streamerSocket = io.sockets.sockets.get(streamerId);
+    if (streamerSocket) {
+      streamerSocket.emit('public-stream-viewer-joined', { viewerId: socket.id });
+    }
+  });
+
+  socket.on('next-public-streamer', () => {
+    const currentIdx = viewerStreamIndex.get(socket.id) ?? -1;
+    if (publicStreamers.length === 0) {
+      socket.emit('public-stream-ended');
+      return;
+    }
+    let nextIdx = (currentIdx + 1) % publicStreamers.length;
+    // Skip self
+    if (publicStreamers[nextIdx] === socket.id) {
+      if (publicStreamers.length <= 1) {
+        socket.emit('public-stream-ended');
+        return;
+      }
+      nextIdx = (nextIdx + 1) % publicStreamers.length;
+    }
+    // Disconnect from current streamer
+    if (currentIdx >= 0 && currentIdx < publicStreamers.length) {
+      const oldStreamerId = publicStreamers[currentIdx];
+      const oldStreamerSocket = io.sockets.sockets.get(oldStreamerId);
+      if (oldStreamerSocket) {
+        oldStreamerSocket.emit('public-stream-viewer-left', { viewerId: socket.id });
+      }
+    }
+    viewerStreamIndex.set(socket.id, nextIdx);
+    const streamerId = publicStreamers[nextIdx];
+    const streamerName = getSocketDisplayName(streamerId);
+    socket.emit('public-stream-ready', { streamerId, streamerName, streamerIndex: nextIdx });
+    const streamerSocket = io.sockets.sockets.get(streamerId);
+    if (streamerSocket) {
+      streamerSocket.emit('public-stream-viewer-joined', { viewerId: socket.id });
+    }
+  });
+
+  socket.on('public-stream-signal', ({ to, data }) => {
+    if (!to) return;
+    const dest = io.sockets.sockets.get(to);
+    if (dest) dest.emit('public-stream-signal', { from: socket.id, data });
+  });
+
+  socket.on('stop-watching-public-stream', () => {
+    const idx = viewerStreamIndex.get(socket.id);
+    if (idx != null && idx >= 0 && idx < publicStreamers.length) {
+      const streamerId = publicStreamers[idx];
+      const streamerSocket = io.sockets.sockets.get(streamerId);
+      if (streamerSocket) {
+        streamerSocket.emit('public-stream-viewer-left', { viewerId: socket.id });
+      }
+    }
+    viewerStreamIndex.delete(socket.id);
+  });
+
+  socket.on('request-public-streamers', () => {
+    if (publicStreamers.length > 0) {
+      socket.emit('public-stream-update', { streamers: getPublicStreamersList() });
+    }
   });
 
   socket.on('find', ({ isBot } = {}) => {
@@ -1621,6 +1753,24 @@ io.on('connection', (socket) => {
     searching.delete(socket.id);
     lastPartner.delete(socket.id);
     notifiedJoins.delete(socket.id);
+
+    // Clean up public stream state
+    const streamerIdx = publicStreamers.indexOf(socket.id);
+    if (streamerIdx !== -1) {
+      publicStreamers.splice(streamerIdx, 1);
+      // Notify viewers who were watching this streamer
+      for (const [viewerId, viewerIdx] of viewerStreamIndex.entries()) {
+        if (viewerIdx === streamerIdx) {
+          viewerStreamIndex.delete(viewerId);
+          const viewerSocket = io.sockets.sockets.get(viewerId);
+          if (viewerSocket) viewerSocket.emit('public-stream-ended');
+        } else if (viewerIdx > streamerIdx) {
+          viewerStreamIndex.set(viewerId, viewerIdx - 1);
+        }
+      }
+      io.emit('public-stream-update', { streamers: getPublicStreamersList() });
+    }
+    viewerStreamIndex.delete(socket.id);
 
     if (wasInPublicRoom) {
       pushPublicRoomEvent(buildPublicRoomEvent({
