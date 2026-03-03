@@ -87,6 +87,87 @@
         otherId = null;
         // Don't actively search - just wait to be matched
       });
+
+      // ── Public Stream: bot as broadcaster ──
+      let isBotStreaming = false;
+      const publicStreamPCs = new Map(); // viewerId → RTCPeerConnection
+
+      socket.on('start-bot-stream', () => {
+        if (isBotStreaming) return;
+        isBotStreaming = true;
+        // Restart video for fresh stream
+        video.currentTime = 0;
+        video.play();
+        stream = video.captureStream();
+        socket.emit('start-public-stream');
+        console.log(`[${botName}] Started public stream`);
+      });
+
+      socket.on('stop-bot-stream', () => {
+        if (!isBotStreaming) return;
+        isBotStreaming = false;
+        for (const [vid, vpc] of publicStreamPCs) {
+          vpc.close();
+        }
+        publicStreamPCs.clear();
+        socket.emit('stop-public-stream');
+        console.log(`[${botName}] Stopped public stream`);
+      });
+
+      socket.on('public-stream-viewer-joined', async ({ viewerId }) => {
+        if (!isBotStreaming) return;
+        try {
+          // Re-capture stream to ensure fresh tracks
+          video.currentTime = 0;
+          video.play();
+          stream = video.captureStream();
+          const viewerPC = new RTCPeerConnection({
+            iceServers: [{ urls: 'stun:stun.l.google.com:19302' }]
+          });
+          publicStreamPCs.set(viewerId, viewerPC);
+
+          viewerPC.onicecandidate = (e) => {
+            if (e.candidate) {
+              socket.emit('public-stream-signal', { to: viewerId, data: { type: 'candidate', candidate: e.candidate } });
+            }
+          };
+
+          stream.getTracks().forEach(track => {
+            viewerPC.addTrack(track, stream);
+          });
+
+          const offer = await viewerPC.createOffer();
+          await viewerPC.setLocalDescription(offer);
+          socket.emit('public-stream-signal', { to: viewerId, data: { type: 'offer', sdp: viewerPC.localDescription } });
+          console.log(`[${botName}] Sending stream offer to viewer ${viewerId}`);
+        } catch (e) {
+          console.error(`[${botName}] Error creating stream for viewer:`, e);
+        }
+      });
+
+      socket.on('public-stream-viewer-left', ({ viewerId }) => {
+        const vpc = publicStreamPCs.get(viewerId);
+        if (vpc) {
+          vpc.close();
+          publicStreamPCs.delete(viewerId);
+          console.log(`[${botName}] Viewer ${viewerId} left stream`);
+        }
+      });
+
+      socket.on('public-stream-signal', async ({ from, data }) => {
+        // Handle signals from viewers (answers and ICE candidates)
+        const vpc = publicStreamPCs.get(from);
+        if (!vpc) return;
+        try {
+          if (data.type === 'answer') {
+            await vpc.setRemoteDescription(new RTCSessionDescription(data.sdp));
+          } else if (data.type === 'candidate') {
+            await vpc.addIceCandidate(new RTCIceCandidate(data.candidate));
+          }
+        } catch (e) {
+          console.warn(`[${botName}] Stream signal error:`, e.message);
+        }
+      });
       
       socket.on('chat-message', ({ from, text }) => {
         console.log(`[${botName}] Received message from ${from}: "${text}"`);

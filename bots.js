@@ -2,6 +2,7 @@ const puppeteer = require('puppeteer');
 
 const requestedBotCount = Number.parseInt(process.env.NUM_BOTS || '5', 10);
 const BOT_COUNT = Number.isFinite(requestedBotCount) ? Math.max(1, Math.min(20, requestedBotCount)) : 5;
+const BOT_PORT = process.env.PORT || '3000';
 let browser = null;
 const botPages = [];
 
@@ -35,7 +36,7 @@ async function startBots() {
     });
     
     // Navigate to bot page
-    await page.goto(`http://localhost:3000/bot.html?id=${i}`);
+    await page.goto(`http://localhost:${BOT_PORT}/bot.html?id=${i}`);
     botPages.push(page);
     
     // Small delay between bot launches

@@ -105,6 +105,8 @@ const publicStreamArea = document.getElementById('publicStreamArea');
 const publicStreamVideo = document.getElementById('publicStreamVideo');
 const publicStreamName = document.getElementById('publicStreamName');
 const nextStreamerBtn = document.getElementById('nextStreamerBtn');
+const hideStreamBtn = document.getElementById('hideStreamBtn');
+let streamHiddenByUser = false;
 
 // Online users panel toggle
 if (usersToggleBtn && onlineUsersPanel) {
@@ -294,6 +296,7 @@ function setRandomMode(active) {
       if (publicStreamViewerPC) { publicStreamViewerPC.close(); publicStreamViewerPC = null; }
     }
     if (publicStreamArea) publicStreamArea.style.display = 'none';
+    streamHiddenByUser = false; // reset so stream auto-shows when returning
 
     chatInterface.style.display = 'none';
     if (privateChatInterface) {
@@ -930,6 +933,11 @@ socket.on('public-stream-viewer-left', ({ viewerId }) => {
 
 // ── Viewer: server tells us which streamer to connect to ──
 socket.on('public-stream-ready', ({ streamerId, streamerName, streamerIndex }) => {
+  // If user has hidden the stream, don't show it
+  if (streamHiddenByUser) {
+    socket.emit('stop-watching-public-stream');
+    return;
+  }
   // Close existing viewer PC
   if (publicStreamViewerPC) {
     publicStreamViewerPC.close();
@@ -997,10 +1005,19 @@ socket.on('public-stream-signal', async ({ from, data }) => {
   } else if (publicStreamViewerPC && from === currentWatchingStreamerId) {
     // We're the viewer, this signal is from the streamer
     if (data.type === 'offer') {
-      await publicStreamViewerPC.setRemoteDescription(new RTCSessionDescription(data.sdp));
-      const answer = await publicStreamViewerPC.createAnswer();
-      await publicStreamViewerPC.setLocalDescription(answer);
-      socket.emit('public-stream-signal', { to: from, data: { type: 'answer', sdp: publicStreamViewerPC.localDescription } });
+      try {
+        // Only process offer if PC is in a state that can accept it
+        if (publicStreamViewerPC.signalingState !== 'stable' && publicStreamViewerPC.signalingState !== 'have-local-offer') {
+          console.warn('Ignoring offer in state:', publicStreamViewerPC.signalingState);
+          return;
+        }
+        await publicStreamViewerPC.setRemoteDescription(new RTCSessionDescription(data.sdp));
+        const answer = await publicStreamViewerPC.createAnswer();
+        await publicStreamViewerPC.setLocalDescription(answer);
+        socket.emit('public-stream-signal', { to: from, data: { type: 'answer', sdp: publicStreamViewerPC.localDescription } });
+      } catch (e) {
+        console.warn('Stream offer handling error:', e.message);
+      }
     } else if (data.type === 'candidate') {
       try { await publicStreamViewerPC.addIceCandidate(new RTCIceCandidate(data.candidate)); } catch (e) { console.warn(e); }
     }
@@ -1010,14 +1027,32 @@ socket.on('public-stream-signal', async ({ from, data }) => {
 // ── Stream update: new streamer list from server ──
 socket.on('public-stream-update', ({ streamers }) => {
   // If not currently watching and not streaming, and there are streamers, auto-watch first
-  if (!isStreaming && !currentWatchingStreamerId && streamers.length > 0) {
+  if (!isStreaming && !currentWatchingStreamerId && !streamHiddenByUser && streamers.length > 0) {
     socket.emit('watch-public-stream', { streamerIndex: 0 });
   }
+  // If no streamers left, reset the hidden flag so next stream auto-shows
+  if (streamers.length === 0) streamHiddenByUser = false;
 });
 
 // ── Next streamer button ──
 if (nextStreamerBtn) {
   nextStreamerBtn.onclick = () => {
+    streamHiddenByUser = false;
     socket.emit('next-public-streamer');
   };
+}
+
+// ── Hide stream button ──
+if (hideStreamBtn) {
+  hideStreamBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    streamHiddenByUser = true;
+    if (publicStreamArea) publicStreamArea.style.display = 'none';
+    if (currentWatchingStreamerId) {
+      socket.emit('stop-watching-public-stream');
+      currentWatchingStreamerId = null;
+      if (publicStreamViewerPC) { publicStreamViewerPC.close(); publicStreamViewerPC = null; }
+    }
+    if (publicStreamVideo) publicStreamVideo.srcObject = null;
+  });
 }

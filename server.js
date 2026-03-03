@@ -512,6 +512,20 @@ function getPublicStreamersList() {
     name: getSocketDisplayName(id)
   }));
 }
+
+// ── Trigger a random bot to start streaming ──
+function triggerRandomBotStream() {
+  // Find bots that are not already streaming
+  const availableBots = [...bots].filter(id => !publicStreamers.includes(id));
+  if (availableBots.length === 0) return;
+  const randomBot = availableBots[Math.floor(Math.random() * availableBots.length)];
+  const botSocket = io.sockets.sockets.get(randomBot);
+  if (botSocket) {
+    botSocket.emit('start-bot-stream');
+    console.log(`>>> Triggered bot ${randomBot} (${getSocketDisplayName(randomBot)}) to start streaming`);
+  }
+}
+
 const joinWebhookStats = {
   configured: Boolean(JOIN_WEBHOOK_URL),
   attempts: 0,
@@ -1248,6 +1262,11 @@ io.on('connection', (socket) => {
           text: `${displayName} joined the public room`
         }));
       }
+
+      // If no one is streaming, trigger a random bot to start
+      if (publicStreamers.length === 0) {
+        setTimeout(() => triggerRandomBotStream(), 1500);
+      }
     }
 
     emitPublicOnlineUsers();
@@ -1323,7 +1342,6 @@ io.on('connection', (socket) => {
 
   // ── Public Stream handlers ──
   socket.on('start-public-stream', () => {
-    if (socket.data.isBot) return;
     if (publicStreamers.includes(socket.id)) return; // already streaming
     publicStreamers.push(socket.id);
     const streamerName = getSocketDisplayName(socket.id);
