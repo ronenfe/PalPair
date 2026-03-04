@@ -359,10 +359,12 @@ body.chat-active #privateChatInterface {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 8px;
   padding: 14px 16px;
   background: #2B2930;
   border-bottom: 1px solid #49454F;
   flex-shrink: 0;
+  overflow: hidden;
 }
 
 .chat-header-main {
@@ -565,7 +567,7 @@ body.chat-active .control-btn {
 .go-random-btn {
   position: relative;
   z-index: 10;
-  min-width: 150px;
+  min-width: auto;
   padding: 10px 18px;
   border-radius: 999px;
   background: #D0BCFF;
@@ -575,6 +577,8 @@ body.chat-active .control-btn {
   font-size: 14px;
   font-weight: 700;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 
 .go-random-btn:hover {
@@ -583,7 +587,7 @@ body.chat-active .control-btn {
 }
 
 body.chat-active.random-active .go-random-btn {
-  min-width: 170px;
+  min-width: auto;
 }
 
 body.chat-active:not(.random-active) .controls-overlay {
@@ -1245,9 +1249,8 @@ body.chat-active:not(.random-active) .chat-container {
   }
 
   .go-random-btn {
-    width: min(92vw, 280px);
-    padding: 12px 16px;
-    font-size: 16px;
+    padding: 8px 12px;
+    font-size: 12px;
   }
 
   .chat-input-wrap {

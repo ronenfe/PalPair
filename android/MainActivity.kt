@@ -56,6 +56,9 @@ class MainActivity : AppCompatActivity() {
             javaScriptCanOpenWindowsAutomatically = true
             allowFileAccess = true
             allowContentAccess = true
+            useWideViewPort = true
+            loadWithOverviewMode = true
+            cacheMode = WebSettings.LOAD_NO_CACHE
         }
 
         // Handle camera/mic permission requests from the web page

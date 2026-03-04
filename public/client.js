@@ -339,16 +339,15 @@ function setRandomMode(active) {
     // Disable private chat input
     if (privateChatInput) { privateChatInput.disabled = true; privateChatInput.value = ''; }
     if (privateSendBtn) privateSendBtn.disabled = true;
-    if (chatModeLabel) chatModeLabel.textContent = 'Public chat';
     // Re-check for active public streamers when returning to public room
     socket.emit('request-public-streamers');
   }
 
   if (goRandomBtn) {
-    goRandomBtn.style.display = active ? 'none' : 'inline-flex';
+    goRandomBtn.style.display = active ? 'none' : '';
   }
   if (goLiveBtn) {
-    goLiveBtn.style.display = active ? 'none' : 'inline-flex';
+    goLiveBtn.style.display = active ? 'none' : '';
   }
   if (stopRandomBtn) {
     stopRandomBtn.style.display = active ? 'flex' : 'none';
