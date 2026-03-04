@@ -106,7 +106,10 @@ const publicStreamVideo = document.getElementById('publicStreamVideo');
 const publicStreamName = document.getElementById('publicStreamName');
 const nextStreamerBtn = document.getElementById('nextStreamerBtn');
 const hideStreamBtn = document.getElementById('hideStreamBtn');
+const coinCountEl = document.getElementById('coinCount');
+const coinBalanceEl = document.getElementById('coinBalance');
 let streamHiddenByUser = false;
+let myCoins = 0;
 
 // Online users panel toggle
 if (usersToggleBtn && onlineUsersPanel) {
@@ -731,6 +734,11 @@ function addPublicRoomEvent(event = {}) {
     return;
   }
 
+  if (event.type === 'tip') {
+    addChatMessage(event.text, 'tip', 'public', event.timestamp);
+    return;
+  }
+
   const isMine = event.socketId === socket.id;
   const sender = isMine ? 'local' : 'remote';
   const prefix = isMine ? '' : `${event.name || 'Guest'}: `;
@@ -1063,5 +1071,290 @@ if (hideStreamBtn) {
       if (publicStreamViewerPC) { publicStreamViewerPC.close(); publicStreamViewerPC = null; }
     }
     if (publicStreamVideo) publicStreamVideo.srcObject = null;
+  });
+}
+
+// ═══════════════════════════════════
+//  Virtual Coins / Tips
+// ═══════════════════════════════════
+
+socket.on('coin-balance', ({ balance }) => {
+  myCoins = balance;
+  if (coinCountEl) coinCountEl.textContent = balance;
+  if (coinBalanceEl) {
+    coinBalanceEl.classList.remove('coin-pop');
+    void coinBalanceEl.offsetWidth; // force reflow
+    coinBalanceEl.classList.add('coin-pop');
+  }
+});
+
+socket.on('tip-error', ({ message }) => {
+  addChatMessage(`⚠️ ${message}`, 'system', 'public');
+});
+
+// Tip buttons
+document.querySelectorAll('.tip-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const amount = parseInt(btn.dataset.amount);
+    if (!currentWatchingStreamerId) return;
+    if (myCoins < amount) {
+      addChatMessage('⚠️ Not enough coins!', 'system', 'public');
+      return;
+    }
+    socket.emit('send-tip', { toSocketId: currentWatchingStreamerId, amount });
+  });
+});
+
+// ═══════════════════════════════════
+//  Buy Coins — PayPal Integration
+// ═══════════════════════════════════
+
+const buyCoinsBtn = document.getElementById('buyCoinsBtn');
+const buyCoinsModal = document.getElementById('buyCoinsModal');
+const closeBuyModal = document.getElementById('closeBuyModal');
+const coinPackagesEl = document.getElementById('coinPackages');
+const paypalContainer = document.getElementById('paypalButtonContainer');
+const buyStatus = document.getElementById('buyStatus');
+
+let selectedPackage = null;
+let paypalLoaded = false;
+let paypalClientId = null;
+
+// Open modal
+if (buyCoinsBtn) {
+  buyCoinsBtn.addEventListener('click', async () => {
+    buyCoinsModal.style.display = 'flex';
+    buyStatus.textContent = '';
+    buyStatus.className = 'buy-status';
+    // Reset selection
+    document.querySelectorAll('.coin-package').forEach(p => p.classList.remove('selected'));
+    paypalContainer.style.display = 'none';
+    paypalContainer.innerHTML = '';
+    selectedPackage = null;
+
+    // Fetch config if needed
+    if (!paypalClientId) {
+      try {
+        const res = await fetch('/api/coin-packages');
+        const data = await res.json();
+        paypalClientId = data.paypalClientId;
+      } catch (e) {
+        buyStatus.textContent = 'Failed to load payment config';
+        buyStatus.className = 'buy-status error';
+      }
+    }
+  });
+}
+
+// Close modal
+if (closeBuyModal) {
+  closeBuyModal.addEventListener('click', () => {
+    buyCoinsModal.style.display = 'none';
+  });
+}
+if (buyCoinsModal) {
+  buyCoinsModal.addEventListener('click', (e) => {
+    if (e.target === buyCoinsModal) buyCoinsModal.style.display = 'none';
+  });
+}
+
+// Package selection
+document.querySelectorAll('.coin-package').forEach(pkg => {
+  pkg.addEventListener('click', async () => {
+    const pkgId = pkg.dataset.package;
+    selectedPackage = pkgId;
+
+    document.querySelectorAll('.coin-package').forEach(p => p.classList.remove('selected'));
+    pkg.classList.add('selected');
+
+    // Load PayPal SDK if needed
+    if (!paypalLoaded && paypalClientId) {
+      buyStatus.textContent = 'Loading payment...';
+      buyStatus.className = 'buy-status';
+      try {
+        await loadPayPalSDK(paypalClientId);
+        paypalLoaded = true;
+        buyStatus.textContent = '';
+      } catch (e) {
+        buyStatus.textContent = 'Failed to load PayPal';
+        buyStatus.className = 'buy-status error';
+        return;
+      }
+    }
+
+    if (!paypalClientId) {
+      buyStatus.textContent = 'PayPal not configured on server';
+      buyStatus.className = 'buy-status error';
+      return;
+    }
+
+    // Render PayPal buttons
+    paypalContainer.style.display = 'block';
+    paypalContainer.innerHTML = '';
+
+    if (window.paypal) {
+      window.paypal.Buttons({
+        style: {
+          layout: 'vertical',
+          color: 'gold',
+          shape: 'pill',
+          label: 'pay',
+          height: 40
+        },
+        createOrder: async () => {
+          buyStatus.textContent = 'Creating order...';
+          buyStatus.className = 'buy-status';
+          const res = await fetch('/api/create-order', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ packageId: selectedPackage, socketId: socket.id })
+          });
+          const data = await res.json();
+          if (data.error) {
+            buyStatus.textContent = data.error;
+            buyStatus.className = 'buy-status error';
+            throw new Error(data.error);
+          }
+          buyStatus.textContent = '';
+          return data.orderId;
+        },
+        onApprove: async (data) => {
+          buyStatus.textContent = 'Processing payment...';
+          buyStatus.className = 'buy-status';
+          const res = await fetch('/api/capture-order', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ orderId: data.orderID })
+          });
+          const result = await res.json();
+          if (result.success) {
+            buyStatus.textContent = `✅ +${result.coins} coins added!`;
+            buyStatus.className = 'buy-status success';
+            setTimeout(() => {
+              buyCoinsModal.style.display = 'none';
+            }, 2000);
+          } else {
+            buyStatus.textContent = result.error || 'Payment failed';
+            buyStatus.className = 'buy-status error';
+          }
+        },
+        onError: (err) => {
+          console.error('PayPal error:', err);
+          buyStatus.textContent = 'Payment error. Please try again.';
+          buyStatus.className = 'buy-status error';
+        },
+        onCancel: () => {
+          buyStatus.textContent = 'Payment cancelled';
+          buyStatus.className = 'buy-status';
+        }
+      }).render(paypalContainer);
+    }
+  });
+});
+
+function loadPayPalSDK(clientId) {
+  return new Promise((resolve, reject) => {
+    if (window.paypal) return resolve();
+    const script = document.createElement('script');
+    script.src = `https://www.paypal.com/sdk/js?client-id=${clientId}&currency=USD`;
+    script.onload = resolve;
+    script.onerror = reject;
+    document.head.appendChild(script);
+  });
+}
+
+// ── Cashout ──
+const cashoutBtn = document.getElementById('cashoutBtn');
+const cashoutModal = document.getElementById('cashoutModal');
+const closeCashoutModal = document.getElementById('closeCashoutModal');
+const cashoutCoinsInput = document.getElementById('cashoutCoins');
+const cashoutEmailInput = document.getElementById('cashoutEmail');
+const cashoutPayoutEl = document.getElementById('cashoutPayout');
+const cashoutCoinCountEl = document.getElementById('cashoutCoinCount');
+const cashoutSubmitBtn = document.getElementById('cashoutSubmitBtn');
+const cashoutStatus = document.getElementById('cashoutStatus');
+
+const CASHOUT_RATE = 0.007; // $0.007 per coin
+const CASHOUT_MIN = 1000;
+
+if (cashoutBtn) {
+  cashoutBtn.addEventListener('click', () => {
+    cashoutModal.style.display = 'flex';
+    cashoutCoinCountEl.textContent = myCoins;
+    cashoutCoinsInput.value = '';
+    cashoutEmailInput.value = '';
+    cashoutPayoutEl.textContent = '0.00';
+    cashoutStatus.textContent = '';
+    cashoutStatus.className = 'cashout-status';
+    cashoutSubmitBtn.disabled = false;
+  });
+}
+
+if (closeCashoutModal) {
+  closeCashoutModal.addEventListener('click', () => {
+    cashoutModal.style.display = 'none';
+  });
+}
+
+if (cashoutCoinsInput) {
+  cashoutCoinsInput.addEventListener('input', () => {
+    const val = parseInt(cashoutCoinsInput.value) || 0;
+    const payout = (val * CASHOUT_RATE).toFixed(2);
+    cashoutPayoutEl.textContent = payout;
+  });
+}
+
+if (cashoutSubmitBtn) {
+  cashoutSubmitBtn.addEventListener('click', async () => {
+    const coins = parseInt(cashoutCoinsInput.value) || 0;
+    const email = (cashoutEmailInput.value || '').trim();
+
+    cashoutStatus.textContent = '';
+    cashoutStatus.className = 'cashout-status';
+
+    if (coins < CASHOUT_MIN) {
+      cashoutStatus.textContent = `Minimum cashout is ${CASHOUT_MIN} coins`;
+      cashoutStatus.className = 'cashout-status error';
+      return;
+    }
+    if (coins > myCoins) {
+      cashoutStatus.textContent = 'Not enough coins';
+      cashoutStatus.className = 'cashout-status error';
+      return;
+    }
+    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      cashoutStatus.textContent = 'Enter a valid PayPal email';
+      cashoutStatus.className = 'cashout-status error';
+      return;
+    }
+
+    cashoutSubmitBtn.disabled = true;
+    cashoutStatus.textContent = 'Submitting request...';
+
+    try {
+      const res = await fetch('/api/cashout', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ socketId: socket.id, paypalEmail: email, coins })
+      });
+      const result = await res.json();
+      if (result.success) {
+        cashoutStatus.textContent = `✅ Cashout requested! $${result.payout} will be sent to ${email}`;
+        cashoutStatus.className = 'cashout-status success';
+        cashoutCoinCountEl.textContent = result.balance;
+        setTimeout(() => {
+          cashoutModal.style.display = 'none';
+        }, 3000);
+      } else {
+        cashoutStatus.textContent = result.error || 'Cashout failed';
+        cashoutStatus.className = 'cashout-status error';
+        cashoutSubmitBtn.disabled = false;
+      }
+    } catch (err) {
+      console.error('Cashout error:', err);
+      cashoutStatus.textContent = 'Network error. Try again.';
+      cashoutStatus.className = 'cashout-status error';
+      cashoutSubmitBtn.disabled = false;
+    }
   });
 }

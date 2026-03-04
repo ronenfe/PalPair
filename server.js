@@ -90,6 +90,25 @@ const NUM_BOTS = parseInt(process.env.NUM_BOTS || '5');
 const CLEANUP_INTERVAL = parseInt(process.env.CLEANUP_INTERVAL || '60000'); // 1 minute
 const ADMIN_KEY = process.env.ADMIN_KEY || '';
 const JOIN_WEBHOOK_URL = (process.env.JOIN_WEBHOOK_URL || process.env.NTFY_URL || '').trim();
+const PAYPAL_CLIENT_ID = (process.env.PAYPAL_CLIENT_ID || '').trim();
+const PAYPAL_CLIENT_SECRET = (process.env.PAYPAL_CLIENT_SECRET || '').trim();
+const PAYPAL_MODE = (process.env.PAYPAL_MODE || 'sandbox').trim(); // 'sandbox' or 'live'
+const PAYPAL_API = PAYPAL_MODE === 'live' ? 'https://api-m.paypal.com' : 'https://api-m.sandbox.paypal.com';
+
+// Coin packages: { id, coins, price (USD) }
+const COIN_PACKAGES = [
+  { id: 'pack_100', coins: 100, price: '1.00', label: '100 Coins' },
+  { id: 'pack_600', coins: 600, price: '5.00', label: '600 Coins' },
+  { id: 'pack_1500', coins: 1500, price: '10.00', label: '1,500 Coins' },
+];
+
+// Pending PayPal orders: orderId → { socketId, packageId, coins }
+const pendingOrders = new Map();
+
+// Cashout config
+const CASHOUT_MIN_COINS = 1000;
+const CASHOUT_RATE = 0.007; // $0.70 per 100 coins = $0.007 per coin
+const CASHOUT_NTFY_URL = (process.env.CASHOUT_NTFY_URL || process.env.JOIN_WEBHOOK_URL || '').trim();
 
 const app = express();
 const server = http.createServer(app);
@@ -463,6 +482,254 @@ app.get('/api/user-count', (req, res) => {
   });
 });
 
+// ── PayPal Coin Purchase API ──
+app.get('/api/coin-packages', (req, res) => {
+  res.json({
+    packages: COIN_PACKAGES,
+    paypalClientId: PAYPAL_CLIENT_ID,
+    mode: PAYPAL_MODE
+  });
+});
+
+// Helper: get PayPal access token
+async function getPayPalAccessToken() {
+  return new Promise((resolve, reject) => {
+    const url = new URL(`${PAYPAL_API}/v1/oauth2/token`);
+    const auth = Buffer.from(`${PAYPAL_CLIENT_ID}:${PAYPAL_CLIENT_SECRET}`).toString('base64');
+    const postData = 'grant_type=client_credentials';
+    const req = https.request({
+      hostname: url.hostname,
+      path: url.pathname,
+      method: 'POST',
+      headers: {
+        'Authorization': `Basic ${auth}`,
+        'Content-Type': 'application/x-www-form-urlencoded',
+        'Content-Length': Buffer.byteLength(postData)
+      }
+    }, (res) => {
+      let body = '';
+      res.on('data', d => body += d);
+      res.on('end', () => {
+        try {
+          const data = JSON.parse(body);
+          if (data.access_token) resolve(data.access_token);
+          else reject(new Error('No access token: ' + body));
+        } catch (e) { reject(e); }
+      });
+    });
+    req.on('error', reject);
+    req.write(postData);
+    req.end();
+  });
+}
+
+// Create PayPal order
+app.post('/api/create-order', express.json(), async (req, res) => {
+  const { packageId, socketId } = req.body;
+  const pkg = COIN_PACKAGES.find(p => p.id === packageId);
+  if (!pkg) return res.status(400).json({ error: 'Invalid package' });
+  if (!PAYPAL_CLIENT_ID || !PAYPAL_CLIENT_SECRET) {
+    return res.status(500).json({ error: 'PayPal not configured' });
+  }
+
+  try {
+    const accessToken = await getPayPalAccessToken();
+    const orderBody = JSON.stringify({
+      intent: 'CAPTURE',
+      purchase_units: [{
+        amount: {
+          currency_code: 'USD',
+          value: pkg.price
+        },
+        description: `${pkg.label} - Palpair`
+      }]
+    });
+
+    const url = new URL(`${PAYPAL_API}/v2/checkout/orders`);
+    const orderRes = await new Promise((resolve, reject) => {
+      const req = https.request({
+        hostname: url.hostname,
+        path: url.pathname,
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${accessToken}`,
+          'Content-Type': 'application/json',
+          'Content-Length': Buffer.byteLength(orderBody)
+        }
+      }, (res) => {
+        let body = '';
+        res.on('data', d => body += d);
+        res.on('end', () => {
+          try { resolve(JSON.parse(body)); }
+          catch (e) { reject(e); }
+        });
+      });
+      req.on('error', reject);
+      req.write(orderBody);
+      req.end();
+    });
+
+    if (orderRes.id) {
+      pendingOrders.set(orderRes.id, { socketId, packageId: pkg.id, coins: pkg.coins });
+      console.log(`>>> PayPal order created: ${orderRes.id} for ${pkg.label} (socket: ${socketId})`);
+      res.json({ orderId: orderRes.id });
+    } else {
+      console.error('PayPal order error:', orderRes);
+      res.status(500).json({ error: 'Failed to create order' });
+    }
+  } catch (err) {
+    console.error('PayPal create-order error:', err);
+    res.status(500).json({ error: 'Payment error' });
+  }
+});
+
+// Capture PayPal order (after user approves)
+app.post('/api/capture-order', express.json(), async (req, res) => {
+  const { orderId } = req.body;
+  const pending = pendingOrders.get(orderId);
+  if (!pending) return res.status(400).json({ error: 'Unknown order' });
+
+  try {
+    const accessToken = await getPayPalAccessToken();
+    const url = new URL(`${PAYPAL_API}/v2/checkout/orders/${orderId}/capture`);
+    const captureRes = await new Promise((resolve, reject) => {
+      const req = https.request({
+        hostname: url.hostname,
+        path: url.pathname,
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${accessToken}`,
+          'Content-Type': 'application/json'
+        }
+      }, (res) => {
+        let body = '';
+        res.on('data', d => body += d);
+        res.on('end', () => {
+          try { resolve(JSON.parse(body)); }
+          catch (e) { reject(e); }
+        });
+      });
+      req.on('error', reject);
+      req.end();
+    });
+
+    if (captureRes.status === 'COMPLETED') {
+      // Credit coins to user
+      const currentBalance = getUserBalance(pending.socketId);
+      setUserBalance(pending.socketId, currentBalance + pending.coins);
+      const newBalance = getUserBalance(pending.socketId);
+
+      // Notify user of new balance via socket
+      const userSocket = io.sockets.sockets.get(pending.socketId);
+      if (userSocket) {
+        userSocket.emit('coin-balance', { balance: newBalance });
+      }
+
+      pendingOrders.delete(orderId);
+      const userName = getSocketDisplayName(pending.socketId);
+      console.log(`>>> PURCHASE: ${userName} bought ${pending.coins} coins (Order: ${orderId})`);
+
+      res.json({ success: true, coins: pending.coins, balance: newBalance });
+    } else {
+      console.error('PayPal capture not completed:', captureRes.status, captureRes);
+      res.status(400).json({ error: 'Payment not completed' });
+    }
+  } catch (err) {
+    console.error('PayPal capture-order error:', err);
+    res.status(500).json({ error: 'Capture error' });
+  }
+});
+
+// ── Cashout Request ──
+app.post('/api/cashout', express.json(), (req, res) => {
+  const { socketId, paypalEmail, coins } = req.body;
+  if (!socketId || !paypalEmail || !coins) return res.status(400).json({ error: 'Missing fields' });
+
+  const emailStr = String(paypalEmail).trim().toLowerCase();
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailStr)) {
+    return res.status(400).json({ error: 'Invalid email' });
+  }
+
+  const amount = parseInt(coins);
+  if (!amount || amount < CASHOUT_MIN_COINS) {
+    return res.status(400).json({ error: `Minimum cashout is ${CASHOUT_MIN_COINS} coins` });
+  }
+
+  const balance = getUserBalance(socketId);
+  if (balance < amount) {
+    return res.status(400).json({ error: 'Not enough coins' });
+  }
+
+  const payout = (amount * CASHOUT_RATE).toFixed(2);
+
+  // Deduct coins
+  setUserBalance(socketId, balance - amount);
+  const newBalance = getUserBalance(socketId);
+
+  // Notify user of new balance
+  const userSocket = io.sockets.sockets.get(socketId);
+  if (userSocket) {
+    userSocket.emit('coin-balance', { balance: newBalance });
+  }
+
+  const userName = getSocketDisplayName(socketId);
+  console.log(`>>> CASHOUT REQUEST: ${userName} → ${emailStr} | ${amount} coins = $${payout}`);
+
+  // Send ntfy notification to admin
+  sendCashoutNotification({
+    userName,
+    socketId,
+    paypalEmail: emailStr,
+    coins: amount,
+    payout,
+    newBalance
+  });
+
+  res.json({ success: true, payout, coins: amount, balance: newBalance });
+});
+
+function sendCashoutNotification({ userName, socketId, paypalEmail, coins, payout, newBalance }) {
+  const ntfyUrl = CASHOUT_NTFY_URL;
+  if (!ntfyUrl) {
+    console.log('>>> No CASHOUT_NTFY_URL configured, skipping notification');
+    return;
+  }
+
+  let target;
+  try { target = new URL(ntfyUrl); } catch { return; }
+
+  const body = [
+    '💰 CASHOUT REQUEST',
+    `User: ${userName}`,
+    `PayPal: ${paypalEmail}`,
+    `Coins: ${coins}`,
+    `Payout: $${payout}`,
+    `Remaining balance: ${newBalance} coins`,
+    `Time: ${new Date().toLocaleString()}`
+  ].join('\n');
+
+  const reqOptions = {
+    hostname: target.hostname,
+    port: target.port || (target.protocol === 'https:' ? 443 : 80),
+    path: target.pathname + target.search,
+    method: 'POST',
+    headers: {
+      'Content-Type': 'text/plain; charset=utf-8',
+      'Title': 'Palpair: Cashout Request',
+      'Priority': 'high',
+      'Tags': 'moneybag'
+    }
+  };
+
+  const transport = target.protocol === 'https:' ? https : http;
+  const req = transport.request(reqOptions, (res) => {
+    console.log(`>>> Cashout ntfy status: ${res.statusCode}`);
+  });
+  req.on('error', (err) => console.error('Cashout ntfy error:', err.message));
+  req.write(body);
+  req.end();
+}
+
 // Endpoint for bots to get AI responses
 app.post('/api/ai-response', express.json(), async (req, res) => {
   const { message, botId, socketId } = req.body;
@@ -505,6 +772,19 @@ let publicRoomSpeakerBotId = null; // exactly one bot that replies in public roo
 // ── Public Stream ──
 const publicStreamers = []; // ordered list of socket IDs currently streaming
 const viewerStreamIndex = new Map(); // viewerSocketId → index in publicStreamers they're watching
+
+// ── Virtual Coins / Tips ──
+const STARTING_COINS = 50;
+const userBalances = new Map(); // socketId → coin balance
+
+function getUserBalance(socketId) {
+  if (!userBalances.has(socketId)) userBalances.set(socketId, 0);
+  return userBalances.get(socketId);
+}
+
+function setUserBalance(socketId, amount) {
+  userBalances.set(socketId, Math.max(0, amount));
+}
 
 function getPublicStreamersList() {
   return publicStreamers.map((id) => ({
@@ -1225,6 +1505,10 @@ io.on('connection', (socket) => {
     if (!socket.data.isBot) {
       upsertLoginSession(socket.id, profile?.name);
     }
+    // Initialize coin balance for new users
+    if (!socket.data.isBot && !userBalances.has(socket.id)) {
+      userBalances.set(socket.id, STARTING_COINS);
+    }
     emitAdminOnlineUsers();
 
     if (!socket.data.isBot && !notifiedJoins.has(socket.id)) {
@@ -1250,6 +1534,9 @@ io.on('connection', (socket) => {
       socket.emit('public-room-init', {
         events: publicRoomEvents.slice(-150)
       });
+
+      // Send coin balance to user
+      socket.emit('coin-balance', { balance: getUserBalance(socket.id) });
 
       // Send current public streamers to new joiner
       if (publicStreamers.length > 0) {
@@ -1321,6 +1608,46 @@ io.on('connection', (socket) => {
     emitPublicOnlineUsers();
     
     console.log(`>>> ${socket.id} registered as bot - Name: ${profile.name}, Age: ${profile.age}, Gender: ${profile.gender}, Country: ${profile.countryName} (${profile.country})`);
+  });
+
+  // ── Virtual Coins / Tips ──
+  socket.on('send-tip', ({ toSocketId, amount } = {}) => {
+    if (socket.data.isBot) return;
+    const tipAmount = parseInt(amount);
+    if (!tipAmount || tipAmount <= 0 || ![10, 50, 100].includes(tipAmount)) return;
+    if (!toSocketId || toSocketId === socket.id) return;
+
+    const senderBalance = getUserBalance(socket.id);
+    if (senderBalance < tipAmount) {
+      socket.emit('tip-error', { message: 'Not enough coins' });
+      return;
+    }
+
+    // Deduct from sender, add to recipient
+    setUserBalance(socket.id, senderBalance - tipAmount);
+    const recipientBalance = getUserBalance(toSocketId);
+    setUserBalance(toSocketId, recipientBalance + tipAmount);
+
+    const senderName = getSocketDisplayName(socket.id);
+    const recipientName = getSocketDisplayName(toSocketId);
+
+    // Notify both parties of new balances
+    socket.emit('coin-balance', { balance: getUserBalance(socket.id) });
+    const recipientSocket = io.sockets.sockets.get(toSocketId);
+    if (recipientSocket) {
+      recipientSocket.emit('coin-balance', { balance: getUserBalance(toSocketId) });
+    }
+
+    // Broadcast tip as a public room event
+    pushPublicRoomEvent(buildPublicRoomEvent({
+      type: 'tip',
+      text: `🪙 ${senderName} tipped ${recipientName} ${tipAmount} coins!`,
+      amount: tipAmount,
+      fromName: senderName,
+      toName: recipientName
+    }));
+
+    console.log(`>>> TIP: ${senderName} → ${recipientName}: ${tipAmount} coins`);
   });
 
   socket.on('public-chat-message', ({ text, clientMsgId } = {}) => {
@@ -1774,6 +2101,7 @@ io.on('connection', (socket) => {
     searching.delete(socket.id);
     lastPartner.delete(socket.id);
     notifiedJoins.delete(socket.id);
+    userBalances.delete(socket.id);
 
     // Clean up public stream state
     const streamerIdx = publicStreamers.indexOf(socket.id);

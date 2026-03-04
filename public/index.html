@@ -458,6 +458,10 @@
           <div class="chat-header-main">
             <div class="chat-mode-label" id="chatModeLabel" data-i18n="publicChatTitle">Public chat</div>
           </div>
+          <div class="coin-balance" id="coinBalance" title="Your coins">🪙 <span id="coinCount">0</span>
+            <button id="buyCoinsBtn" class="buy-coins-btn" title="Buy coins">+</button>
+            <button id="cashoutBtn" class="cashout-btn" title="Cash out">💸</button>
+          </div>
           <button id="goLiveBtn" class="go-live-btn" aria-label="Go live">📡 Go Live</button>
           <button id="goRandomBtn" class="go-random-btn" aria-label="Go random">🎥 Go Random</button>
         </header>
@@ -473,6 +477,11 @@
               <button id="hideStreamBtn" class="hide-stream-btn" title="Hide stream">✕</button>
             </div>
             <video id="publicStreamVideo" class="public-stream-video" autoplay playsinline></video>
+            <div class="stream-tip-bar">
+              <button class="tip-btn" data-amount="10">🪙 10</button>
+              <button class="tip-btn" data-amount="50">🪙 50</button>
+              <button class="tip-btn" data-amount="100">🪙 100</button>
+            </div>
           </div>
 
           <div class="room-layout">
@@ -536,6 +545,57 @@
           </div>
         </section>
       </div>
+
+    <!-- Buy Coins Modal -->
+    <div id="buyCoinsModal" class="modal-overlay" style="display:none;">
+      <div class="modal-content buy-coins-modal">
+        <button class="modal-close" id="closeBuyModal">&times;</button>
+        <h2 class="modal-title">🪙 Buy Coins</h2>
+        <p class="modal-subtitle">Tip streamers and support creators</p>
+        <div class="coin-packages" id="coinPackages">
+          <button class="coin-package" data-package="pack_100">
+            <span class="package-coins">🪙 100</span>
+            <span class="package-price">$1.00</span>
+          </button>
+          <button class="coin-package" data-package="pack_600">
+            <span class="package-coins">🪙 600</span>
+            <span class="package-bonus">+20% bonus</span>
+            <span class="package-price">$5.00</span>
+          </button>
+          <button class="coin-package featured" data-package="pack_1500">
+            <span class="package-badge">Best Value</span>
+            <span class="package-coins">🪙 1,500</span>
+            <span class="package-bonus">+50% bonus</span>
+            <span class="package-price">$10.00</span>
+          </button>
+        </div>
+        <div id="paypalButtonContainer" class="paypal-container" style="display:none;"></div>
+        <p id="buyStatus" class="buy-status"></p>
+      </div>
+    </div>
+
+    <!-- Cashout Modal -->
+    <div id="cashoutModal" class="modal-overlay" style="display:none;">
+      <div class="modal-content cashout-modal">
+        <button class="modal-close" id="closeCashoutModal">&times;</button>
+        <h2 class="modal-title">💸 Cash Out</h2>
+        <p class="modal-subtitle">Convert your coins to real money</p>
+        <div class="cashout-info">
+          <div class="cashout-balance">Your balance: <strong>🪙 <span id="cashoutCoinCount">0</span></strong></div>
+          <div class="cashout-rate">Rate: 100 coins = <strong>$0.70</strong> (30% platform fee)</div>
+          <div class="cashout-min">Minimum: <strong>1,000 coins ($7.00)</strong></div>
+        </div>
+        <div class="cashout-form">
+          <label for="cashoutCoins" class="cashout-label">Coins to cash out</label>
+          <input type="number" id="cashoutCoins" class="cashout-input" min="1000" step="100" placeholder="1000">
+          <div class="cashout-payout">You'll receive: <strong>$<span id="cashoutPayout">0.00</span></strong></div>
+          <label for="cashoutEmail" class="cashout-label">Your PayPal email</label>
+          <input type="email" id="cashoutEmail" class="cashout-input" placeholder="you@example.com">
+          <button id="cashoutSubmitBtn" class="cashout-submit-btn">Request Cashout</button>
+        </div>
+        <p id="cashoutStatus" class="cashout-status"></p>
+      </div>
+    </div>
 
     <script src="/socket.io/socket.io.js"></script>
     <script src="/i18n.js"></script>
