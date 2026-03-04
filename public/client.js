@@ -826,7 +826,7 @@ function renderOnlineUsers(users = []) {
     const nameEl = document.createElement('span');
     nameEl.className = 'online-user-name';
     const genderValue = String(user.gender || '').toLowerCase();
-    const genderEmoji = user.isBot ? '🤖' : (genderValue === 'male' ? '👨' : (genderValue === 'female' ? '👩' : '👤'));
+    const genderEmoji = user.isBot ? '🤖' : (genderValue === 'male' ? '👨' : (genderValue === 'female' ? '👩‍🦰' : '👤'));
     const baseName = user.socketId === socket.id ? `${user.name} (You)` : user.name;
     nameEl.textContent = `${genderEmoji} ${baseName}`;
 
