@@ -1927,3 +1927,22 @@ body.chat-active:not(.random-active) .chat-container {
   color: #4ADE80;
 }
 
+/* ── Google Play Buy Button ── */
+.google-play-buy-btn {
+  width: 100%;
+  padding: 14px;
+  border: none;
+  border-radius: 12px;
+  background: linear-gradient(135deg, #34A853, #1E8E3E);
+  color: #fff;
+  font-weight: 700;
+  font-size: 1rem;
+  cursor: pointer;
+  margin-top: 12px;
+  transition: transform .15s, box-shadow .15s;
+}
+.google-play-buy-btn:hover {
+  transform: scale(1.02);
+  box-shadow: 0 4px 20px rgba(52,168,83,.3);
+}
+

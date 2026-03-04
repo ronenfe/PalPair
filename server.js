@@ -523,6 +523,49 @@ async function getPayPalAccessToken() {
   });
 }
 
+// ── Google Play Billing verification ──
+app.post('/api/verify-google-purchase', express.json(), (req, res) => {
+  const { socketId, packageId, purchaseToken, orderId } = req.body;
+  if (!socketId || !packageId || !purchaseToken) {
+    return res.status(400).json({ error: 'Missing fields' });
+  }
+
+  const pkg = COIN_PACKAGES.find(p => p.id === packageId);
+  if (!pkg) return res.status(400).json({ error: 'Invalid package' });
+
+  // TODO: Server-side verification with Google Play Developer API
+  // For now, trust the client purchase token (add verification in production)
+  // See: https://developers.google.com/android-publisher/api-ref/rest/v3/purchases.products/get
+  
+  // Credit coins
+  const currentBalance = getUserBalance(socketId);
+  setUserBalance(socketId, currentBalance + pkg.coins);
+  addUserPurchased(socketId, pkg.coins); // Track as purchased (cashout-eligible)
+  const newBalance = getUserBalance(socketId);
+
+  // Notify user via socket
+  const userSocket = io.sockets.sockets.get(socketId);
+  if (userSocket) {
+    userSocket.emit('coin-balance', { balance: newBalance });
+  }
+
+  const userName = getSocketDisplayName(socketId);
+  console.log(`>>> GOOGLE PURCHASE: ${userName} bought ${pkg.coins} coins (Order: ${orderId})`);
+  saveBalancesToDisk();
+
+  res.json({ success: true, coins: pkg.coins, balance: newBalance });
+});
+
+// Test PayPal auth (temporary diagnostic)
+app.get('/api/paypal-test', async (req, res) => {
+  try {
+    const token = await getPayPalAccessToken();
+    res.json({ ok: true, tokenPrefix: token.substring(0, 10) + '...', api: PAYPAL_API });
+  } catch (err) {
+    res.status(500).json({ ok: false, error: err.message || String(err), api: PAYPAL_API });
+  }
+});
+
 // Create PayPal order
 app.post('/api/create-order', express.json(), async (req, res) => {
   const { packageId, socketId } = req.body;
@@ -578,7 +621,7 @@ app.post('/api/create-order', express.json(), async (req, res) => {
       res.status(500).json({ error: 'Failed to create order' });
     }
   } catch (err) {
-    console.error('PayPal create-order error:', err);
+    console.error('PayPal create-order error:', err.message || err);
     res.status(500).json({ error: 'Payment error' });
   }
 });
@@ -617,6 +660,7 @@ app.post('/api/capture-order', express.json(), async (req, res) => {
       // Credit coins to user
       const currentBalance = getUserBalance(pending.socketId);
       setUserBalance(pending.socketId, currentBalance + pending.coins);
+      addUserPurchased(pending.socketId, pending.coins); // Track as purchased (cashout-eligible)
       const newBalance = getUserBalance(pending.socketId);
 
       // Notify user of new balance via socket
@@ -628,6 +672,7 @@ app.post('/api/capture-order', express.json(), async (req, res) => {
       pendingOrders.delete(orderId);
       const userName = getSocketDisplayName(pending.socketId);
       console.log(`>>> PURCHASE: ${userName} bought ${pending.coins} coins (Order: ${orderId})`);
+      saveBalancesToDisk();
 
       res.json({ success: true, coins: pending.coins, balance: newBalance });
     } else {
@@ -660,11 +705,27 @@ app.post('/api/cashout', express.json(), (req, res) => {
     return res.status(400).json({ error: 'Not enough coins' });
   }
 
+  // Only allow cashing out purchased/earned coins (not free starting coins)
+  const purchased = getUserPurchased(socketId);
+  if (purchased < amount) {
+    const msg = purchased > 0
+      ? `Only ${purchased} of your coins are eligible for cashout (purchased/tipped). Free starting coins cannot be cashed out.`
+      : 'Only purchased or tipped coins can be cashed out. Free starting coins are not eligible.';
+    return res.status(400).json({ error: msg });
+  }
+
   const payout = (amount * CASHOUT_RATE).toFixed(2);
 
   // Deduct coins
   setUserBalance(socketId, balance - amount);
+  // Deduct from purchased tracking
+  const uid = resolveUserId(socketId);
+  const prevPurchased = getUserPurchased(socketId);
+  userPurchasedCoins.set(uid, Math.max(0, prevPurchased - amount));
   const newBalance = getUserBalance(socketId);
+
+  // Save to disk immediately after cashout
+  saveBalancesToDisk();
 
   // Notify user of new balance
   const userSocket = io.sockets.sockets.get(socketId);
@@ -774,16 +835,93 @@ const publicStreamers = []; // ordered list of socket IDs currently streaming
 const viewerStreamIndex = new Map(); // viewerSocketId → index in publicStreamers they're watching
 
 // ── Virtual Coins / Tips ──
-const STARTING_COINS = 50;
-const userBalances = new Map(); // socketId → coin balance
+const userBalances = new Map(); // userId → coin balance
+const userPurchasedCoins = new Map(); // userId → coins from purchases/tips (cashout-eligible)
+const socketToUserId = new Map(); // socketId → userId
+const userIdToSocket = new Map(); // userId → socketId (latest connection)
 
-function getUserBalance(socketId) {
-  if (!userBalances.has(socketId)) userBalances.set(socketId, 0);
-  return userBalances.get(socketId);
+// Persistence: load/save balances to disk
+const BALANCES_FILE = path.join(__dirname, 'data', 'balances.json');
+
+function loadBalancesFromDisk() {
+  try {
+    if (fs.existsSync(BALANCES_FILE)) {
+      const data = JSON.parse(fs.readFileSync(BALANCES_FILE, 'utf8'));
+      if (data.balances) {
+        for (const [uid, bal] of Object.entries(data.balances)) {
+          userBalances.set(uid, bal);
+        }
+      }
+      if (data.purchased) {
+        for (const [uid, purchased] of Object.entries(data.purchased)) {
+          userPurchasedCoins.set(uid, purchased);
+        }
+      }
+      console.log(`>>> Loaded ${userBalances.size} coin balances from disk`);
+    }
+  } catch (e) {
+    console.error('Failed to load balances:', e.message);
+  }
 }
 
-function setUserBalance(socketId, amount) {
-  userBalances.set(socketId, Math.max(0, amount));
+function saveBalancesToDisk() {
+  try {
+    const dir = path.dirname(BALANCES_FILE);
+    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+    const data = {
+      balances: Object.fromEntries(userBalances),
+      purchased: Object.fromEntries(userPurchasedCoins),
+      savedAt: new Date().toISOString()
+    };
+    fs.writeFileSync(BALANCES_FILE, JSON.stringify(data, null, 2));
+  } catch (e) {
+    console.error('Failed to save balances:', e.message);
+  }
+}
+
+// Load on startup
+loadBalancesFromDisk();
+
+// Auto-save every 60 seconds
+setInterval(saveBalancesToDisk, 60000);
+
+function resolveUserId(socketId) {
+  return socketToUserId.get(socketId) || socketId;
+}
+
+function getUserBalance(socketIdOrUserId) {
+  const uid = socketToUserId.get(socketIdOrUserId) || socketIdOrUserId;
+  if (!userBalances.has(uid)) userBalances.set(uid, 0);
+  return userBalances.get(uid);
+}
+
+function setUserBalance(socketIdOrUserId, amount) {
+  const uid = socketToUserId.get(socketIdOrUserId) || socketIdOrUserId;
+  userBalances.set(uid, Math.max(0, amount));
+}
+
+function getUserPurchased(socketIdOrUserId) {
+  const uid = socketToUserId.get(socketIdOrUserId) || socketIdOrUserId;
+  return userPurchasedCoins.get(uid) || 0;
+}
+
+function addUserPurchased(socketIdOrUserId, coins) {
+  const uid = socketToUserId.get(socketIdOrUserId) || socketIdOrUserId;
+  userPurchasedCoins.set(uid, getUserPurchased(uid) + coins);
+}
+
+function getSocketIp(socketOrId) {
+  const s = typeof socketOrId === 'string' ? io.sockets.sockets.get(socketOrId) : socketOrId;
+  if (!s) return null;
+  const forwarded = s.handshake?.headers?.['x-forwarded-for'];
+  if (forwarded) return String(forwarded).split(',')[0].trim();
+  return String(s.handshake?.address || '').trim().toLowerCase();
+}
+
+function areSameIp(socketId1, socketId2) {
+  const ip1 = getSocketIp(socketId1);
+  const ip2 = getSocketIp(socketId2);
+  return ip1 && ip2 && ip1 === ip2;
 }
 
 function getPublicStreamersList() {
@@ -1494,6 +1632,15 @@ io.on('connection', (socket) => {
   socket.data.isBot = false;
   socket.data.publicRoomJoined = false;
   socket.data.publicRoomName = null;
+
+  // Map persistent userId to this socket
+  const userId = socket.handshake?.auth?.userId;
+  if (userId && typeof userId === 'string' && userId.startsWith('u_')) {
+    socketToUserId.set(socket.id, userId);
+    userIdToSocket.set(userId, socket.id);
+    socket.data.userId = userId;
+  }
+
   broadcastUserCount();
   emitAdminOnlineUsers();
   emitPublicOnlineUsers();
@@ -1505,9 +1652,9 @@ io.on('connection', (socket) => {
     if (!socket.data.isBot) {
       upsertLoginSession(socket.id, profile?.name);
     }
-    // Initialize coin balance for new users
-    if (!socket.data.isBot && !userBalances.has(socket.id)) {
-      userBalances.set(socket.id, STARTING_COINS);
+    // Initialize coin balance for new users (0 coins - must purchase)
+    if (!socket.data.isBot && !userBalances.has(resolveUserId(socket.id))) {
+      userBalances.set(resolveUserId(socket.id), 0);
     }
     emitAdminOnlineUsers();
 
@@ -1617,6 +1764,20 @@ io.on('connection', (socket) => {
     if (!tipAmount || tipAmount <= 0 || ![10, 50, 100].includes(tipAmount)) return;
     if (!toSocketId || toSocketId === socket.id) return;
 
+    // Only allow tips to logged-in users (not guests)
+    const recipientSock = io.sockets.sockets.get(toSocketId);
+    if (!recipientSock || !recipientSock.data.userId) {
+      socket.emit('tip-error', { message: 'Can only tip logged-in users' });
+      return;
+    }
+
+    // Block tips between same-IP connections (anti-abuse)
+    if (areSameIp(socket.id, toSocketId)) {
+      socket.emit('tip-error', { message: 'Cannot tip users on the same network' });
+      console.log(`>>> TIP BLOCKED (same IP): ${socket.id} → ${toSocketId}`);
+      return;
+    }
+
     const senderBalance = getUserBalance(socket.id);
     if (senderBalance < tipAmount) {
       socket.emit('tip-error', { message: 'Not enough coins' });
@@ -1627,6 +1788,7 @@ io.on('connection', (socket) => {
     setUserBalance(socket.id, senderBalance - tipAmount);
     const recipientBalance = getUserBalance(toSocketId);
     setUserBalance(toSocketId, recipientBalance + tipAmount);
+    addUserPurchased(toSocketId, tipAmount); // Tips received are cashout-eligible
 
     const senderName = getSocketDisplayName(socket.id);
     const recipientName = getSocketDisplayName(toSocketId);
@@ -2101,7 +2263,8 @@ io.on('connection', (socket) => {
     searching.delete(socket.id);
     lastPartner.delete(socket.id);
     notifiedJoins.delete(socket.id);
-    userBalances.delete(socket.id);
+    // Don't delete userBalances - they persist by userId now
+    socketToUserId.delete(socket.id);
 
     // Clean up public stream state
     const streamerIdx = publicStreamers.indexOf(socket.id);
@@ -2170,6 +2333,7 @@ server.listen(PORT, '0.0.0.0', () => {
     console.log('\nShutting down server and bots...');
     botsProcess.kill();
     clearInterval(cleanupInterval);
+    saveBalancesToDisk();
     process.exit(0);
   });
 });

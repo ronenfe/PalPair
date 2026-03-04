@@ -1,5 +1,16 @@
-const socket = io();
-console.log('Socket.IO client initialized');
+// Generate or retrieve persistent user ID
+function getPersistentUserId() {
+  let userId = localStorage.getItem('palpair_userId');
+  if (!userId) {
+    userId = 'u_' + crypto.randomUUID();
+    localStorage.setItem('palpair_userId', userId);
+  }
+  return userId;
+}
+const persistentUserId = getPersistentUserId();
+
+const socket = io({ auth: { userId: persistentUserId } });
+console.log('Socket.IO client initialized, userId:', persistentUserId);
 
 const i18n = window.PALPAIR_I18N;
 const translate = i18n ? i18n.t : (key, params = {}) => {
@@ -1114,11 +1125,15 @@ const buyCoinsModal = document.getElementById('buyCoinsModal');
 const closeBuyModal = document.getElementById('closeBuyModal');
 const coinPackagesEl = document.getElementById('coinPackages');
 const paypalContainer = document.getElementById('paypalButtonContainer');
+const googlePlayBuyBtn = document.getElementById('googlePlayBuyBtn');
 const buyStatus = document.getElementById('buyStatus');
 
 let selectedPackage = null;
 let paypalLoaded = false;
 let paypalClientId = null;
+
+// Detect if running inside Android WebView app
+const isNativeApp = !!(window.PalpairApp);
 
 // Open modal
 if (buyCoinsBtn) {
@@ -1180,6 +1195,20 @@ document.querySelectorAll('.coin-package').forEach(pkg => {
         buyStatus.className = 'buy-status error';
         return;
       }
+    }
+
+    // Native app: show Google Play button instead of PayPal
+    if (isNativeApp) {
+      paypalContainer.style.display = 'none';
+      if (googlePlayBuyBtn) {
+        googlePlayBuyBtn.style.display = 'block';
+        googlePlayBuyBtn.onclick = () => {
+          buyStatus.textContent = 'Opening Google Play...';
+          buyStatus.className = 'buy-status';
+          window.PalpairApp.purchaseCoins(selectedPackage, socket.id);
+        };
+      }
+      return;
     }
 
     if (!paypalClientId) {
@@ -1262,6 +1291,42 @@ function loadPayPalSDK(clientId) {
     document.head.appendChild(script);
   });
 }
+
+// ── Google Play Billing callback (called from native Android app) ──
+window.onGooglePlayPurchaseResult = async function(packageId, purchaseToken, orderId, success) {
+  const buyStatusEl = document.getElementById('buyStatus');
+  const modal = document.getElementById('buyCoinsModal');
+
+  if (!success) {
+    buyStatusEl.textContent = 'Purchase cancelled or failed';
+    buyStatusEl.className = 'buy-status error';
+    return;
+  }
+
+  buyStatusEl.textContent = 'Verifying purchase...';
+  buyStatusEl.className = 'buy-status';
+
+  try {
+    const res = await fetch('/api/verify-google-purchase', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ socketId: socket.id, packageId, purchaseToken, orderId })
+    });
+    const result = await res.json();
+    if (result.success) {
+      buyStatusEl.textContent = `\u2705 +${result.coins} coins added!`;
+      buyStatusEl.className = 'buy-status success';
+      setTimeout(() => { modal.style.display = 'none'; }, 2000);
+    } else {
+      buyStatusEl.textContent = result.error || 'Verification failed';
+      buyStatusEl.className = 'buy-status error';
+    }
+  } catch (err) {
+    console.error('Google purchase verify error:', err);
+    buyStatusEl.textContent = 'Network error. Try again.';
+    buyStatusEl.className = 'buy-status error';
+  }
+};
 
 // ── Cashout ──
 const cashoutBtn = document.getElementById('cashoutBtn');
