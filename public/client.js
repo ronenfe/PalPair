@@ -158,6 +158,7 @@ if (remotePlaceholder) {
 let localStream = null;
 let pc = null;
 let isActive = false;
+let useFrontCamera = true; // true = front (user), false = rear (environment)
 const pendingPublicMessageIds = new Set();
 
 // Public stream state
@@ -405,7 +406,7 @@ if (goRandomBtn) {
         nextBtn.disabled = true;
         reportBtn.disabled = false;
 
-        localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+        localStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: useFrontCamera ? 'user' : 'environment' }, audio: true });
         localVideo.srcObject = localStream;
         
         // Ensure remote video is hidden when starting
@@ -685,6 +686,40 @@ function clearRemoteVideo() {
   }
 }
 
+// ── Flip Camera ──
+const flipCameraBtn = document.getElementById('flipCameraBtn');
+if (flipCameraBtn) {
+  flipCameraBtn.onclick = async () => {
+    if (!localStream) return;
+    useFrontCamera = !useFrontCamera;
+    try {
+      // Get new stream with the other camera
+      const newStream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: useFrontCamera ? 'user' : 'environment' },
+        audio: true
+      });
+      // Replace video track in peer connection
+      const newVideoTrack = newStream.getVideoTracks()[0];
+      if (pc) {
+        const sender = pc.getSenders().find(s => s.track && s.track.kind === 'video');
+        if (sender) await sender.replaceTrack(newVideoTrack);
+      }
+      // Stop old video tracks (keep audio from old stream)
+      localStream.getVideoTracks().forEach(t => t.stop());
+      // Replace video track in localStream
+      localStream.removeTrack(localStream.getVideoTracks()[0]);
+      localStream.addTrack(newVideoTrack);
+      // Stop new audio track since we keep the original
+      newStream.getAudioTracks().forEach(t => t.stop());
+      // Update local preview
+      localVideo.srcObject = localStream;
+    } catch (e) {
+      console.error('Failed to flip camera:', e);
+      useFrontCamera = !useFrontCamera; // revert
+    }
+  };
+}
+
 async function createPeerConnection(targetId, initiator) {
   pc = new RTCPeerConnection({
     iceServers: [{ urls: 'stun:stun.l.google.com:19302' }]
@@ -884,7 +919,7 @@ if (goLiveBtn) {
 
 async function startPublicStream() {
   try {
-    publicStreamLocalStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+    publicStreamLocalStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: useFrontCamera ? 'user' : 'environment' }, audio: true });
     isStreaming = true;
     goLiveBtn.textContent = '⏹ Stop Live';
     goLiveBtn.classList.add('is-live');

@@ -564,6 +564,12 @@ body.chat-active .control-btn {
   left: 0;
 }
 
+#flipCameraBtn {
+  top: 0;
+  left: 50%;
+  transform: translateX(-50%);
+}
+
 .go-random-btn {
   position: relative;
   z-index: 10;
