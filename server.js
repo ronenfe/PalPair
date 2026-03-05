@@ -1304,6 +1304,11 @@ function getPublicRoomSpeakerBotSocketId() {
 }
 
 function maybeEmitBotReplyToHumanPublicMessage(fromSocketId, text) {
+  // Don't let bots intervene when multiple real users are chatting
+  const humansInPublicRoom = Array.from(io.sockets.sockets.values())
+    .filter(s => s.data?.publicRoomJoined && !s.data?.isBot).length;
+  if (humansInPublicRoom > 1) return;
+
   const speakerId = getPublicRoomSpeakerBotSocketId();
   if (!speakerId) return;
 
@@ -1334,6 +1339,134 @@ function maybeEmitBotReplyToHumanPublicMessage(fromSocketId, text) {
     }
   }, 900);
 }
+
+// ═══════════════════════════════════════════════
+//  Bot-to-Bot Conversation (when no humans chat)
+// ═══════════════════════════════════════════════
+let lastHumanMessageAt = Date.now();
+let botConvoTimer = null;
+let botConvoLastMessage = '';  // track last bot message for context
+const BOT_CONVO_IDLE_MS = 60_000;   // resume after 60s of no human messages
+const BOT_CONVO_INTERVAL_MS = 12_000; // bots exchange every 12s
+let botConvoGeneration = 0; // incremented when human speaks, cancels in-flight bot replies
+let botConvoInProgress = false; // lock to prevent overlapping async turns
+
+function countHumansInPublicRoom() {
+  return Array.from(io.sockets.sockets.values())
+    .filter(s => s.data?.publicRoomJoined && !s.data?.isBot).length;
+}
+
+function pickTwoBots() {
+  const botIds = getPublicRoomBotSocketIds();
+  if (botIds.length < 2) return null;
+  const shuffled = botIds.sort(() => Math.random() - 0.5);
+  return [shuffled[0], shuffled[1]];
+}
+
+const botConvoStarters = [
+  'Hey! How\'s your day going?',
+  'What kind of music are you into?',
+  'Have you watched any good movies lately?',
+  'What do you do for fun?',
+  'Where are you from? I love learning about new places!',
+  'Do you have any pets?',
+  'What\'s the best food you\'ve ever had?',
+  'If you could travel anywhere, where would you go?',
+  'What\'s your favorite thing about weekends?',
+  'Do you have any hobbies?'
+];
+
+function shouldBotsChat() {
+  // No chatting if no humans are in the public room (no audience)
+  if (countHumansInPublicRoom() === 0) return false;
+  // No chatting if a human spoke recently (within 60s)
+  if (Date.now() - lastHumanMessageAt < BOT_CONVO_IDLE_MS) return false;
+  return true;
+}
+
+async function doBotConvoTurn() {
+  if (botConvoInProgress) return; // skip if previous turn still in-flight
+  if (!shouldBotsChat()) {
+    botConvoLastMessage = '';
+    return;
+  }
+
+  const pair = pickTwoBots();
+  if (!pair) return;
+
+  botConvoInProgress = true;
+  const [speakerA, speakerB] = pair;
+  const socketA = io.sockets.sockets.get(speakerA);
+  const socketB = io.sockets.sockets.get(speakerB);
+  if (!socketA || !socketB) { botConvoInProgress = false; return; }
+
+  const profileA = botProfiles.get(speakerA) || userProfiles.get(speakerA)?.profile || {};
+  const profileB = botProfiles.get(speakerB) || userProfiles.get(speakerB)?.profile || {};
+  const nameA = getSocketDisplayName(speakerA);
+  const nameB = getSocketDisplayName(speakerB);
+
+  const gen = botConvoGeneration;
+  console.log(`[BOT-CONVO] Turn start gen=${gen}, humans=${countHumansInPublicRoom()}`);
+
+  try {
+    if (!botConvoLastMessage) {
+      // Start a fresh conversation — Bot A initiates
+      if (!shouldBotsChat()) { botConvoInProgress = false; return; }
+      const starter = botConvoStarters[Math.floor(Math.random() * botConvoStarters.length)];
+      pushPublicRoomEvent(buildPublicRoomEvent({
+        type: 'message', text: starter, socketId: speakerA, name: nameA
+      }));
+      botConvoLastMessage = starter;
+
+      // Bot B replies after a delay — but abort if human joined or spoke
+      setTimeout(async () => {
+        if (botConvoGeneration !== gen || !shouldBotsChat()) { botConvoInProgress = false; return; }
+        try {
+          const reply = await getPublicRoomBotReply(`${nameA} said: "${starter}"`, profileB);
+          if (botConvoGeneration !== gen || !shouldBotsChat()) { botConvoInProgress = false; return; }
+          pushPublicRoomEvent(buildPublicRoomEvent({
+            type: 'message', text: reply, socketId: speakerB, name: nameB
+          }));
+          botConvoLastMessage = reply;
+        } catch (e) {
+          console.warn('Bot-to-bot reply error:', e.message);
+        }
+        botConvoInProgress = false;
+      }, 3000 + Math.random() * 2000);
+      return; // don't release lock here — setTimeout will release it
+    } else {
+      // Continue — Bot A responds to last message
+      if (!shouldBotsChat()) { botConvoInProgress = false; return; }
+      const reply = await getPublicRoomBotReply(botConvoLastMessage, profileA);
+      if (botConvoGeneration !== gen || !shouldBotsChat()) { botConvoInProgress = false; return; }
+      pushPublicRoomEvent(buildPublicRoomEvent({
+        type: 'message', text: reply, socketId: speakerA, name: nameA
+      }));
+      botConvoLastMessage = reply;
+    }
+  } catch (e) {
+    console.warn('Bot-to-bot convo error:', e.message);
+    botConvoLastMessage = '';
+  }
+  botConvoInProgress = false;
+}
+
+function startBotConvoLoop() {
+  if (botConvoTimer) return;
+  botConvoTimer = setInterval(doBotConvoTurn, BOT_CONVO_INTERVAL_MS);
+  console.log('Bot-to-bot conversation loop started');
+}
+
+function stopBotConvoLoop() {
+  if (botConvoTimer) {
+    clearInterval(botConvoTimer);
+    botConvoTimer = null;
+    botConvoLastMessage = '';
+  }
+}
+
+// Start the bot conversation loop after server boots
+setTimeout(startBotConvoLoop, 15_000);
 
 function startChatSession(socketIdA, socketIdB) {
   const existing = socketToChatSession.get(socketIdA) || socketToChatSession.get(socketIdB);
@@ -1823,6 +1956,11 @@ io.on('connection', (socket) => {
   socket.on('public-chat-message', ({ text, clientMsgId } = {}) => {
     if (socket.data.isBot) return;
     if (!socket.data.publicRoomJoined) return;
+
+    lastHumanMessageAt = Date.now();
+    botConvoLastMessage = '';
+    botConvoGeneration++;
+    console.log(`[HUMAN MSG] gen=${botConvoGeneration}, from=${getSocketDisplayName(socket.id)}`);
 
     const safeText = String(text || '').trim().slice(0, 500);
     if (!safeText) return;
