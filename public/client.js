@@ -167,6 +167,7 @@ let publicStreamLocalStream = null;
 const publicStreamPCs = new Map(); // viewerId → RTCPeerConnection (streamer-side)
 let publicStreamViewerPC = null;    // single PC for viewer-side
 let currentWatchingStreamerId = null;
+let pendingWatchByIdActive = false;
 
 // User profile and filters
 let userProfile = null;
@@ -258,6 +259,14 @@ saveProfileBtn.addEventListener('click', () => {
   chatInput.disabled = false;
   sendBtn.disabled = false;
   status(translate('statusPublicRoom'));
+
+  // ── If user arrived via ?watch= link, start watching that stream now ──
+  if (pendingWatchId) {
+    const wid = pendingWatchId;
+    pendingWatchId = null;
+    pendingWatchByIdActive = true;
+    socket.emit('watch-public-stream-by-id', { streamerId: wid });
+  }
 });
 let otherId = null;
 let isRunning = false;
@@ -917,6 +926,37 @@ if (goLiveBtn) {
   };
 }
 
+// ── Flip Camera (live broadcast) ──
+const flipCameraBtnLive = document.getElementById('flipCameraBtnLive');
+if (flipCameraBtnLive) {
+  flipCameraBtnLive.onclick = async () => {
+    if (!publicStreamLocalStream) return;
+    useFrontCamera = !useFrontCamera;
+    try {
+      const newStream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: useFrontCamera ? 'user' : 'environment' },
+        audio: true
+      });
+      const newVideoTrack = newStream.getVideoTracks()[0];
+      // Replace track in all viewer peer connections
+      for (const [, viewerPC] of publicStreamPCs) {
+        const sender = viewerPC.getSenders().find(s => s.track && s.track.kind === 'video');
+        if (sender) await sender.replaceTrack(newVideoTrack);
+      }
+      // Stop old video tracks
+      publicStreamLocalStream.getVideoTracks().forEach(t => t.stop());
+      publicStreamLocalStream.removeTrack(publicStreamLocalStream.getVideoTracks()[0]);
+      publicStreamLocalStream.addTrack(newVideoTrack);
+      newStream.getAudioTracks().forEach(t => t.stop());
+      // Update preview
+      if (publicStreamVideo) publicStreamVideo.srcObject = publicStreamLocalStream;
+    } catch (e) {
+      console.error('Failed to flip camera (live):', e);
+      useFrontCamera = !useFrontCamera;
+    }
+  };
+}
+
 async function startPublicStream() {
   try {
     publicStreamLocalStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: useFrontCamera ? 'user' : 'environment' }, audio: true });
@@ -930,6 +970,9 @@ async function startPublicStream() {
       publicStreamVideo.muted = true; // mute own playback
     }
     if (publicStreamName) publicStreamName.textContent = 'You (Live)';
+    if (flipCameraBtnLive) flipCameraBtnLive.style.display = 'flex';
+    const shareBtn = document.getElementById('shareStreamBtn');
+    if (shareBtn) shareBtn.style.display = 'inline-flex';
     socket.emit('start-public-stream');
   } catch (e) {
     console.error('Failed to start public stream:', e);
@@ -940,6 +983,9 @@ function stopPublicStream() {
   isStreaming = false;
   goLiveBtn.textContent = '📡 Go Live';
   goLiveBtn.classList.remove('is-live');
+  if (flipCameraBtnLive) flipCameraBtnLive.style.display = 'none';
+  const shareBtn = document.getElementById('shareStreamBtn');
+  if (shareBtn) shareBtn.style.display = 'none';
   socket.emit('stop-public-stream');
   // Close all viewer peer connections
   for (const [viewerId, viewerPC] of publicStreamPCs) {
@@ -1006,6 +1052,7 @@ socket.on('public-stream-ready', ({ streamerId, streamerName, streamerIndex }) =
     publicStreamViewerPC = null;
   }
   currentWatchingStreamerId = streamerId;
+  pendingWatchByIdActive = false;
   if (publicStreamArea) publicStreamArea.style.display = 'flex';
   if (publicStreamName) publicStreamName.textContent = streamerName;
   if (publicStreamVideo && !isStreaming) publicStreamVideo.muted = false;
@@ -1036,6 +1083,7 @@ socket.on('watch-public-stream-redirect', ({ streamerIndex }) => {
 // ── Viewer: stream ended ──
 socket.on('public-stream-ended', () => {
   currentWatchingStreamerId = null;
+  pendingWatchByIdActive = false;
   if (publicStreamViewerPC) {
     publicStreamViewerPC.close();
     publicStreamViewerPC = null;
@@ -1089,7 +1137,8 @@ socket.on('public-stream-signal', async ({ from, data }) => {
 // ── Stream update: new streamer list from server ──
 socket.on('public-stream-update', ({ streamers }) => {
   // If not currently watching and not streaming, and there are streamers, auto-watch first
-  if (!isStreaming && !currentWatchingStreamerId && !streamHiddenByUser && streamers.length > 0) {
+  // Skip auto-watch if we have a pending watch-by-id request in flight
+  if (!isStreaming && !currentWatchingStreamerId && !streamHiddenByUser && !pendingWatchByIdActive && streamers.length > 0) {
     socket.emit('watch-public-stream', { streamerIndex: 0 });
   }
   // If no streamers left, reset the hidden flag so next stream auto-shows
@@ -1457,3 +1506,72 @@ if (cashoutSubmitBtn) {
     }
   });
 }
+
+// ═══════════════════════════════════
+//  QR Code — Share Live Stream
+// ═══════════════════════════════════
+
+const shareStreamBtn = document.getElementById('shareStreamBtn');
+const qrModal = document.getElementById('qrModal');
+const closeQrModal = document.getElementById('closeQrModal');
+const qrCanvas = document.getElementById('qrCanvas');
+const qrLinkEl = document.getElementById('qrLink');
+const copyStreamLink = document.getElementById('copyStreamLink');
+
+if (shareStreamBtn) {
+  shareStreamBtn.addEventListener('click', () => {
+    if (!isStreaming) return;
+    const streamUrl = `${window.location.origin}?watch=${socket.id}`;
+    qrCanvas.innerHTML = '';
+    if (window.QRCode) {
+      new QRCode(qrCanvas, {
+        text: streamUrl,
+        width: 220,
+        height: 220,
+        colorDark: '#E6E1E5',
+        colorLight: '#1C1B1F',
+        correctLevel: QRCode.CorrectLevel.M
+      });
+    }
+    qrLinkEl.textContent = streamUrl;
+    qrModal.style.display = 'flex';
+  });
+}
+
+if (closeQrModal) {
+  closeQrModal.addEventListener('click', () => { qrModal.style.display = 'none'; });
+}
+if (qrModal) {
+  qrModal.addEventListener('click', (e) => { if (e.target === qrModal) qrModal.style.display = 'none'; });
+}
+if (copyStreamLink) {
+  copyStreamLink.addEventListener('click', () => {
+    const link = qrLinkEl.textContent;
+    navigator.clipboard.writeText(link).then(() => {
+      copyStreamLink.textContent = '✅ Copied!';
+      setTimeout(() => { copyStreamLink.textContent = '📋 Copy Link'; }, 2000);
+    }).catch(() => {
+      // Fallback
+      const input = document.createElement('input');
+      input.value = link;
+      document.body.appendChild(input);
+      input.select();
+      document.execCommand('copy');
+      document.body.removeChild(input);
+      copyStreamLink.textContent = '✅ Copied!';
+      setTimeout(() => { copyStreamLink.textContent = '📋 Copy Link'; }, 2000);
+    });
+  });
+}
+
+// ── Auto-watch from URL param ──
+let pendingWatchId = null;
+(function checkAutoWatch() {
+  const params = new URLSearchParams(window.location.search);
+  const watchId = params.get('watch');
+  if (watchId) {
+    // Clean URL but save the ID for after sign-in
+    window.history.replaceState({}, '', window.location.pathname);
+    pendingWatchId = watchId;
+  }
+})();

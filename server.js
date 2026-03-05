@@ -1898,6 +1898,21 @@ io.on('connection', (socket) => {
     }
   });
 
+  // ── Watch specific streamer by socket ID (QR / share link) ──
+  socket.on('watch-public-stream-by-id', ({ streamerId } = {}) => {
+    if (!streamerId) { socket.emit('public-stream-ended'); return; }
+    const idx = publicStreamers.indexOf(streamerId);
+    if (idx === -1) { socket.emit('public-stream-ended'); return; }
+    if (streamerId === socket.id) { socket.emit('public-stream-ended'); return; }
+    viewerStreamIndex.set(socket.id, idx);
+    const streamerName = getSocketDisplayName(streamerId);
+    socket.emit('public-stream-ready', { streamerId, streamerName, streamerIndex: idx });
+    const streamerSocket = io.sockets.sockets.get(streamerId);
+    if (streamerSocket) {
+      streamerSocket.emit('public-stream-viewer-joined', { viewerId: socket.id });
+    }
+  });
+
   socket.on('next-public-streamer', () => {
     const currentIdx = viewerStreamIndex.get(socket.id) ?? -1;
     if (publicStreamers.length === 0) {

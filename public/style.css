@@ -564,10 +564,31 @@ body.chat-active .control-btn {
   left: 0;
 }
 
-#flipCameraBtn {
-  top: 0;
-  left: 50%;
-  transform: translateX(-50%);
+.flip-camera-btn {
+  position: absolute;
+  bottom: 8px;
+  right: 8px;
+  z-index: 20;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.55);
+  color: #fff;
+  font-size: 16px;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  backdrop-filter: blur(4px);
+  transition: background 0.2s;
+  pointer-events: auto;
+}
+
+.flip-camera-btn:hover {
+  background: rgba(0, 0, 0, 0.75);
 }
 
 .go-random-btn {
@@ -1408,6 +1429,7 @@ body.chat-active:not(.random-active) .chat-container {
    Public Stream
    ═══════════════════════════════════ */
 .public-stream-area {
+  position: relative;
   background: #2B2930;
   border-radius: 12px;
   overflow: hidden;
@@ -1953,5 +1975,65 @@ body.chat-active:not(.random-active) .chat-container {
 .google-play-buy-btn:hover {
   transform: scale(1.02);
   box-shadow: 0 4px 20px rgba(52,168,83,.3);
+}
+
+/* ── QR Share Modal ── */
+.qr-modal {
+  max-width: 320px;
+  text-align: center;
+}
+.qr-modal .modal-title {
+  margin-bottom: 4px;
+}
+.qr-modal .modal-subtitle {
+  color: #CAC4D0;
+  font-size: 0.88rem;
+  margin-bottom: 16px;
+}
+#qrCanvas {
+  margin: 0 auto 14px;
+  display: flex;
+  justify-content: center;
+}
+#qrCanvas canvas {
+  border-radius: 8px;
+}
+#qrLink {
+  display: block;
+  font-size: 0.78rem;
+  color: #CAC4D0;
+  word-break: break-all;
+  background: #1C1B1F;
+  border-radius: 8px;
+  padding: 10px 12px;
+  margin-bottom: 14px;
+  user-select: all;
+}
+#copyStreamLink {
+  background: linear-gradient(135deg, #D0BCFF, #B69DF8);
+  border: none;
+  border-radius: 10px;
+  color: #1C1B1F;
+  font-weight: 700;
+  font-size: 0.95rem;
+  padding: 10px 20px;
+  cursor: pointer;
+  transition: transform .15s, box-shadow .15s;
+}
+#copyStreamLink:hover {
+  transform: scale(1.03);
+  box-shadow: 0 4px 16px rgba(208,188,255,.35);
+}
+#shareStreamBtn {
+  font-size: 1.2rem;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 4px 6px;
+  border-radius: 8px;
+  transition: background .2s;
+}
+#shareStreamBtn:hover {
+  background: rgba(208,188,255,.15);
 }
 

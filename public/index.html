@@ -470,10 +470,12 @@
             <div class="public-stream-header">
               <span class="stream-live-badge">🔴 LIVE</span>
               <span id="publicStreamName" class="stream-name">—</span>
+              <button id="shareStreamBtn" class="share-stream-btn" title="Share stream QR" style="display:none;">📲</button>
               <button id="nextStreamerBtn" class="next-streamer-btn" title="Next streamer">⏭ Next</button>
               <button id="hideStreamBtn" class="hide-stream-btn" title="Hide stream">✕</button>
             </div>
             <video id="publicStreamVideo" class="public-stream-video" autoplay playsinline></video>
+            <button id="flipCameraBtnLive" class="flip-camera-btn" aria-label="Flip camera" title="Flip Camera" style="display:none;">🔄</button>
             <div class="stream-tip-bar">
               <button class="tip-btn" data-amount="10">🪙 10</button>
               <button class="tip-btn" data-amount="50">🪙 50</button>
@@ -510,7 +512,6 @@
       <div id="privateChatInterface" style="display:none">
           <div class="controls controls-overlay">
               <button id="nextBtn" class="control-btn control-primary" disabled aria-label="Find next partner" title="Find Next">⏭</button>
-              <button id="flipCameraBtn" class="control-btn control-secondary" aria-label="Flip camera" title="Flip Camera">🔄</button>
               <button id="reportBtn" class="control-btn control-danger" aria-label="Report concern" title="Report">⚑</button>
               <button id="chatToggleBtn" class="control-btn control-secondary" aria-label="Collapse chat" title="Collapse Chat">💬</button>
               <button id="stopRandomBtn" class="control-btn stop-random-btn" aria-label="Stop random" title="Stop Random">⏹</button>
@@ -519,6 +520,7 @@
           <div class="videos">
             <div class="video-wrap">
               <video id="localVideo" autoplay muted playsinline></video>
+              <button id="flipCameraBtn" class="flip-camera-btn" aria-label="Flip camera" title="Flip Camera">🔄</button>
             </div>
             <div class="video-wrap">
               <video id="remoteVideo" autoplay playsinline></video>
@@ -596,6 +598,19 @@
       </div>
     </div>
 
+    <!-- QR Code Modal -->
+    <div id="qrModal" class="modal-overlay" style="display:none;">
+      <div class="modal-content qr-modal">
+        <button class="modal-close" id="closeQrModal">&times;</button>
+        <h2 class="modal-title">📲 Share Stream</h2>
+        <p class="modal-subtitle">Scan to watch this live stream</p>
+        <div id="qrCanvas" class="qr-canvas"></div>
+        <p id="qrLink" class="qr-link"></p>
+        <button id="copyStreamLink" class="copy-link-btn">📋 Copy Link</button>
+      </div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
     <script src="/socket.io/socket.io.js"></script>
     <script src="/i18n.js"></script>
     <script src="/client.js"></script>
