@@ -1476,6 +1476,16 @@ body.chat-active:not(.random-active) .chat-container {
   white-space: nowrap;
 }
 
+.stream-viewer-count {
+  font-size: 12px;
+  font-weight: 600;
+  color: #CAC4D0;
+  background: rgba(255,255,255,0.08);
+  padding: 2px 8px;
+  border-radius: 12px;
+  white-space: nowrap;
+}
+
 .next-streamer-btn {
   padding: 5px 14px !important;
   border-radius: 999px !important;

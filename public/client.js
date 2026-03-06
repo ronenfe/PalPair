@@ -115,6 +115,7 @@ const goLiveBtn = document.getElementById('goLiveBtn');
 const publicStreamArea = document.getElementById('publicStreamArea');
 const publicStreamVideo = document.getElementById('publicStreamVideo');
 const publicStreamName = document.getElementById('publicStreamName');
+const publicStreamViewerCount = document.getElementById('publicStreamViewerCount');
 const nextStreamerBtn = document.getElementById('nextStreamerBtn');
 const hideStreamBtn = document.getElementById('hideStreamBtn');
 const coinCountEl = document.getElementById('coinCount');
@@ -484,7 +485,7 @@ socket.on('online-users', ({ users = [] } = {}) => {
   renderOnlineUsers(users);
 });
 
-socket.on('matched', async ({ otherId: id, initiator, isBot, botProfile, partnerProfile }) => {
+socket.on('matched', async ({ otherId: id, initiator, isBot, botProfile, botVideoUrl, partnerProfile }) => {
   localNextInProgress = false;
   if (!isRunning) {
     status(translate('statusPublicRoom'));
@@ -545,8 +546,19 @@ socket.on('matched', async ({ otherId: id, initiator, isBot, botProfile, partner
   // stop any pending auto-reconnect attempts
   cancelAutoReconnect();
   
-  // Create peer connection for both real users and bots
-  await createPeerConnection(id, initiator);
+  // If matched with a bot, play video directly (no WebRTC needed)
+  if (botVideoUrl) {
+    remoteVideo.srcObject = null;
+    remoteVideo.src = botVideoUrl;
+    remoteVideo.loop = false;
+    remoteVideo.muted = true;
+    remoteVideo.style.display = 'block';
+    if (remotePlaceholder) remotePlaceholder.style.display = 'none';
+    remoteVideo.play().catch(e => console.log('Bot video play failed:', e));
+  } else {
+    // Create peer connection for real users
+    await createPeerConnection(id, initiator);
+  }
 });
 
 socket.on('signal', async ({ from, data }) => {
@@ -682,7 +694,7 @@ function clearRemoteVideo() {
 
     // hide video element and show black placeholder to avoid frozen frame
     try { remoteVideo.srcObject = null; } catch (e) {}
-    try { remoteVideo.muted = false; } catch (e) {}
+    try { remoteVideo.muted = false; remoteVideo.loop = false; } catch (e) {}
     try { remoteVideo.pause(); remoteVideo.removeAttribute('src'); remoteVideo.removeAttribute('srcObject'); } catch (e) {}
     try { remoteVideo.style.display = 'none'; } catch (e) {}
     try { remoteVideo.style.backgroundColor = '#000'; } catch (e) {}
@@ -1050,7 +1062,7 @@ socket.on('public-stream-viewer-left', ({ viewerId }) => {
 });
 
 // ── Viewer: server tells us which streamer to connect to ──
-socket.on('public-stream-ready', ({ streamerId, streamerName, streamerIndex }) => {
+socket.on('public-stream-ready', ({ streamerId, streamerName, streamerIndex, botVideoUrl, viewerCount }) => {
   // If user has hidden the stream, don't show it
   if (streamHiddenByUser) {
     socket.emit('stop-watching-public-stream');
@@ -1065,9 +1077,22 @@ socket.on('public-stream-ready', ({ streamerId, streamerName, streamerIndex }) =
   pendingWatchByIdActive = false;
   if (publicStreamArea) publicStreamArea.style.display = 'flex';
   if (publicStreamName) publicStreamName.textContent = streamerName;
+  if (publicStreamViewerCount) publicStreamViewerCount.textContent = `👁 ${viewerCount || 0}`;
   if (publicStreamVideo && !isStreaming) publicStreamVideo.muted = false;
 
-  // Create viewer peer connection (receive only)
+  // If bot stream, play MP4 directly (no WebRTC)
+  if (botVideoUrl) {
+    if (publicStreamVideo) {
+      publicStreamVideo.srcObject = null;
+      publicStreamVideo.src = botVideoUrl;
+      publicStreamVideo.loop = false;
+      publicStreamVideo.muted = false;
+      publicStreamVideo.play().catch(e => console.log('Bot stream play failed:', e));
+    }
+    return;
+  }
+
+  // Create viewer peer connection (receive only) for real streamers
   publicStreamViewerPC = new RTCPeerConnection({
     iceServers: [{ urls: 'stun:stun.l.google.com:19302' }]
   });
@@ -1107,7 +1132,11 @@ socket.on('public-stream-ended', () => {
     if (publicStreamName) publicStreamName.textContent = 'You (Live)';
   } else {
     if (publicStreamArea) publicStreamArea.style.display = 'none';
-    if (publicStreamVideo) publicStreamVideo.srcObject = null;
+    if (publicStreamVideo) {
+      publicStreamVideo.srcObject = null;
+      publicStreamVideo.removeAttribute('src');
+      publicStreamVideo.loop = false;
+    }
   }
 });
 
@@ -1146,6 +1175,13 @@ socket.on('public-stream-signal', async ({ from, data }) => {
 
 // ── Stream update: new streamer list from server ──
 socket.on('public-stream-update', ({ streamers }) => {
+  // Update viewer count if currently watching
+  if (currentWatchingStreamerId) {
+    const current = streamers.find(s => s.socketId === currentWatchingStreamerId);
+    if (current && publicStreamViewerCount) {
+      publicStreamViewerCount.textContent = `👁 ${current.viewerCount || 0}`;
+    }
+  }
   // If not currently watching and not streaming, and there are streamers, auto-watch first
   // Skip auto-watch if we have a pending watch-by-id request in flight
   if (!isStreaming && !currentWatchingStreamerId && !streamHiddenByUser && !pendingWatchByIdActive && streamers.length > 0) {

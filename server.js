@@ -3,7 +3,6 @@ const http = require('http');
 const path = require('path');
 const fs = require('fs');
 const { Server } = require('socket.io');
-const { spawn } = require('child_process');
 const https = require('https');
 
 const SERVER_LOCK_PATH = path.join(__dirname, '.server.lock');
@@ -309,8 +308,54 @@ const botPersonas = [
   }
 ];
 
-// Store bot profiles: socket.id -> { name, fullName, age, location, personaStyle }
+// Store bot profiles: botId -> { name, fullName, age, location, personaStyle }
 const botProfiles = new Map();
+
+// ── Virtual Bots (no Puppeteer) ──
+// Virtual bots are server-side entities with fake IDs. No real sockets needed.
+// Video is served directly as MP4 files to the client.
+const virtualBotIds = [];
+
+function initVirtualBots() {
+  for (let i = 1; i <= NUM_BOTS; i++) {
+    const botId = `virtual-bot-${i}`;
+    virtualBotIds.push(botId);
+    bots.add(botId);
+    searching.add(botId);
+
+    const profile = randomBotProfile();
+    const personaIdx = (i - 1) % botPersonas.length;
+    profile.style = botPersonas[personaIdx].style;
+    profile.gender = 'female';
+    profile.botVideoUrl = `/videos/bot${i}.mp4`;
+    profile.botIndex = i;
+
+    botProfiles.set(botId, profile);
+    userProfiles.set(botId, {
+      profile: {
+        name: profile.name,
+        age: profile.age,
+        gender: profile.gender,
+        country: profile.country
+      },
+      filters: {
+        minAge: 18,
+        maxAge: 100,
+        gender: 'any',
+        country: 'any'
+      }
+    });
+
+    console.log(`>>> Virtual bot ${botId} created - Name: ${profile.name}, Age: ${profile.age}, Country: ${profile.countryName}`);
+  }
+
+  // Set first bot as public room speaker
+  if (virtualBotIds.length > 0) {
+    publicRoomSpeakerBotId = virtualBotIds[0];
+  }
+
+  console.log(`${NUM_BOTS} virtual bots initialized (no Puppeteer)`);
+}
 
 function getPersonaByBotId(botId) {
   const idx = Number(botId) - 1;
@@ -799,34 +844,11 @@ function sendCashoutNotification({ userName, socketId, paypalEmail, coins, payou
   req.end();
 }
 
-// Endpoint for bots to get AI responses
-app.post('/api/ai-response', express.json(), async (req, res) => {
-  const { message, botId, socketId } = req.body;
-  if (!message) {
-    return res.status(400).json({ error: 'message required' });
-  }
-
-  try {
-    let profile = botProfiles.get(socketId);
-    if (!profile) {
-      // Create new profile if doesn't exist
-      const baseProfile = randomBotProfile();
-      const personaIdx = Number(botId) - 1;
-      const style = botPersonas[personaIdx % botPersonas.length].style;
-      profile = { ...baseProfile, style };
-      botProfiles.set(socketId, profile);
-    }
-    
-    const response = await getGroqResponse(message, profile);
-    res.json({ response });
-  } catch (err) {
-    res.status(502).json({ error: `groq_error: ${err.message}` });
-  }
-});
+// Bot AI responses are now handled server-side for virtual bots (no /api/ai-response needed)
 
 const pairs = new Map(); // current matches: socket -> partner
 const lastPartner = new Map(); // socket -> last partner (to avoid immediate re-matching)
-const bots = new Set(); // track which sockets are bots
+const bots = new Set(); // track which IDs are bots (virtual bot IDs)
 const userProfiles = new Map(); // socket -> {profile: {name, age, gender, country}, filters: {...}}
 const searching = new Set(); // track which sockets are actively searching for a match
 const activeChatSessions = new Map(); // chatId -> session
@@ -932,24 +954,32 @@ function areSameIp(socketId1, socketId2) {
   return ip1 && ip2 && ip1 === ip2;
 }
 
+function getViewerCount(streamerId) {
+  let count = 0;
+  for (const [, idx] of viewerStreamIndex.entries()) {
+    if (publicStreamers[idx] === streamerId) count++;
+  }
+  return count;
+}
+
 function getPublicStreamersList() {
   return publicStreamers.map((id) => ({
     socketId: id,
-    name: getSocketDisplayName(id)
+    name: getSocketDisplayName(id),
+    viewerCount: getViewerCount(id)
   }));
 }
 
-// ── Trigger a random bot to start streaming ──
+// ── Trigger a random virtual bot to start streaming ──
 function triggerRandomBotStream() {
   // Find bots that are not already streaming
-  const availableBots = [...bots].filter(id => !publicStreamers.includes(id));
+  const availableBots = virtualBotIds.filter(id => !publicStreamers.includes(id));
   if (availableBots.length === 0) return;
   const randomBot = availableBots[Math.floor(Math.random() * availableBots.length)];
-  const botSocket = io.sockets.sockets.get(randomBot);
-  if (botSocket) {
-    botSocket.emit('start-bot-stream');
-    console.log(`>>> Triggered bot ${randomBot} (${getSocketDisplayName(randomBot)}) to start streaming`);
-  }
+  publicStreamers.push(randomBot);
+  console.log(`>>> Virtual bot ${randomBot} (${getSocketDisplayName(randomBot)}) started streaming`);
+  io.emit('public-stream-update', { streamers: getPublicStreamersList() });
+  emitPublicOnlineUsers();
 }
 
 const joinWebhookStats = {
@@ -1211,23 +1241,38 @@ function buildChatSummary(session) {
 
 function buildOnlineUsersSnapshot() {
   const online = [];
+  // Real connected users
   for (const socket of io.sockets.sockets.values()) {
     const socketId = socket.id;
-    const isBot = !!socket.data?.isBot;
     const profileData = userProfiles.get(socketId);
-    const botData = botProfiles.get(socketId);
 
     online.push({
       socketId,
       shortId: socketId.substring(0, 8),
-      isBot,
-      name: botData?.name || profileData?.profile?.name || null,
-      age: botData?.age ?? profileData?.profile?.age ?? null,
-      gender: botData?.gender || profileData?.profile?.gender || null,
-      country: botData?.countryName || profileData?.profile?.country || null,
+      isBot: false,
+      name: profileData?.profile?.name || null,
+      age: profileData?.profile?.age ?? null,
+      gender: profileData?.profile?.gender || null,
+      country: profileData?.profile?.country || null,
       hasProfile: userProfiles.has(socketId),
       searching: searching.has(socketId),
       paired: pairs.has(socketId)
+    });
+  }
+  // Virtual bots
+  for (const botId of virtualBotIds) {
+    const bp = botProfiles.get(botId);
+    online.push({
+      socketId: botId,
+      shortId: botId.substring(0, 8),
+      isBot: true,
+      name: bp?.name || 'Bot',
+      age: bp?.age ?? null,
+      gender: bp?.gender || 'female',
+      country: bp?.countryName || null,
+      hasProfile: true,
+      searching: searching.has(botId),
+      paired: pairs.has(botId)
     });
   }
 
@@ -1248,23 +1293,35 @@ function emitAdminOnlineUsers() {
 
 function buildPublicOnlineUsersSnapshot() {
   const users = [];
+  // Add real connected users
   for (const socket of io.sockets.sockets.values()) {
     const socketId = socket.id;
-    const isBot = !!socket.data?.isBot;
     const profile = userProfiles.get(socketId)?.profile || {};
-    const botProfile = botProfiles.get(socketId) || {};
-    const profileName = profile.name || botProfile.name;
-    // Skip sockets that haven't set a profile (no name) and aren't bots
-    if (!profileName && !isBot) continue;
+    const profileName = profile.name;
+    // Skip sockets that haven't set a profile (no name)
+    if (!profileName) continue;
     const fallbackName = `Guest-${socketId.substring(0, 4)}`;
     users.push({
       socketId,
       name: (profileName || fallbackName).trim(),
-      isBot,
-      gender: (profile.gender || botProfile.gender || '').toString().toLowerCase(),
+      isBot: false,
+      gender: (profile.gender || '').toString().toLowerCase(),
       searching: searching.has(socketId),
       paired: pairs.has(socketId),
       streaming: publicStreamers.includes(socketId)
+    });
+  }
+  // Add virtual bots
+  for (const botId of virtualBotIds) {
+    const bp = botProfiles.get(botId) || {};
+    users.push({
+      socketId: botId,
+      name: bp.name || 'Bot',
+      isBot: true,
+      gender: (bp.gender || 'female').toLowerCase(),
+      searching: searching.has(botId),
+      paired: pairs.has(botId),
+      streaming: publicStreamers.includes(botId)
     });
   }
 
@@ -1279,13 +1336,8 @@ function emitPublicOnlineUsers() {
 }
 
 function getPublicRoomBotSocketIds() {
-  const botSocketIds = [];
-  for (const socket of io.sockets.sockets.values()) {
-    if (!socket.data?.isBot) continue;
-    if (!socket.data?.publicRoomJoined) continue;
-    botSocketIds.push(socket.id);
-  }
-  return botSocketIds;
+  // Virtual bots are always in the public room
+  return virtualBotIds.slice();
 }
 
 function getPublicRoomSpeakerBotSocketId() {
@@ -1754,8 +1806,8 @@ const cleanupInterval = setInterval(cleanupStaleEntries, CLEANUP_INTERVAL);
 
 function broadcastUserCount() {
   const connected = Array.from(io.sockets.sockets.values());
-  const botsOnline = connected.filter(s => s.data.isBot).length;
   const humansOnline = connected.filter(s => !s.data.isBot).length;
+  const botsOnline = virtualBotIds.length;
   io.emit('user-count', {
     humans: humansOnline,
     bots: botsOnline,
@@ -1848,55 +1900,7 @@ io.on('connection', (socket) => {
     emitPublicOnlineUsers();
   });
 
-  socket.on('register-bot', () => {
-    socket.data.isBot = true;
-    socket.data.publicRoomJoined = true;
-    bots.add(socket.id);
-    // Generate random profile for this bot session
-    const profile = randomBotProfile();
-    const personaIdx = Math.floor(Math.random() * botPersonas.length);
-    profile.style = botPersonas[personaIdx].style;
-    
-    // Add gender for matching (country already set by randomBotProfile)
-    profile.gender = 'female'; // All bots are female personas
-    
-    botProfiles.set(socket.id, profile);
-    socket.data.publicRoomName = profile.name;
-    if (!publicRoomSpeakerBotId) {
-      publicRoomSpeakerBotId = socket.id;
-    }
-    
-    // Set bot profile in userProfiles so it can be matched
-    userProfiles.set(socket.id, {
-      profile: {
-        name: profile.name,
-        age: profile.age,
-        gender: profile.gender,
-        country: profile.country
-      },
-      filters: {
-        minAge: 18,
-        maxAge: 100,
-        gender: 'any',
-        country: 'any'
-      }
-    });
-    
-    // Add bot to searching pool (bots are always available)
-    searching.add(socket.id);
-    console.log(`>>> ${socket.id} added to searching pool (bot)`);
-
-    pushPublicRoomEvent(buildPublicRoomEvent({
-      type: 'system',
-      text: `${profile.name} joined the public room`
-    }));
-
-    broadcastUserCount();
-    emitAdminOnlineUsers();
-    emitPublicOnlineUsers();
-    
-    console.log(`>>> ${socket.id} registered as bot - Name: ${profile.name}, Age: ${profile.age}, Gender: ${profile.gender}, Country: ${profile.countryName} (${profile.country})`);
-  });
+  // register-bot handler removed — bots are now virtual (no Puppeteer)
 
   // ── Virtual Coins / Tips ──
   socket.on('send-tip', ({ toSocketId, amount } = {}) => {
@@ -2027,12 +2031,19 @@ io.on('connection', (socket) => {
     }
     viewerStreamIndex.set(socket.id, idx);
     const streamerName = getSocketDisplayName(streamerId);
+    const bp = botProfiles.get(streamerId);
+    const botVideoUrl = bp ? bp.botVideoUrl : null;
+    const viewerCount = getViewerCount(streamerId);
     // Tell the viewer to connect to this streamer
-    socket.emit('public-stream-ready', { streamerId, streamerName, streamerIndex: idx });
-    // Tell the streamer to send an offer to this viewer
-    const streamerSocket = io.sockets.sockets.get(streamerId);
-    if (streamerSocket) {
-      streamerSocket.emit('public-stream-viewer-joined', { viewerId: socket.id });
+    socket.emit('public-stream-ready', { streamerId, streamerName, streamerIndex: idx, botVideoUrl, viewerCount });
+    // Broadcast updated viewer counts
+    io.emit('public-stream-update', { streamers: getPublicStreamersList() });
+    // If real streamer, tell them to send an offer to this viewer
+    if (!botVideoUrl) {
+      const streamerSocket = io.sockets.sockets.get(streamerId);
+      if (streamerSocket) {
+        streamerSocket.emit('public-stream-viewer-joined', { viewerId: socket.id });
+      }
     }
   });
 
@@ -2044,10 +2055,16 @@ io.on('connection', (socket) => {
     if (streamerId === socket.id) { socket.emit('public-stream-ended'); return; }
     viewerStreamIndex.set(socket.id, idx);
     const streamerName = getSocketDisplayName(streamerId);
-    socket.emit('public-stream-ready', { streamerId, streamerName, streamerIndex: idx });
-    const streamerSocket = io.sockets.sockets.get(streamerId);
-    if (streamerSocket) {
-      streamerSocket.emit('public-stream-viewer-joined', { viewerId: socket.id });
+    const bp = botProfiles.get(streamerId);
+    const botVideoUrl = bp ? bp.botVideoUrl : null;
+    const viewerCount = getViewerCount(streamerId);
+    socket.emit('public-stream-ready', { streamerId, streamerName, streamerIndex: idx, botVideoUrl, viewerCount });
+    io.emit('public-stream-update', { streamers: getPublicStreamersList() });
+    if (!botVideoUrl) {
+      const streamerSocket = io.sockets.sockets.get(streamerId);
+      if (streamerSocket) {
+        streamerSocket.emit('public-stream-viewer-joined', { viewerId: socket.id });
+      }
     }
   });
 
@@ -2077,7 +2094,9 @@ io.on('connection', (socket) => {
     viewerStreamIndex.set(socket.id, nextIdx);
     const streamerId = publicStreamers[nextIdx];
     const streamerName = getSocketDisplayName(streamerId);
-    socket.emit('public-stream-ready', { streamerId, streamerName, streamerIndex: nextIdx });
+    const viewerCount = getViewerCount(streamerId);
+    socket.emit('public-stream-ready', { streamerId, streamerName, streamerIndex: nextIdx, viewerCount });
+    io.emit('public-stream-update', { streamers: getPublicStreamersList() });
     const streamerSocket = io.sockets.sockets.get(streamerId);
     if (streamerSocket) {
       streamerSocket.emit('public-stream-viewer-joined', { viewerId: socket.id });
@@ -2100,6 +2119,7 @@ io.on('connection', (socket) => {
       }
     }
     viewerStreamIndex.delete(socket.id);
+    io.emit('public-stream-update', { streamers: getPublicStreamersList() });
   });
 
   socket.on('request-public-streamers', () => {
@@ -2134,33 +2154,38 @@ io.on('connection', (socket) => {
       const user1Data = userProfiles.get(socketId1);
       const user2Data = userProfiles.get(socketId2);
       
-      const socket1 = io.sockets.sockets.get(socketId1);
-      const socket2 = io.sockets.sockets.get(socketId2);
-      if (!socket1 || !socket2) return false;
-      
       // Need profiles for both users/bots
       if (!user1Data || !user2Data) return false;
       
       const { profile: p1, filters: f1 } = user1Data;
       const { profile: p2, filters: f2 } = user2Data;
       
-      // Check if user1 meets user2's filters
-      if (f2.gender !== 'any' && p1.gender !== f2.gender) return false;
-      if (f2.country !== 'any' && p1.country !== f2.country) return false;
-      if (p1.age < f2.minAge || p1.age > f2.maxAge) return false;
+      const id1IsBot = bots.has(socketId1);
+      const id2IsBot = bots.has(socketId2);
       
-      // Check if user2 meets user1's filters
-      if (f1.gender !== 'any' && p2.gender !== f1.gender) {
-        console.log(`>>> Filter mismatch: ${socketId1} wants gender=${f1.gender}, ${socketId2} is gender=${p2.gender}`);
-        return false;
+      // Bots accept anyone — skip the bot's filter check against the other user
+      // Only apply filters from real users
+      if (!id2IsBot) {
+        // Check if user1 meets user2's filters
+        if (f2.gender !== 'any' && p1.gender !== f2.gender) return false;
+        if (f2.country !== 'any' && p1.country !== f2.country) return false;
+        if (p1.age < f2.minAge || p1.age > f2.maxAge) return false;
       }
-      if (f1.country !== 'any' && p2.country !== f1.country) {
-        console.log(`>>> Filter mismatch: ${socketId1} wants country=${f1.country}, ${socketId2} is country=${p2.country}`);
-        return false;
-      }
-      if (p2.age < f1.minAge || p2.age > f1.maxAge) {
-        console.log(`>>> Filter mismatch: ${socketId1} wants age ${f1.minAge}-${f1.maxAge}, ${socketId2} is age ${p2.age}`);
-        return false;
+      
+      if (!id1IsBot) {
+        // Check if user2 meets user1's filters
+        if (f1.gender !== 'any' && p2.gender !== f1.gender) {
+          console.log(`>>> Filter mismatch: ${socketId1} wants gender=${f1.gender}, ${socketId2} is gender=${p2.gender}`);
+          return false;
+        }
+        if (f1.country !== 'any' && p2.country !== f1.country) {
+          console.log(`>>> Filter mismatch: ${socketId1} wants country=${f1.country}, ${socketId2} is country=${p2.country}`);
+          return false;
+        }
+        if (p2.age < f1.minAge || p2.age > f1.maxAge) {
+          console.log(`>>> Filter mismatch: ${socketId1} wants age ${f1.minAge}-${f1.maxAge}, ${socketId2} is age ${p2.age}`);
+          return false;
+        }
       }
       
       return true;
@@ -2209,6 +2234,7 @@ io.on('connection', (socket) => {
     const availableUsers = [];
     const availableBots = [];
     
+    // Check real connected users
     for (const otherSocket of io.sockets.sockets.values()) {
       const sid = otherSocket.id;
       if (sid === socket.id) continue; // skip self
@@ -2220,11 +2246,17 @@ io.on('connection', (socket) => {
       // Check if filters match
       if (!checkFiltersMatch(socket.id, sid)) continue;
       
-      // Separate into users and bots based on socket.data.isBot
-      if (otherSocket.data.isBot) {
-        availableBots.push(sid);
-      } else {
-        availableUsers.push(sid);
+      availableUsers.push(sid);
+    }
+
+    // Check virtual bots (not real sockets)
+    if (!isBot) {
+      for (const botId of virtualBotIds) {
+        if (pairs.has(botId)) continue;
+        if (!searching.has(botId)) continue;
+        if (lastPartner.get(socket.id) === botId || lastPartner.get(botId) === socket.id) continue;
+        if (!checkFiltersMatch(socket.id, botId)) continue;
+        availableBots.push(botId);
       }
     }
     
@@ -2270,6 +2302,7 @@ io.on('connection', (socket) => {
       
       const isMatchWithBot = bots.has(otherId);
       let botProfile = null;
+      let botVideoUrl = null;
       if (isMatchWithBot) {
         const profile = botProfiles.get(otherId);
         if (profile) {
@@ -2278,6 +2311,7 @@ io.on('connection', (socket) => {
             age: profile.age,
             country: profile.countryName
           };
+          botVideoUrl = profile.botVideoUrl;
         }
       }
 
@@ -2300,14 +2334,18 @@ io.on('connection', (socket) => {
         initiator: true,
         isBot: isMatchWithBot,
         botProfile,
+        botVideoUrl,
         partnerProfile: requesterPartnerProfile
       });
-      io.to(otherId).emit('matched', {
-        otherId: socket.id,
-        initiator: false,
-        isBot: bots.has(socket.id),
-        partnerProfile: otherPartnerProfile
-      });
+      // Virtual bots don't have a real socket, so don't emit to them
+      if (!isMatchWithBot) {
+        io.to(otherId).emit('matched', {
+          otherId: socket.id,
+          initiator: false,
+          isBot: false,
+          partnerProfile: otherPartnerProfile
+        });
+      }
     } else {
       console.log(`>>> ${socket.id} has no available partners`);
       socket.emit('waiting');
@@ -2322,6 +2360,24 @@ io.on('connection', (socket) => {
 
   socket.on('chat-message', ({ to, text }) => {
     if (!to || !text) return;
+    // If the recipient is a virtual bot, handle AI response server-side
+    if (bots.has(to)) {
+      recordChatMessage(socket.id, to, text);
+      const profile = botProfiles.get(to);
+      if (!profile) return;
+      setTimeout(async () => {
+        try {
+          const response = await getGroqResponse(text, profile);
+          if (response) {
+            socket.emit('chat-message', { from: to, text: response });
+            recordChatMessage(to, socket.id, response);
+          }
+        } catch (err) {
+          console.warn('Bot chat response error:', err.message);
+        }
+      }, 500 + Math.random() * 1500);
+      return;
+    }
     const dest = io.sockets.sockets.get(to);
     if (dest) {
       dest.emit('chat-message', { from: socket.id, text });
@@ -2444,6 +2500,7 @@ io.on('connection', (socket) => {
       io.emit('public-stream-update', { streamers: getPublicStreamersList() });
     }
     viewerStreamIndex.delete(socket.id);
+    io.emit('public-stream-update', { streamers: getPublicStreamersList() });
 
     if (wasInPublicRoom) {
       pushPublicRoomEvent(buildPublicRoomEvent({
@@ -2477,22 +2534,12 @@ server.listen(PORT, '0.0.0.0', () => {
   console.log(`Number of bots: ${NUM_BOTS}`);
   console.log(`Cleanup interval: ${CLEANUP_INTERVAL}ms`);
   
-  // Start bots automatically
-  console.log('Starting AI bots...');
-  const botsProcess = spawn('node', ['bots.js'], {
-    stdio: 'inherit',
-    cwd: __dirname,
-    env: { ...process.env, NUM_BOTS: NUM_BOTS.toString() }
-  });
-  
-  botsProcess.on('error', (err) => {
-    console.error('Failed to start bots:', err);
-  });
-  
-  // Clean up bots when server stops
+  // Initialize virtual bots (no Puppeteer needed)
+  initVirtualBots();
+
+  // Clean up when server stops
   process.on('SIGINT', () => {
-    console.log('\nShutting down server and bots...');
-    botsProcess.kill();
+    console.log('\nShutting down server...');
     clearInterval(cleanupInterval);
     saveBalancesToDisk();
     process.exit(0);
