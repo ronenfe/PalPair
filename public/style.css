@@ -1628,6 +1628,118 @@ body.chat-active:not(.random-active) .chat-container {
   cursor: not-allowed !important;
 }
 
+/* ── Fullscreen Stream Button ── */
+.fullscreen-stream-btn {
+  padding: 5px 10px !important;
+  border-radius: 999px !important;
+  background: #4A4458 !important;
+  color: #E6E1E5 !important;
+  font-size: 14px !important;
+  font-weight: 600 !important;
+  min-width: auto !important;
+  border: none !important;
+  cursor: pointer;
+  transition: background 0.2s;
+  line-height: 1;
+}
+.fullscreen-stream-btn:hover {
+  background: #D0BCFF !important;
+  color: #381E72 !important;
+}
+
+/* ── Fullscreen Chat Overlay (hidden when not fullscreen) ── */
+.fullscreen-chat-overlay {
+  display: none;
+}
+
+/* ── Stream Fullscreen Mode ── */
+.public-stream-area.stream-fullscreen {
+  background: #000;
+  border: none;
+  border-radius: 0;
+  margin: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.public-stream-area.stream-fullscreen .public-stream-video {
+  max-height: none;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.public-stream-area.stream-fullscreen .public-stream-header {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 10;
+  background: linear-gradient(to bottom, rgba(0,0,0,.7), transparent);
+  border: none;
+  opacity: 0;
+  transition: opacity 0.3s;
+}
+.public-stream-area.stream-fullscreen:hover .public-stream-header {
+  opacity: 1;
+}
+
+.public-stream-area.stream-fullscreen .stream-tip-bar {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  z-index: 10;
+  background: linear-gradient(to top, rgba(0,0,0,.7), transparent);
+  border: none;
+  opacity: 0;
+  transition: opacity 0.3s;
+  padding: 16px 12px;
+}
+.public-stream-area.stream-fullscreen:hover .stream-tip-bar {
+  opacity: 1;
+}
+
+.public-stream-area.stream-fullscreen .fullscreen-chat-overlay {
+  display: flex;
+  flex-direction: column;
+  position: absolute;
+  bottom: 60px;
+  left: 0;
+  width: 320px;
+  max-height: 40vh;
+  overflow-y: auto;
+  z-index: 8;
+  padding: 12px 16px;
+  pointer-events: none;
+  mask-image: linear-gradient(to bottom, transparent 0%, black 30%);
+  -webkit-mask-image: linear-gradient(to bottom, transparent 0%, black 30%);
+}
+
+.public-stream-area.stream-fullscreen .fullscreen-chat-overlay .message {
+  background: rgba(0,0,0,.5);
+  backdrop-filter: blur(4px);
+  border-radius: 8px;
+  padding: 4px 10px;
+  margin-bottom: 4px;
+  font-size: 13px;
+  color: #E6E1E5;
+  pointer-events: auto;
+  max-width: 100%;
+  word-break: break-word;
+}
+.public-stream-area.stream-fullscreen .fullscreen-chat-overlay .message .sender {
+  font-weight: 700;
+  margin-right: 6px;
+}
+.public-stream-area.stream-fullscreen .fullscreen-chat-overlay::-webkit-scrollbar {
+  display: none;
+}
+
+.public-stream-area.stream-fullscreen .flip-camera-btn {
+  z-index: 10;
+}
+
 /* ── Tip Chat Message ── */
 .chat-message.tip {
   background: linear-gradient(135deg, #3d3a45, #2B2930);

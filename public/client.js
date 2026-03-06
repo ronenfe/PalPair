@@ -1508,6 +1508,76 @@ if (cashoutSubmitBtn) {
 }
 
 // ═══════════════════════════════════
+//  Fullscreen Stream
+// ═══════════════════════════════════
+
+const fullscreenStreamBtn = document.getElementById('fullscreenStreamBtn');
+const fullscreenChat = document.getElementById('fullscreenChat');
+let isStreamFullscreen = false;
+
+function mirrorChatToFullscreen() {
+  if (!fullscreenChat || !isStreamFullscreen) return;
+  const chatMessages = document.getElementById('chatMessages');
+  if (!chatMessages) return;
+  // Clone last 15 messages
+  const msgs = chatMessages.querySelectorAll('.message');
+  fullscreenChat.innerHTML = '';
+  const start = Math.max(0, msgs.length - 15);
+  for (let i = start; i < msgs.length; i++) {
+    const clone = msgs[i].cloneNode(true);
+    fullscreenChat.appendChild(clone);
+  }
+  fullscreenChat.scrollTop = fullscreenChat.scrollHeight;
+}
+
+// Mirror new messages in real-time when fullscreen
+const _origPushPublicRoom = window._origPushPublicRoom; // not needed, use MutationObserver
+let fsChatObserver = null;
+
+function startFullscreenChatMirror() {
+  const chatMessages = document.getElementById('chatMessages');
+  if (!chatMessages || fsChatObserver) return;
+  fsChatObserver = new MutationObserver(() => mirrorChatToFullscreen());
+  fsChatObserver.observe(chatMessages, { childList: true });
+  mirrorChatToFullscreen();
+}
+
+function stopFullscreenChatMirror() {
+  if (fsChatObserver) {
+    fsChatObserver.disconnect();
+    fsChatObserver = null;
+  }
+  if (fullscreenChat) fullscreenChat.innerHTML = '';
+}
+
+if (fullscreenStreamBtn && publicStreamArea) {
+  fullscreenStreamBtn.addEventListener('click', () => {
+    if (!document.fullscreenElement) {
+      publicStreamArea.requestFullscreen().catch(err => {
+        console.warn('Fullscreen error:', err);
+      });
+    } else {
+      document.exitFullscreen();
+    }
+  });
+
+  document.addEventListener('fullscreenchange', () => {
+    isStreamFullscreen = !!document.fullscreenElement;
+    if (isStreamFullscreen) {
+      publicStreamArea.classList.add('stream-fullscreen');
+      fullscreenStreamBtn.textContent = '⛶';
+      fullscreenStreamBtn.title = 'Exit fullscreen';
+      startFullscreenChatMirror();
+    } else {
+      publicStreamArea.classList.remove('stream-fullscreen');
+      fullscreenStreamBtn.textContent = '⛶';
+      fullscreenStreamBtn.title = 'Fullscreen';
+      stopFullscreenChatMirror();
+    }
+  });
+}
+
+// ═══════════════════════════════════
 //  QR Code — Share Live Stream
 // ═══════════════════════════════════
 
