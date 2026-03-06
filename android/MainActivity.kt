@@ -1,4 +1,4 @@
-package net.festinger.palpair
+package net.festinger.flashlive
 
 import android.Manifest
 import android.annotation.SuppressLint
@@ -87,16 +87,16 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
-        // Billing bridge — exposes window.PalpairApp in JavaScript
+        // Billing bridge — exposes window.FlashLiveApp in JavaScript
         billingBridge = BillingBridge(this, webView)
-        webView.addJavascriptInterface(billingBridge, "PalpairApp")
+        webView.addJavascriptInterface(billingBridge, "FlashLiveApp")
 
         // Ask for camera + mic up front so they're ready when getUserMedia fires
         if (!hasAllPermissions()) {
             requestRuntimePermissions()
         }
 
-        webView.loadUrl("https://app.palpair.lol/")
+        webView.loadUrl("https://app.flashlive.app/")
     }
 
     /** Check if CAMERA and RECORD_AUDIO are both granted */

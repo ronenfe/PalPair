@@ -1,9 +1,9 @@
 // Generate or retrieve persistent user ID
 function getPersistentUserId() {
-  let userId = localStorage.getItem('palpair_userId');
+  let userId = localStorage.getItem('flashlive_userId') || localStorage.getItem('palpair_userId');
   if (!userId) {
     userId = 'u_' + crypto.randomUUID();
-    localStorage.setItem('palpair_userId', userId);
+    localStorage.setItem('flashlive_userId', userId);
   }
   return userId;
 }
@@ -12,7 +12,7 @@ const persistentUserId = getPersistentUserId();
 const socket = io({ auth: { userId: persistentUserId } });
 console.log('Socket.IO client initialized, userId:', persistentUserId);
 
-const i18n = window.PALPAIR_I18N;
+const i18n = window.FLASHLIVE_I18N;
 const translate = i18n ? i18n.t : (key, params = {}) => {
   const dictionary = {
     alertFillProfile: 'Please fill in all profile fields',
@@ -28,7 +28,7 @@ const translate = i18n ? i18n.t : (key, params = {}) => {
     statusPublicRoom: 'Public room',
     statusReturnedPublic: 'Back in public room',
     reportPrompt: 'Report safety concern (child safety, harassment, explicit content, etc.). Please include useful details:',
-    reportSubmitted: 'Safety report submitted. Thank you for helping keep Palpair safe.',
+    reportSubmitted: 'Safety report submitted. Thank you for helping keep FlashLive safe.',
     start: 'Start',
     stop: 'Stop'
   };
@@ -907,6 +907,16 @@ function renderOnlineUsers(users = []) {
 
     item.appendChild(nameEl);
     item.appendChild(stateEl);
+
+    // Click on a broadcasting user to switch to their stream
+    if (user.streaming && user.socketId !== socket.id) {
+      item.style.cursor = 'pointer';
+      item.title = `Watch ${user.name}'s broadcast`;
+      item.addEventListener('click', () => {
+        socket.emit('watch-public-stream-by-id', { streamerId: user.socketId });
+      });
+    }
+
     onlineUsersList.appendChild(item);
   });
 }
@@ -1216,7 +1226,7 @@ let paypalLoaded = false;
 let paypalClientId = null;
 
 // Detect if running inside Android WebView app
-const isNativeApp = !!(window.PalpairApp);
+const isNativeApp = !!(window.FlashLiveApp || window.PalpairApp);
 
 // Open modal
 if (buyCoinsBtn) {
@@ -1288,7 +1298,7 @@ document.querySelectorAll('.coin-package').forEach(pkg => {
         googlePlayBuyBtn.onclick = () => {
           buyStatus.textContent = 'Opening Google Play...';
           buyStatus.className = 'buy-status';
-          window.PalpairApp.purchaseCoins(selectedPackage, socket.id);
+          (window.FlashLiveApp || window.PalpairApp).purchaseCoins(selectedPackage, socket.id);
         };
       }
       return;
@@ -1520,7 +1530,7 @@ function mirrorChatToFullscreen() {
   const chatMessages = document.getElementById('chatMessages');
   if (!chatMessages) return;
   // Clone last 15 messages
-  const msgs = chatMessages.querySelectorAll('.message');
+  const msgs = chatMessages.querySelectorAll('.chat-message');
   fullscreenChat.innerHTML = '';
   const start = Math.max(0, msgs.length - 15);
   for (let i = start; i < msgs.length; i++) {

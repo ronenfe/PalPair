@@ -813,6 +813,11 @@ body.chat-active .videos .video-wrap:nth-child(2) #status {
   border-radius: 8px;
   background: #36343B;
   margin-bottom: 6px;
+  transition: background 0.2s;
+}
+
+.online-user-item[style*="cursor: pointer"]:hover {
+  background: #4A4458;
 }
 
 .online-user-item.empty {
@@ -1716,19 +1721,20 @@ body.chat-active:not(.random-active) .chat-container {
   -webkit-mask-image: linear-gradient(to bottom, transparent 0%, black 30%);
 }
 
-.public-stream-area.stream-fullscreen .fullscreen-chat-overlay .message {
-  background: rgba(0,0,0,.5);
-  backdrop-filter: blur(4px);
-  border-radius: 8px;
-  padding: 4px 10px;
-  margin-bottom: 4px;
-  font-size: 13px;
-  color: #E6E1E5;
+.public-stream-area.stream-fullscreen .fullscreen-chat-overlay .chat-message {
+  background: none;
+  backdrop-filter: none;
+  border-radius: 0;
+  padding: 2px 0;
+  margin-bottom: 2px;
+  font-size: 14px;
+  color: #fff;
   pointer-events: auto;
   max-width: 100%;
   word-break: break-word;
+  text-shadow: 0 1px 4px rgba(0,0,0,.8), 0 0 2px rgba(0,0,0,.6);
 }
-.public-stream-area.stream-fullscreen .fullscreen-chat-overlay .message .sender {
+.public-stream-area.stream-fullscreen .fullscreen-chat-overlay .chat-message .sender {
   font-weight: 700;
   margin-right: 6px;
 }

@@ -24,10 +24,10 @@
 
   const translations = {
     en: {
-      title: 'Palpair - Random Video Chat',
+      title: 'FlashLive - Random Video Chat',
       subtitle: 'Meet new people instantly',
       peopleOnline: 'people online now',
-      safetyNote: 'Palpair - Random Video Chat allows users to report child safety concerns in-app. To learn more about reporting requirements, visit the <a href="/help-center.html" target="_blank" rel="noopener">Help center</a>.',
+      safetyNote: 'FlashLive - Random Video Chat allows users to report child safety concerns in-app. To learn more about reporting requirements, visit the <a href="/help-center.html" target="_blank" rel="noopener">Help center</a>.',
       yourProfile: 'Your Profile',
       namePlaceholder: 'Name',
       agePlaceholder: 'Age',
@@ -68,7 +68,7 @@
       statusPublicRoom: 'Public room',
       statusReturnedPublic: 'Back in public room',
       reportPrompt: 'Report safety concern (child safety, harassment, explicit content, etc.). Please include useful details:',
-      reportSubmitted: 'Safety report submitted. Thank you for helping keep Palpair safe.'
+      reportSubmitted: 'Safety report submitted. Thank you for helping keep FlashLive safe.'
     },
     es: {
       subtitle: 'Conoce gente nueva al instante • Videochat en todo el mundo',
@@ -345,7 +345,7 @@
       element.innerHTML = t(key);
     });
 
-    window.dispatchEvent(new CustomEvent('palpair-language-changed', { detail: { language: currentLanguage } }));
+    window.dispatchEvent(new CustomEvent('flashlive-language-changed', { detail: { language: currentLanguage } }));
   }
 
   function setLanguage(languageCode) {
@@ -362,7 +362,7 @@
     return LANGUAGES.slice();
   }
 
-  window.PALPAIR_I18N = {
+  window.FLASHLIVE_I18N = {
     t,
     setLanguage,
     getLanguage,

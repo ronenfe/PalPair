@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width,initial-scale=1" />
-    <title>Palpair Admin - Live Chats</title>
+    <title>FlashLive Admin - Live Chats</title>
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <style>
       * { box-sizing: border-box; }
@@ -137,7 +137,7 @@
   </head>
   <body>
     <div class="topbar">
-      <strong>Palpair Admin - Live Chats</strong>
+      <strong>FlashLive Admin - Live Chats</strong>
       <div>
         <span id="connStatus" class="status">Connecting...</span>
         <button id="enableNotifyBtn" class="notify-btn">Enable Notifications</button>
@@ -212,7 +212,7 @@
 
         if ('Notification' in window && Notification.permission === 'granted') {
           try {
-            new Notification(title, { body: body || 'A new user connected to Palpair.' });
+            new Notification(title, { body: body || 'A new user connected to FlashLive.' });
           } catch (e) {
             // ignore notification errors
           }

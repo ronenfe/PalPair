@@ -1,4 +1,4 @@
-package com.palpair.app
+package com.flashlive.app
 
 import android.app.Activity
 import android.util.Log
@@ -15,12 +15,12 @@ import com.android.billingclient.api.*
  *
  * 2. In your WebView setup:
  *    val billingBridge = BillingBridge(this, webView)
- *    webView.addJavascriptInterface(billingBridge, "PalpairApp")
+ *    webView.addJavascriptInterface(billingBridge, "FlashLiveApp")
  *
  * 3. Define your product IDs in Google Play Console matching these:
- *    - palpair_coins_100  ($1.00 → 100 coins)
- *    - palpair_coins_600  ($5.00 → 600 coins)
- *    - palpair_coins_1500 ($10.00 → 1,500 coins)
+ *    - flashlive_coins_100  ($1.00 → 100 coins)
+ *    - flashlive_coins_600  ($5.00 → 600 coins)
+ *    - flashlive_coins_1500 ($10.00 → 1,500 coins)
  */
 class BillingBridge(
     private val activity: Activity,
@@ -28,13 +28,13 @@ class BillingBridge(
 ) : PurchasesUpdatedListener {
 
     companion object {
-        private const val TAG = "PalpairBilling"
+        private const val TAG = "FlashLiveBilling"
 
         // Map web package IDs to Google Play product IDs
         val PRODUCT_MAP = mapOf(
-            "pack_100" to "palpair_coins_100",
-            "pack_600" to "palpair_coins_600",
-            "pack_1500" to "palpair_coins_1500"
+            "pack_100" to "flashlive_coins_100",
+            "pack_600" to "flashlive_coins_600",
+            "pack_1500" to "flashlive_coins_1500"
         )
     }
 
@@ -93,7 +93,7 @@ class BillingBridge(
     }
 
     /**
-     * Called from JavaScript: window.PalpairApp.purchaseCoins("pack_100", "socketId123")
+     * Called from JavaScript: window.FlashLiveApp.purchaseCoins("pack_100", "socketId123")
      */
     @JavascriptInterface
     fun purchaseCoins(packageId: String, socketId: String) {

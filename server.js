@@ -592,7 +592,7 @@ app.post('/api/create-order', express.json(), async (req, res) => {
           currency_code: 'USD',
           value: pkg.price
         },
-        description: `${pkg.label} - Palpair`
+        description: `${pkg.label} - FlashLive`
       }]
     });
 
@@ -784,7 +784,7 @@ function sendCashoutNotification({ userName, socketId, paypalEmail, coins, payou
     method: 'POST',
     headers: {
       'Content-Type': 'text/plain; charset=utf-8',
-      'Title': 'Palpair: Cashout Request',
+      'Title': 'FlashLive: Cashout Request',
       'Priority': 'high',
       'Tags': 'moneybag'
     }
@@ -1004,7 +1004,7 @@ function sendJoinWebhook(payload) {
         `Time: ${eventTime}`
       ].join('\n')
     : [
-        'New user joined Palpair',
+        'New user joined FlashLive',
         `Name: ${name}`,
         `Age: ${age}`,
         `Gender: ${gender}`,
@@ -1013,7 +1013,7 @@ function sendJoinWebhook(payload) {
         `Time: ${eventTime}`
       ].join('\n');
 
-  const ntfyTitle = payload?.event === 'chat-started' ? 'Palpair: chat started' : 'Palpair: user joined';
+  const ntfyTitle = payload?.event === 'chat-started' ? 'FlashLive: chat started' : 'FlashLive: user joined';
 
   const body = isNtfy ? prettyBody : JSON.stringify(payload);
   const headers = isNtfy
@@ -1589,7 +1589,7 @@ adminNamespace.on('connection', (socket) => {
 
 const supportConversations = new Map(); // sessionId → { messages: [], lastActivity, socketId? }
 
-const SUPPORT_NTFY_URL = (process.env.SUPPORT_NTFY_URL || 'https://ntfy.sh/palpair-7x9k2q').trim();
+const SUPPORT_NTFY_URL = (process.env.SUPPORT_NTFY_URL || 'https://ntfy.sh/flashlive-support').trim();
 
 function sendSupportNtfy(sessionId, text) {
   if (!SUPPORT_NTFY_URL) return;
