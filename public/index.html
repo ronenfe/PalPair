@@ -504,6 +504,10 @@
               <button class="tip-btn" data-amount="5000">🚀 5K</button>
             </div>
             <div id="fullscreenChat" class="fullscreen-chat-overlay"></div>
+            <div class="fullscreen-chat-input-wrap" style="display:none;">
+              <input id="fullscreenChatInput" type="text" placeholder="Type a message..." maxlength="500" />
+              <button id="fullscreenSendBtn">Send</button>
+            </div>
           </div>
 
           <div class="room-layout">
@@ -513,6 +517,19 @@
             <aside class="online-users-panel" id="onlineUsersPanel" aria-live="polite">
               <h3 class="online-users-title">Room viewers</h3>
               <ul id="onlineUsersList" class="online-users-list"></ul>
+            </aside>
+            <!-- Private DM Panel -->
+            <aside class="dm-panel" id="dmPanel">
+              <div class="dm-panel-header">
+                <button id="dmBackBtn" class="dm-back-btn" title="Back">←</button>
+                <span id="dmPartnerName" class="dm-partner-name">—</span>
+                <button id="dmCloseBtn" class="dm-close-btn" title="Close">✕</button>
+              </div>
+              <div id="dmMessages" class="dm-messages"></div>
+              <div class="dm-input-wrap">
+                <input id="dmInput" type="text" placeholder="Type a message..." maxlength="500" />
+                <button id="dmSendBtn">Send</button>
+              </div>
             </aside>
           </div>
         </section>

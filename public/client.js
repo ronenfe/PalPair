@@ -108,6 +108,19 @@ const chatModeLabel = document.getElementById('chatModeLabel');
 const chatModeSub = document.getElementById('chatModeSub');
 const privateChatInput = document.getElementById('privateChatInput');
 const privateSendBtn = document.getElementById('privateSendBtn');
+
+// DM panel elements
+const dmPanel = document.getElementById('dmPanel');
+const dmMessages = document.getElementById('dmMessages');
+const dmInput = document.getElementById('dmInput');
+const dmSendBtn = document.getElementById('dmSendBtn');
+const dmPartnerName = document.getElementById('dmPartnerName');
+const dmBackBtn = document.getElementById('dmBackBtn');
+const dmCloseBtn = document.getElementById('dmCloseBtn');
+let currentDmPartnerId = null;
+let currentDmPartnerDisplayName = '';
+const dmConversations = new Map(); // partnerId -> [{from, fromName, text, timestamp}]
+const dmUnread = new Map(); // partnerId -> count
 const AI_PARTNER_LABEL = '🤖 AI Partner';
 
 // Public stream elements
@@ -964,11 +977,125 @@ function renderOnlineUsers(users = []) {
       item.addEventListener('click', () => {
         socket.emit('watch-public-stream-by-id', { streamerId: user.socketId });
       });
+    } else if (user.socketId !== socket.id) {
+      // Click to open DM
+      item.style.cursor = 'pointer';
+      item.title = `Message ${user.name}`;
+      item.addEventListener('click', () => {
+        openDmPanel(user.socketId, user.name);
+      });
+    }
+
+    // Show unread badge
+    const unread = dmUnread.get(user.socketId) || 0;
+    if (unread > 0 && user.socketId !== socket.id) {
+      const badge = document.createElement('span');
+      badge.className = 'dm-unread-badge';
+      badge.textContent = unread > 99 ? '99+' : unread;
+      item.appendChild(badge);
     }
 
     onlineUsersList.appendChild(item);
   });
 }
+
+// ═══════════════════════════════════
+//  Private Direct Messages (DM)
+// ═══════════════════════════════════
+
+function openDmPanel(partnerId, partnerName) {
+  currentDmPartnerId = partnerId;
+  currentDmPartnerDisplayName = partnerName;
+  if (dmPartnerName) dmPartnerName.textContent = partnerName;
+  // Clear unread
+  dmUnread.delete(partnerId);
+  // Render conversation history
+  renderDmMessages();
+  // Show panel
+  if (dmPanel) dmPanel.classList.add('open');
+  if (onlineUsersPanel) onlineUsersPanel.classList.remove('open');
+  if (dmInput) { dmInput.disabled = false; dmInput.focus(); }
+}
+
+function closeDmPanel() {
+  currentDmPartnerId = null;
+  currentDmPartnerDisplayName = '';
+  if (dmPanel) dmPanel.classList.remove('open');
+}
+
+function renderDmMessages() {
+  if (!dmMessages) return;
+  dmMessages.innerHTML = '';
+  const msgs = dmConversations.get(currentDmPartnerId) || [];
+  msgs.forEach(msg => {
+    const el = document.createElement('div');
+    const isSent = msg.from === socket.id;
+    el.className = `dm-msg ${isSent ? 'sent' : 'received'}`;
+    const senderEl = document.createElement('div');
+    senderEl.className = 'dm-msg-sender';
+    senderEl.textContent = isSent ? 'You' : (msg.fromName || 'User');
+    const textEl = document.createElement('div');
+    textEl.textContent = msg.text;
+    el.appendChild(senderEl);
+    el.appendChild(textEl);
+    dmMessages.appendChild(el);
+  });
+  dmMessages.scrollTop = dmMessages.scrollHeight;
+}
+
+function addDmMessage(msg) {
+  const partnerId = msg.from === socket.id ? msg.to : msg.from;
+  if (!dmConversations.has(partnerId)) {
+    dmConversations.set(partnerId, []);
+  }
+  const convo = dmConversations.get(partnerId);
+  convo.push(msg);
+  // Keep last 200 messages per conversation
+  if (convo.length > 200) convo.shift();
+  // If this conversation is open, re-render
+  if (currentDmPartnerId === partnerId) {
+    renderDmMessages();
+  } else if (msg.from !== socket.id) {
+    // Increment unread count
+    dmUnread.set(partnerId, (dmUnread.get(partnerId) || 0) + 1);
+  }
+}
+
+function sendDm() {
+  if (!currentDmPartnerId || !dmInput) return;
+  const text = dmInput.value.trim();
+  if (!text) return;
+  socket.emit('private-message', { to: currentDmPartnerId, text });
+  dmInput.value = '';
+  dmInput.focus();
+}
+
+// DM send button
+if (dmSendBtn) dmSendBtn.addEventListener('click', sendDm);
+if (dmInput) {
+  dmInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') { e.preventDefault(); sendDm(); }
+  });
+}
+// DM back button → show users list
+if (dmBackBtn) {
+  dmBackBtn.addEventListener('click', () => {
+    closeDmPanel();
+    if (onlineUsersPanel) onlineUsersPanel.classList.add('open');
+  });
+}
+// DM close button → close everything
+if (dmCloseBtn) {
+  dmCloseBtn.addEventListener('click', () => {
+    closeDmPanel();
+  });
+}
+
+// Receive private messages
+socket.on('private-message', (msg) => {
+  if (!msg || !msg.from || !msg.text) return;
+  addDmMessage(msg);
+});
 
 // ═══════════════════════════════════
 //  Public Stream — Go Live / Watch
@@ -1718,6 +1845,9 @@ if (cashoutSubmitBtn) {
 
 const fullscreenStreamBtn = document.getElementById('fullscreenStreamBtn');
 const fullscreenChat = document.getElementById('fullscreenChat');
+const fullscreenChatInputWrap = document.querySelector('.fullscreen-chat-input-wrap');
+const fullscreenChatInput = document.getElementById('fullscreenChatInput');
+const fullscreenSendBtn = document.getElementById('fullscreenSendBtn');
 let isStreamFullscreen = false;
 
 function mirrorChatToFullscreen() {
@@ -1733,6 +1863,10 @@ function mirrorChatToFullscreen() {
     fullscreenChat.appendChild(clone);
   }
   fullscreenChat.scrollTop = fullscreenChat.scrollHeight;
+  // Show input in fullscreen
+  if (fullscreenChatInputWrap) {
+    fullscreenChatInputWrap.style.display = isStreamFullscreen ? 'flex' : 'none';
+  }
 }
 
 // Mirror new messages in real-time when fullscreen
@@ -1756,30 +1890,117 @@ function stopFullscreenChatMirror() {
 }
 
 if (fullscreenStreamBtn && publicStreamArea) {
+  let isFakeFullscreen = false;
+
+  function enterFullscreenUI() {
+    isStreamFullscreen = true;
+    publicStreamArea.classList.add('stream-fullscreen');
+    fullscreenStreamBtn.textContent = '⛶';
+    fullscreenStreamBtn.title = 'Exit fullscreen';
+    startFullscreenChatMirror();
+    if (fullscreenChatInputWrap) fullscreenChatInputWrap.style.display = 'flex';
+  }
+
+  function exitFullscreenUI() {
+    isStreamFullscreen = false;
+    publicStreamArea.classList.remove('stream-fullscreen', 'stream-fake-fullscreen');
+    document.body.classList.remove('stream-fake-fullscreen-active');
+    // Remove JS-applied inline sizing
+    publicStreamArea.style.top = '';
+    publicStreamArea.style.left = '';
+    publicStreamArea.style.width = '';
+    publicStreamArea.style.height = '';
+    // Stop visualViewport listeners
+    if (fakeFullscreenVPListener && window.visualViewport) {
+      window.visualViewport.removeEventListener('resize', fakeFullscreenVPListener);
+      window.visualViewport.removeEventListener('scroll', fakeFullscreenVPListener);
+      fakeFullscreenVPListener = null;
+    }
+    fullscreenStreamBtn.textContent = '⛶';
+    fullscreenStreamBtn.title = 'Fullscreen';
+    stopFullscreenChatMirror();
+    if (fullscreenChatInputWrap) fullscreenChatInputWrap.style.display = 'none';
+    isFakeFullscreen = false;
+  }
+
+  let fakeFullscreenVPListener = null;
+
+  function applyFakeFullscreenSize() {
+    const vv = window.visualViewport;
+    const top = vv ? vv.offsetTop : 0;
+    const left = vv ? vv.offsetLeft : 0;
+    const w = vv ? vv.width : window.innerWidth;
+    const h = vv ? vv.height : window.innerHeight;
+    publicStreamArea.style.top = top + 'px';
+    publicStreamArea.style.left = left + 'px';
+    publicStreamArea.style.width = w + 'px';
+    publicStreamArea.style.height = h + 'px';
+  }
+
+  function enterFakeFullscreen() {
+    isFakeFullscreen = true;
+    publicStreamArea.classList.add('stream-fake-fullscreen');
+    document.body.classList.add('stream-fake-fullscreen-active');
+    applyFakeFullscreenSize();
+    // Keep size in sync when browser bars show/hide or keyboard opens
+    if (window.visualViewport) {
+      fakeFullscreenVPListener = () => applyFakeFullscreenSize();
+      window.visualViewport.addEventListener('resize', fakeFullscreenVPListener);
+      window.visualViewport.addEventListener('scroll', fakeFullscreenVPListener);
+    }
+    enterFullscreenUI();
+  }
+
   fullscreenStreamBtn.addEventListener('click', () => {
-    if (!document.fullscreenElement) {
-      publicStreamArea.requestFullscreen().catch(err => {
-        console.warn('Fullscreen error:', err);
-      });
+    // Exit path
+    if (isFakeFullscreen) {
+      exitFullscreenUI();
+      return;
+    }
+    if (document.fullscreenElement || document.webkitFullscreenElement) {
+      (document.exitFullscreen || document.webkitExitFullscreen).call(document);
+      return;
+    }
+    // Enter path — try native fullscreen, fall back to CSS fake
+    const reqFS = publicStreamArea.requestFullscreen ||
+                  publicStreamArea.webkitRequestFullscreen ||
+                  publicStreamArea.mozRequestFullScreen;
+    if (reqFS) {
+      const p = reqFS.call(publicStreamArea);
+      if (p && p.catch) {
+        p.catch(() => enterFakeFullscreen());
+      }
     } else {
-      document.exitFullscreen();
+      enterFakeFullscreen();
     }
   });
 
-  document.addEventListener('fullscreenchange', () => {
-    isStreamFullscreen = !!document.fullscreenElement;
-    if (isStreamFullscreen) {
-      publicStreamArea.classList.add('stream-fullscreen');
-      fullscreenStreamBtn.textContent = '⛶';
-      fullscreenStreamBtn.title = 'Exit fullscreen';
-      startFullscreenChatMirror();
+  function onNativeFullscreenChange() {
+    if (isFakeFullscreen) return;
+    const active = !!(document.fullscreenElement || document.webkitFullscreenElement);
+    if (active) {
+      enterFullscreenUI();
     } else {
-      publicStreamArea.classList.remove('stream-fullscreen');
-      fullscreenStreamBtn.textContent = '⛶';
-      fullscreenStreamBtn.title = 'Fullscreen';
-      stopFullscreenChatMirror();
+      exitFullscreenUI();
     }
-  });
+  }
+  document.addEventListener('fullscreenchange', onNativeFullscreenChange);
+  document.addEventListener('webkitfullscreenchange', onNativeFullscreenChange);
+// Fullscreen chat send
+if (fullscreenSendBtn && fullscreenChatInput) {
+  fullscreenSendBtn.onclick = () => {
+    const text = fullscreenChatInput.value.trim();
+    if (!text) return;
+    const clientMsgId = `msg_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+    pendingPublicMessageIds.add(clientMsgId);
+    addChatMessage(text, 'local');
+    socket.emit('public-chat-message', { text, clientMsgId });
+    fullscreenChatInput.value = '';
+  };
+  fullscreenChatInput.onkeypress = (e) => {
+    if (e.key === 'Enter') fullscreenSendBtn.onclick();
+  };
+}
 }
 
 // ═══════════════════════════════════

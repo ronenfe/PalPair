@@ -489,6 +489,22 @@ app.get('/socket.io/socket.io.js.map', (req, res) => {
 });
 app.get('/favicon.ico', (req, res) => res.redirect(302, '/favicon.svg'));
 
+// Explicit routes for support pages — ensures they are accessible through any proxy/CDN
+app.get('/support.html', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'support.html'));
+});
+app.get('/support-he.html', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'support-he.html'));
+});
+app.get('/support-style.css', (req, res) => {
+  res.setHeader('Content-Type', 'text/css');
+  res.sendFile(path.join(__dirname, 'public', 'support-style.css'));
+});
+app.get('/support-chat.js', (req, res) => {
+  res.setHeader('Content-Type', 'application/javascript');
+  res.sendFile(path.join(__dirname, 'public', 'support-chat.js'));
+});
+
 // Debug endpoint to see server state
 app.get('/api/debug', (req, res) => {
   const botsList = [];
@@ -2149,6 +2165,52 @@ io.on('connection', (socket) => {
         clientMsgId: typeof clientMsgId === 'string' ? clientMsgId.slice(0, 80) : null
       }));
       maybeEmitBotReplyToHumanPublicMessage(socket.id, safeText);
+    }
+  });
+
+  // ── Private Direct Messages ──
+  socket.on('private-message', ({ to, text } = {}) => {
+    if (!to || !text || typeof text !== 'string') return;
+    if (socket.data.isBot) return;
+    const safeText = text.trim().slice(0, 500);
+    if (!safeText) return;
+    const senderName = getSocketDisplayName(socket.id);
+    const recipientSocket = io.sockets.sockets.get(to);
+    // Also allow sending to bots
+    const isBotRecipient = bots.has(to);
+    if (!recipientSocket && !isBotRecipient) return;
+    const msg = {
+      from: socket.id,
+      fromName: senderName,
+      to,
+      text: safeText,
+      timestamp: Date.now()
+    };
+    // Send to recipient
+    if (recipientSocket) {
+      recipientSocket.emit('private-message', msg);
+    }
+    // Echo back to sender
+    socket.emit('private-message', msg);
+    // If recipient is a bot, generate an AI reply
+    if (isBotRecipient) {
+      const botProfile = botProfiles.get(to) || {};
+      const botName = getSocketDisplayName(to);
+      setTimeout(async () => {
+        try {
+          const replyBody = await getPublicRoomBotReply(safeText, botProfile);
+          const botMsg = {
+            from: to,
+            fromName: botName,
+            to: socket.id,
+            text: replyBody,
+            timestamp: Date.now()
+          };
+          socket.emit('private-message', botMsg);
+        } catch (e) {
+          console.warn('Bot DM reply error:', e.message);
+        }
+      }, 800 + Math.random() * 1200);
     }
   });
 

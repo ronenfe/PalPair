@@ -872,6 +872,172 @@ body.chat-active .videos .video-wrap:nth-child(2) #status {
   animation: livePulse 1.5s ease-in-out infinite;
 }
 
+/* ── Private DM Panel ── */
+.dm-panel {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 280px;
+  max-width: 85%;
+  background: #1C1B1F;
+  color: #E6E1E5;
+  display: flex;
+  flex-direction: column;
+  z-index: 12;
+  transform: translateX(100%);
+  transition: transform 0.25s ease;
+  border-left: 1px solid #49454F;
+}
+
+.dm-panel.open {
+  transform: translateX(0);
+}
+
+.dm-panel-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  background: #2B2930;
+  border-bottom: 1px solid #49454F;
+}
+
+.dm-back-btn,
+.dm-close-btn {
+  background: transparent;
+  border: none;
+  color: #CAC4D0;
+  font-size: 16px;
+  cursor: pointer;
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.2s;
+  padding: 0;
+  text-transform: none;
+  letter-spacing: 0;
+  line-height: 1;
+}
+
+.dm-back-btn:hover,
+.dm-close-btn:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.dm-partner-name {
+  flex: 1;
+  font-size: 14px;
+  font-weight: 600;
+  color: #E6E1E5;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dm-messages {
+  flex: 1;
+  overflow-y: auto;
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.dm-msg {
+  max-width: 85%;
+  padding: 8px 12px;
+  border-radius: 12px;
+  font-size: 13px;
+  line-height: 1.4;
+  word-break: break-word;
+}
+
+.dm-msg.sent {
+  align-self: flex-end;
+  background: #4F378B;
+  color: #E6E1E5;
+  border-bottom-right-radius: 4px;
+}
+
+.dm-msg.received {
+  align-self: flex-start;
+  background: #36343B;
+  color: #E6E1E5;
+  border-bottom-left-radius: 4px;
+}
+
+.dm-msg .dm-msg-sender {
+  font-size: 11px;
+  font-weight: 600;
+  color: #D0BCFF;
+  margin-bottom: 2px;
+}
+
+.dm-msg.sent .dm-msg-sender {
+  color: #CCC2DC;
+}
+
+.dm-input-wrap {
+  display: flex;
+  gap: 6px;
+  padding: 8px 10px;
+  background: #2B2930;
+  border-top: 1px solid #49454F;
+}
+
+.dm-input-wrap input {
+  flex: 1;
+  background: #1C1B1F;
+  border: 1px solid #49454F;
+  border-radius: 8px;
+  color: #E6E1E5;
+  padding: 8px 10px;
+  font-size: 13px;
+  outline: none;
+}
+
+.dm-input-wrap input:focus {
+  border-color: #D0BCFF;
+}
+
+.dm-input-wrap button {
+  background: #D0BCFF;
+  color: #1C1B1F;
+  border: none;
+  border-radius: 8px;
+  padding: 8px 14px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s;
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+.dm-input-wrap button:hover {
+  background: #E8DEFF;
+}
+
+/* Unread badge on user item */
+.dm-unread-badge {
+  background: #D0BCFF;
+  color: #1C1B1F;
+  font-size: 10px;
+  font-weight: 700;
+  min-width: 18px;
+  height: 18px;
+  border-radius: 9px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 5px;
+  margin-left: 4px;
+}
+
 body.chat-active.random-active .chat-container {
   position: absolute;
   left: 10px;
@@ -1890,6 +2056,24 @@ body.chat-active:not(.random-active) .chat-container {
   display: none;
 }
 
+/* ── CSS Fake Fullscreen (mobile fallback) ── */
+body.stream-fake-fullscreen-active {
+  overflow: hidden;
+  touch-action: none;
+}
+.public-stream-area.stream-fake-fullscreen {
+  position: fixed !important;
+  /* top/left/width/height set by JS via visualViewport */
+  z-index: 9999 !important;
+  border-radius: 0 !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  box-sizing: border-box !important;
+  background: #000 !important;
+  overflow: hidden !important;
+  -webkit-overflow-scrolling: touch;
+}
+
 /* ── Stream Fullscreen Mode ── */
 .public-stream-area.stream-fullscreen {
   background: #000;
@@ -1952,6 +2136,39 @@ body.chat-active:not(.random-active) .chat-container {
   pointer-events: none;
   mask-image: linear-gradient(to bottom, transparent 0%, black 30%);
   -webkit-mask-image: linear-gradient(to bottom, transparent 0%, black 30%);
+}
+
+.public-stream-area.stream-fullscreen .fullscreen-chat-input-wrap {
+  display: flex !important;
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  width: 320px;
+  z-index: 10;
+  background: rgba(0,0,0,0.7);
+  padding: 8px 16px;
+  gap: 8px;
+  border-radius: 0 0 8px 8px;
+}
+.public-stream-area.stream-fullscreen .fullscreen-chat-input-wrap input {
+  flex: 1;
+  padding: 6px 10px;
+  border-radius: 4px;
+  border: none;
+  font-size: 15px;
+  background: #222;
+  color: #fff;
+}
+.public-stream-area.stream-fullscreen .fullscreen-chat-input-wrap button {
+  padding: 6px 16px;
+  border-radius: 4px;
+  border: none;
+  background: #ff9800;
+  color: #fff;
+  font-weight: bold;
+  font-size: 15px;
+  cursor: pointer;
+}
 }
 
 .public-stream-area.stream-fullscreen .fullscreen-chat-overlay .chat-message {
