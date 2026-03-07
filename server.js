@@ -94,11 +94,13 @@ const PAYPAL_CLIENT_SECRET = (process.env.PAYPAL_CLIENT_SECRET || '').trim();
 const PAYPAL_MODE = (process.env.PAYPAL_MODE || 'sandbox').trim(); // 'sandbox' or 'live'
 const PAYPAL_API = PAYPAL_MODE === 'live' ? 'https://api-m.paypal.com' : 'https://api-m.sandbox.paypal.com';
 
-// Coin packages: { id, coins, price (USD) }
+// Coin packages: { id, coins, price (USD) } — premium pricing, no bonuses
 const COIN_PACKAGES = [
-  { id: 'pack_100', coins: 100, price: '1.00', label: '100 Coins' },
-  { id: 'pack_600', coins: 600, price: '5.00', label: '600 Coins' },
-  { id: 'pack_1500', coins: 1500, price: '10.00', label: '1,500 Coins' },
+  { id: 'pack_100',   coins: 100,   price: '0.99',   label: '100 Coins' },
+  { id: 'pack_500',   coins: 500,   price: '4.99',   label: '500 Coins' },
+  { id: 'pack_2000',  coins: 2000,  price: '19.99',  label: '2,000 Coins' },
+  { id: 'pack_5000',  coins: 5000,  price: '49.99',  label: '5,000 Coins' },
+  { id: 'pack_10000', coins: 10000, price: '99.99',  label: '10,000 Coins' },
 ];
 
 // Pending PayPal orders: orderId → { socketId, packageId, coins }
@@ -1906,7 +1908,7 @@ io.on('connection', (socket) => {
   socket.on('send-tip', ({ toSocketId, amount } = {}) => {
     if (socket.data.isBot) return;
     const tipAmount = parseInt(amount);
-    if (!tipAmount || tipAmount <= 0 || ![10, 50, 100].includes(tipAmount)) return;
+    if (!tipAmount || tipAmount <= 0 || ![50, 100, 500, 1000, 5000].includes(tipAmount)) return;
     if (!toSocketId || toSocketId === socket.id) return;
 
     // Only allow tips to logged-in users (not guests)

@@ -479,9 +479,11 @@
             <video id="publicStreamVideo" class="public-stream-video" autoplay playsinline></video>
             <button id="flipCameraBtnLive" class="flip-camera-btn" aria-label="Flip camera" title="Flip Camera" style="display:none;">🔄</button>
             <div class="stream-tip-bar">
+              <button class="tip-btn" data-amount="50">🪙 50</button>
               <button class="tip-btn" data-amount="100">🪙 100</button>
               <button class="tip-btn" data-amount="500">🪙 500</button>
-              <button class="tip-btn" data-amount="1000">🪙 1000</button>
+              <button class="tip-btn" data-amount="1000">🪙 1K</button>
+              <button class="tip-btn" data-amount="5000">🚀 5K</button>
             </div>
             <div id="fullscreenChat" class="fullscreen-chat-overlay"></div>
           </div>
@@ -558,18 +560,25 @@
         <div class="coin-packages" id="coinPackages">
           <button class="coin-package" data-package="pack_100">
             <span class="package-coins">🪙 100</span>
-            <span class="package-price">$1.00</span>
+            <span class="package-price">$0.99</span>
           </button>
-          <button class="coin-package" data-package="pack_600">
-            <span class="package-coins">🪙 600</span>
-            <span class="package-bonus">+20% bonus</span>
-            <span class="package-price">$5.00</span>
+          <button class="coin-package" data-package="pack_500">
+            <span class="package-coins">🪙 500</span>
+            <span class="package-price">$4.99</span>
           </button>
-          <button class="coin-package featured" data-package="pack_1500">
-            <span class="package-badge">Best Value</span>
-            <span class="package-coins">🪙 1,500</span>
-            <span class="package-bonus">+50% bonus</span>
-            <span class="package-price">$10.00</span>
+          <button class="coin-package" data-package="pack_2000">
+            <span class="package-coins">🪙 2,000</span>
+            <span class="package-price">$19.99</span>
+          </button>
+          <button class="coin-package featured" data-package="pack_5000">
+            <span class="package-badge">Popular</span>
+            <span class="package-coins">🪙 5,000</span>
+            <span class="package-price">$49.99</span>
+          </button>
+          <button class="coin-package featured" data-package="pack_10000">
+            <span class="package-badge">🐋 Whale</span>
+            <span class="package-coins">🪙 10,000</span>
+            <span class="package-price">$99.99</span>
           </button>
         </div>
         <div id="paypalButtonContainer" class="paypal-container" style="display:none;"></div>
