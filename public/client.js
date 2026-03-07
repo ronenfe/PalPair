@@ -514,8 +514,12 @@ socket.on('stream-room-users', ({ streamerId, users = [] } = {}) => {
   renderOnlineUsers(users);
 });
 
+// Ignore global online-users when in a stream room — room-scoped events handle it
 socket.on('online-users', ({ users = [] } = {}) => {
-  renderOnlineUsers(users);
+  // Only render if not currently in a stream room
+  if (!currentWatchingStreamerId) {
+    renderOnlineUsers(users);
+  }
 });
 
 socket.on('matched', async ({ otherId: id, initiator, isBot, botProfile, botVideoUrl, partnerProfile }) => {
@@ -921,7 +925,7 @@ function renderOnlineUsers(users = []) {
   if (!users.length) {
     const emptyItem = document.createElement('li');
     emptyItem.className = 'online-user-item empty';
-    emptyItem.textContent = 'No users online';
+    emptyItem.textContent = currentWatchingStreamerId ? 'No viewers yet' : 'Select a streamer';
     onlineUsersList.appendChild(emptyItem);
     return;
   }
@@ -1195,6 +1199,9 @@ socket.on('public-stream-ended', () => {
     publicStreamViewerPC.close();
     publicStreamViewerPC = null;
   }
+  // Clear room users and close panel
+  renderOnlineUsers([]);
+  if (onlineUsersPanel) onlineUsersPanel.classList.remove('open');
   // If we're streaming ourselves, show own stream; otherwise hide
   if (isStreaming) {
     if (publicStreamVideo) {
@@ -1354,6 +1361,9 @@ if (hideStreamBtn) {
       currentWatchingStreamerId = null;
       if (publicStreamViewerPC) { publicStreamViewerPC.close(); publicStreamViewerPC = null; }
     }
+    // Clear room users and close panel
+    renderOnlineUsers([]);
+    if (onlineUsersPanel) onlineUsersPanel.classList.remove('open');
     if (publicStreamVideo) {
       publicStreamVideo.pause();
       publicStreamVideo.srcObject = null;

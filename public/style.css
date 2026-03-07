@@ -764,6 +764,30 @@ body.chat-active .videos .video-wrap:nth-child(2) #status {
   transform: translateX(0);
 }
 
+.users-toggle-btn-inline {
+  background: transparent;
+  border: none;
+  color: #CAC4D0;
+  font-size: 15px;
+  width: 32px;
+  height: 32px;
+  min-height: 32px;
+  padding: 0;
+  border-radius: 8px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.2s;
+  text-transform: none;
+  letter-spacing: 0;
+  line-height: 1;
+}
+
+.users-toggle-btn-inline:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
 .users-toggle-btn {
   position: absolute;
   top: 8px;
