@@ -123,6 +123,13 @@ const coinBalanceEl = document.getElementById('coinBalance');
 let streamHiddenByUser = false;
 let myCoins = 0;
 
+// Streamers discovery grid elements
+const streamersGrid = document.getElementById('streamersGrid');
+const streamersCards = document.getElementById('streamersCards');
+const streamersCountEl = document.getElementById('streamersCount');
+const noStreamersMsg = document.getElementById('noStreamersMsg');
+let lastKnownStreamers = [];
+
 // Online users panel toggle
 if (usersToggleBtn && onlineUsersPanel) {
   usersToggleBtn.addEventListener('click', () => {
@@ -321,6 +328,7 @@ function setRandomMode(active) {
       if (publicStreamViewerPC) { publicStreamViewerPC.close(); publicStreamViewerPC = null; }
     }
     if (publicStreamArea) publicStreamArea.style.display = 'none';
+    if (streamersGrid) streamersGrid.style.display = 'none';
     streamHiddenByUser = false; // reset so stream auto-shows when returning
 
     chatInterface.style.display = 'none';
@@ -351,6 +359,7 @@ function setRandomMode(active) {
     if (privateChatInput) { privateChatInput.disabled = true; privateChatInput.value = ''; }
     if (privateSendBtn) privateSendBtn.disabled = true;
     // Re-check for active public streamers when returning to public room
+    if (streamersGrid) streamersGrid.style.display = '';
     socket.emit('request-public-streamers');
   }
 
@@ -1175,6 +1184,7 @@ socket.on('public-stream-signal', async ({ from, data }) => {
 
 // ── Stream update: new streamer list from server ──
 socket.on('public-stream-update', ({ streamers }) => {
+  lastKnownStreamers = streamers || [];
   // Update viewer count if currently watching
   if (currentWatchingStreamerId) {
     const current = streamers.find(s => s.socketId === currentWatchingStreamerId);
@@ -1182,6 +1192,8 @@ socket.on('public-stream-update', ({ streamers }) => {
       publicStreamViewerCount.textContent = `👁 ${current.viewerCount || 0}`;
     }
   }
+  // Render the streamers discovery grid
+  renderStreamersGrid(streamers);
   // If not currently watching and not streaming, and there are streamers, auto-watch first
   // Skip auto-watch if we have a pending watch-by-id request in flight
   if (!isStreaming && !currentWatchingStreamerId && !streamHiddenByUser && !pendingWatchByIdActive && streamers.length > 0) {
@@ -1190,6 +1202,66 @@ socket.on('public-stream-update', ({ streamers }) => {
   // If no streamers left, reset the hidden flag so next stream auto-shows
   if (streamers.length === 0) streamHiddenByUser = false;
 });
+
+function renderStreamersGrid(streamers) {
+  if (!streamersCards || !streamersCountEl) return;
+  
+  // Update count
+  streamersCountEl.textContent = `${streamers.length} live`;
+  
+  // Clear existing cards (except the no-streamers message)
+  const existingCards = streamersCards.querySelectorAll('.streamer-card');
+  existingCards.forEach(c => c.remove());
+  
+  if (streamers.length === 0) {
+    if (noStreamersMsg) noStreamersMsg.style.display = '';
+    return;
+  }
+  
+  if (noStreamersMsg) noStreamersMsg.style.display = 'none';
+  
+  streamers.forEach((streamer) => {
+    const card = document.createElement('div');
+    card.className = 'streamer-card';
+    if (streamer.socketId === currentWatchingStreamerId) {
+      card.classList.add('watching');
+    }
+    
+    // Build card background: video preview for bots, gradient + emoji for real streamers
+    if (streamer.botVideoUrl) {
+      card.innerHTML = `
+        <video class="streamer-card-video" src="${streamer.botVideoUrl}" muted playsinline loop autoplay></video>
+        <span class="streamer-card-live">LIVE</span>
+        <div class="streamer-card-overlay">
+          <div class="streamer-card-name">${escapeHtml(streamer.name || 'Unknown')}</div>
+          <div class="streamer-card-viewers">👁 ${streamer.viewerCount || 0}</div>
+        </div>
+      `;
+    } else {
+      card.innerHTML = `
+        <div class="streamer-card-bg"><span class="avatar-emoji">📷</span></div>
+        <span class="streamer-card-live">LIVE</span>
+        <div class="streamer-card-overlay">
+          <div class="streamer-card-name">${escapeHtml(streamer.name || 'Unknown')}</div>
+          <div class="streamer-card-viewers">👁 ${streamer.viewerCount || 0}</div>
+        </div>
+      `;
+    }
+    
+    card.addEventListener('click', () => {
+      streamHiddenByUser = false;
+      socket.emit('watch-public-stream-by-id', { streamerId: streamer.socketId });
+    });
+    
+    streamersCards.appendChild(card);
+  });
+}
+
+function escapeHtml(text) {
+  const div = document.createElement('div');
+  div.textContent = text;
+  return div.innerHTML;
+}
 
 // ── Next streamer button ──
 if (nextStreamerBtn) {

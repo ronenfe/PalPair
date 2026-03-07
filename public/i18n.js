@@ -24,8 +24,8 @@
 
   const translations = {
     en: {
-      title: 'FlashLive - Random Video Chat',
-      subtitle: 'Meet new people instantly',
+      title: 'FlashLive - Live Streaming',
+      subtitle: 'Watch & broadcast live',
       peopleOnline: 'people online now',
       safetyNote: 'FlashLive - Random Video Chat allows users to report child safety concerns in-app. To learn more about reporting requirements, visit the <a href="/help-center.html" target="_blank" rel="noopener">Help center</a>.',
       yourProfile: 'Your Profile',
@@ -76,7 +76,7 @@
       nextStreamer: '⏭ Next'
     },
     es: {
-      subtitle: 'Conoce gente nueva al instante • Videochat en todo el mundo',
+      subtitle: 'Mira y transmite en vivo',
       peopleOnline: 'personas en línea ahora',
       yourProfile: 'Tu perfil',
       selectGender: 'Selecciona género',
@@ -110,7 +110,7 @@
       nextStreamer: '⏭ Siguiente'
     },
     fr: {
-      subtitle: 'Rencontrez de nouvelles personnes instantanément • Chat vidéo mondial',
+      subtitle: 'Regardez et diffusez en direct',
       peopleOnline: 'personnes en ligne maintenant',
       yourProfile: 'Votre profil',
       selectGender: 'Sélectionner le genre',
@@ -141,7 +141,7 @@
       nextStreamer: '⏭ Suivant'
     },
     de: {
-      subtitle: 'Triff sofort neue Leute • Videochat weltweit',
+      subtitle: 'Live ansehen & senden',
       peopleOnline: 'Personen jetzt online',
       yourProfile: 'Dein Profil',
       selectGender: 'Geschlecht wählen',
@@ -172,7 +172,7 @@
       nextStreamer: '⏭ Nächster'
     },
     pt: {
-      subtitle: 'Conheça novas pessoas instantaneamente • Chat por vídeo no mundo todo',
+      subtitle: 'Assista e transmita ao vivo',
       peopleOnline: 'pessoas online agora',
       yourProfile: 'Seu perfil',
       selectGender: 'Selecione o gênero',
@@ -196,7 +196,7 @@
       nextStreamer: '⏭ Próximo'
     },
     ru: {
-      subtitle: 'Знакомьтесь с новыми людьми мгновенно • Видеочат по всему миру',
+      subtitle: 'Смотрите и стримьте в прямом эфире',
       peopleOnline: 'пользователей онлайн',
       yourProfile: 'Ваш профиль',
       selectGender: 'Выберите пол',
@@ -225,7 +225,7 @@
     },
     zh: {
       title: 'FlashLive - 随机视频聊天',
-      subtitle: '立即认识新朋友 • 全球视频聊天',
+      subtitle: '观看和直播',
       peopleOnline: '人正在线上',
       safetyNote: 'FlashLive - 随机视频聊天允许用户在应用内举报儿童安全问题。如需了解更多举报要求，请访问<a href="/help-center.html" target="_blank" rel="noopener">帮助中心</a>。',
       yourProfile: '你的资料',
@@ -276,7 +276,7 @@
       nextStreamer: '⏭ 下一个'
     },
     hi: {
-      subtitle: 'तुरंत नए लोगों से मिलें • दुनिया भर में वीडियो चैट',
+      subtitle: 'लाइव देखें और प्रसारण करें',
       peopleOnline: 'लोग अभी ऑनलाइन',
       yourProfile: 'आपकी प्रोफ़ाइल',
       selectGender: 'लिंग चुनें',
@@ -301,7 +301,7 @@
       nextStreamer: '⏭ अगला'
     },
     ar: {
-      subtitle: 'تعرّف على أشخاص جدد فورًا • دردشة فيديو حول العالم',
+      subtitle: 'شاهد وبث مباشر',
       peopleOnline: 'شخص متصل الآن',
       yourProfile: 'ملفك الشخصي',
       selectGender: 'اختر الجنس',
@@ -325,10 +325,10 @@
       streamLive: 'مباشر',
       nextStreamer: '⏭ التالي'
     },
-    bn: { subtitle: 'তাৎক্ষণিক নতুন মানুষের সাথে পরিচিত হন • বিশ্বজুড়ে ভিডিও চ্যাট', language: 'ভাষা', start: 'শুরু', stop: 'বন্ধ', send: 'পাঠান', saveContinue: 'সেভ করে চালিয়ে যান', goLive: '📡 লাইভ', stopLive: '⏹ বন্ধ', goRandom: '🎥 র্যান্ডম', streamLive: 'লাইভ', nextStreamer: '⏭ পরবর্তী' },
-    pa: { subtitle: 'ਤੁਰੰਤ ਨਵੇਂ ਲੋਕਾਂ ਨੂੰ ਮਿਲੋ • ਦੁਨੀਆ ਭਰ ਵਿੱਚ ਵੀਡੀਓ ਚੈਟ', language: 'ਭਾਸ਼ਾ', start: 'ਸ਼ੁਰੂ', stop: 'ਰੋਕੋ', send: 'ਭੇਜੋ', saveContinue: 'ਸੇਵ ਕਰੋ ਅਤੇ ਜਾਰੀ ਰੱਖੋ', goLive: '📡 ਲਾਈਵ', stopLive: '⏹ ਰੋਕੋ', goRandom: '🎥 ਰੈਂਡਮ', streamLive: 'ਲਾਈਵ', nextStreamer: '⏭ ਅਗਲਾ' },
+    bn: { subtitle: 'লাইভ দেখুন ও সম্প্রচার করুন', language: 'ভাষা', start: 'শুরু', stop: 'বন্ধ', send: 'পাঠান', saveContinue: 'সেভ করে চালিয়ে যান', goLive: '📡 লাইভ', stopLive: '⏹ বন্ধ', goRandom: '🎥 র্যান্ডম', streamLive: 'লাইভ', nextStreamer: '⏭ পরবর্তী' },
+    pa: { subtitle: 'ਲਾਈਵ ਦੇਖੋ ਅਤੇ ਪ੍ਰਸਾਰਣ ਕਰੋ', language: 'ਭਾਸ਼ਾ', start: 'ਸ਼ੁਰੂ', stop: 'ਰੋਕੋ', send: 'ਭੇਜੋ', saveContinue: 'ਸੇਵ ਕਰੋ ਅਤੇ ਜਾਰੀ ਰੱਖੋ', goLive: '📡 ਲਾਈਵ', stopLive: '⏹ ਰੋਕੋ', goRandom: '🎥 ਰੈਂਡਮ', streamLive: 'ਲਾਈਵ', nextStreamer: '⏭ ਅਗਲਾ' },
     ja: {
-      subtitle: 'すぐに新しい人と出会う • 世界中でビデオチャット',
+      subtitle: 'ライブ配信を視聴＆配信',
       goLive: '📡 ライブ配信',
       stopLive: '⏹ 配信停止',
       goRandom: '🎥 ランダム',
@@ -349,7 +349,7 @@
       language: '言語'
     },
     ko: {
-      subtitle: '즉시 새로운 사람을 만나보세요 • 전 세계 영상 채팅',
+      subtitle: '라이브 시청 & 방송',
       goLive: '📡 라이브',
       stopLive: '⏹ 중지',
       goRandom: '🎥 랜덤',
@@ -368,13 +368,13 @@
       send: '보내기',
       language: '언어'
     },
-    vi: { subtitle: 'Gặp người mới ngay lập tức • Trò chuyện video toàn cầu', language: 'Ngôn ngữ', start: 'Bắt đầu', stop: 'Dừng', send: 'Gửi', saveContinue: 'Lưu & Tiếp tục', goLive: '📡 Trực tiếp', stopLive: '⏹ Dừng', goRandom: '🎥 Ngẫu nhiên', streamLive: 'TRỰC TIẾ́P', nextStreamer: '⏭ Tiếp' },
-    tr: { subtitle: 'Anında yeni insanlarla tanışın • Dünya çapında görüntülü sohbet', language: 'Dil', start: 'Başlat', stop: 'Durdur', send: 'Gönder', saveContinue: 'Kaydet ve Devam Et', goLive: '📡 Canlı', stopLive: '⏹ Durdur', goRandom: '🎥 Rastgele', streamLive: 'CANLI', nextStreamer: '⏭ Sonraki' },
-    it: { subtitle: 'Incontra nuove persone all’istante • Video chat in tutto il mondo', language: 'Lingua', start: 'Avvia', stop: 'Ferma', send: 'Invia', saveContinue: 'Salva e continua', goLive: '📡 In Diretta', stopLive: '⏹ Ferma', goRandom: '🎥 Casuale', streamLive: 'IN DIRETTA', nextStreamer: '⏭ Prossimo' },
-    pl: { subtitle: 'Poznawaj nowych ludzi od razu • Czat wideo na całym świecie', language: 'Język', start: 'Start', stop: 'Stop', send: 'Wyślij', saveContinue: 'Zapisz i kontynuuj', goLive: '📡 Na żywo', stopLive: '⏹ Zakończ', goRandom: '🎥 Losowo', streamLive: 'NA ŻYWO', nextStreamer: '⏭ Następny' },
-    nl: { subtitle: 'Ontmoet direct nieuwe mensen • Videochat wereldwijd', language: 'Taal', start: 'Start', stop: 'Stop', send: 'Verzenden', saveContinue: 'Opslaan en doorgaan', goLive: '📡 Ga Live', stopLive: '⏹ Stoppen', goRandom: '🎥 Willekeurig', streamLive: 'LIVE', nextStreamer: '⏭ Volgende' },
-    uk: { subtitle: 'Знайомтеся з новими людьми миттєво • Відеочат по всьому світу', language: 'Мова', start: 'Почати', stop: 'Зупинити', send: 'Надіслати', saveContinue: 'Зберегти і продовжити', goLive: '📡 Прямий ефір', stopLive: '⏹ Зупинити', goRandom: '🎥 Випадково', streamLive: 'НАЖИВО', nextStreamer: '⏭ Наступний' },
-    fa: { subtitle: 'فوراً با افراد جدید آشنا شوید • چت تصویری در سراسر جهان', language: 'زبان', start: 'شروع', stop: 'توقف', send: 'ارسال', saveContinue: 'ذخیره و ادامه', goLive: '📡 پخش زنده', stopLive: '⏹ توقف', goRandom: '🎥 تصادفی', streamLive: 'زنده', nextStreamer: '⏭ بعدی' }
+    vi: { subtitle: 'Xem và phát trực tiếp', language: 'Ngôn ngữ', start: 'Bắt đầu', stop: 'Dừng', send: 'Gửi', saveContinue: 'Lưu & Tiếp tục', goLive: '📡 Trực tiếp', stopLive: '⏹ Dừng', goRandom: '🎥 Ngẫu nhiên', streamLive: 'TRỰC TIẾ́P', nextStreamer: '⏭ Tiếp' },
+    tr: { subtitle: 'Canlı izleyin ve yayınlayın', language: 'Dil', start: 'Başlat', stop: 'Durdur', send: 'Gönder', saveContinue: 'Kaydet ve Devam Et', goLive: '📡 Canlı', stopLive: '⏹ Durdur', goRandom: '🎥 Rastgele', streamLive: 'CANLI', nextStreamer: '⏭ Sonraki' },
+    it: { subtitle: 'Guarda e trasmetti in diretta', language: 'Lingua', start: 'Avvia', stop: 'Ferma', send: 'Invia', saveContinue: 'Salva e continua', goLive: '📡 In Diretta', stopLive: '⏹ Ferma', goRandom: '🎥 Casuale', streamLive: 'IN DIRETTA', nextStreamer: '⏭ Prossimo' },
+    pl: { subtitle: 'Oglądaj i nadawaj na żywo', language: 'Język', start: 'Start', stop: 'Stop', send: 'Wyślij', saveContinue: 'Zapisz i kontynuuj', goLive: '📡 Na żywo', stopLive: '⏹ Zakończ', goRandom: '🎥 Losowo', streamLive: 'NA ŻYWO', nextStreamer: '⏭ Następny' },
+    nl: { subtitle: 'Bekijk en stream live', language: 'Taal', start: 'Start', stop: 'Stop', send: 'Verzenden', saveContinue: 'Opslaan en doorgaan', goLive: '📡 Ga Live', stopLive: '⏹ Stoppen', goRandom: '🎥 Willekeurig', streamLive: 'LIVE', nextStreamer: '⏭ Volgende' },
+    uk: { subtitle: 'Дивіться та транслюйте наживо', language: 'Мова', start: 'Почати', stop: 'Зупинити', send: 'Надіслати', saveContinue: 'Зберегти і продовжити', goLive: '📡 Прямий ефір', stopLive: '⏹ Зупинити', goRandom: '🎥 Випадково', streamLive: 'НАЖИВО', nextStreamer: '⏭ Наступний' },
+    fa: { subtitle: 'پخش زنده تماشا کنید و بث کنید', language: 'زبان', start: 'شروع', stop: 'توقف', send: 'ارسال', saveContinue: 'ذخیره و ادامه', goLive: '📡 پخش زنده', stopLive: '⏹ توقف', goRandom: '🎥 تصادفی', streamLive: 'زنده', nextStreamer: '⏭ بعدی' }
   };
 
   const english = translations.en;

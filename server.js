@@ -357,6 +357,14 @@ function initVirtualBots() {
   }
 
   console.log(`${NUM_BOTS} virtual bots initialized (no Puppeteer)`);
+
+  // All bots start broadcasting immediately
+  for (const botId of virtualBotIds) {
+    if (!publicStreamers.includes(botId)) {
+      publicStreamers.push(botId);
+      console.log(`>>> Virtual bot ${botId} (${getSocketDisplayName(botId)}) started streaming`);
+    }
+  }
 }
 
 function getPersonaByBotId(botId) {
@@ -965,23 +973,31 @@ function getViewerCount(streamerId) {
 }
 
 function getPublicStreamersList() {
-  return publicStreamers.map((id) => ({
-    socketId: id,
-    name: getSocketDisplayName(id),
-    viewerCount: getViewerCount(id)
-  }));
+  return publicStreamers.map((id) => {
+    const bp = botProfiles.get(id);
+    return {
+      socketId: id,
+      name: getSocketDisplayName(id),
+      viewerCount: getViewerCount(id),
+      botVideoUrl: bp ? bp.botVideoUrl : null
+    };
+  });
 }
 
-// ── Trigger a random virtual bot to start streaming ──
-function triggerRandomBotStream() {
-  // Find bots that are not already streaming
-  const availableBots = virtualBotIds.filter(id => !publicStreamers.includes(id));
-  if (availableBots.length === 0) return;
-  const randomBot = availableBots[Math.floor(Math.random() * availableBots.length)];
-  publicStreamers.push(randomBot);
-  console.log(`>>> Virtual bot ${randomBot} (${getSocketDisplayName(randomBot)}) started streaming`);
-  io.emit('public-stream-update', { streamers: getPublicStreamersList() });
-  emitPublicOnlineUsers();
+// ── Ensure all virtual bots are streaming ──
+function triggerAllBotStreams() {
+  let added = 0;
+  for (const botId of virtualBotIds) {
+    if (!publicStreamers.includes(botId)) {
+      publicStreamers.push(botId);
+      console.log(`>>> Virtual bot ${botId} (${getSocketDisplayName(botId)}) started streaming`);
+      added++;
+    }
+  }
+  if (added > 0) {
+    io.emit('public-stream-update', { streamers: getPublicStreamersList() });
+    emitPublicOnlineUsers();
+  }
 }
 
 const joinWebhookStats = {
@@ -1893,9 +1909,9 @@ io.on('connection', (socket) => {
         }));
       }
 
-      // If no one is streaming, trigger a random bot to start
-      if (publicStreamers.length === 0) {
-        setTimeout(() => triggerRandomBotStream(), 1500);
+      // Ensure all bots are streaming
+      if (publicStreamers.length < virtualBotIds.length) {
+        setTimeout(() => triggerAllBotStreams(), 1500);
       }
     }
 

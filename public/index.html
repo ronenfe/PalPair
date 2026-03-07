@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width,initial-scale=1" />
-    <title>FlashLive - Random Video Chat</title>
+    <title>FlashLive - Live Streaming</title>
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <link rel="stylesheet" href="/style.css">
   </head>
@@ -13,7 +13,7 @@
       <div id="profileContainer" class="profile-screen">
         <header class="profile-header">
           <h1>FlashLive</h1>
-          <p class="subtitle" data-i18n="subtitle">Meet new people instantly</p>
+          <p class="subtitle" data-i18n="subtitle">Watch & broadcast live</p>
           <div id="userCounter" class="user-counter-wrap">
             <span class="counter-chip"><span id="userCount">0</span>&nbsp;<span data-i18n="peopleOnline">people online now</span></span>
           </div>
@@ -460,8 +460,23 @@
             <button id="cashoutBtn" class="cashout-btn" title="Cash out">💸</button>
           </div>
           <button id="goLiveBtn" class="go-live-btn" data-i18n="goLive" aria-label="Go live">📡 Go Live</button>
-          <button id="goRandomBtn" class="go-random-btn" data-i18n="goRandom" aria-label="Go random">🎥 Go Random</button>
+          <button id="goRandomBtn" class="go-random-btn go-random-secondary" data-i18n="goRandom" aria-label="Go random">🎲 Random</button>
         </header>
+
+        <!-- Live Streamers Discovery Grid -->
+        <div id="streamersGrid" class="streamers-grid">
+          <div class="streamers-grid-header">
+            <h2 class="streamers-grid-title">🔴 Live Now</h2>
+            <span id="streamersCount" class="streamers-count">0 live</span>
+          </div>
+          <div id="streamersCards" class="streamers-cards">
+            <div class="no-streamers-msg" id="noStreamersMsg">
+              <span class="no-streamers-icon">📡</span>
+              <p>No one is live right now</p>
+              <p class="no-streamers-sub">Be the first to go live!</p>
+            </div>
+          </div>
+        </div>
 
         <!-- Public chat view -->
         <section id="publicChatSection" class="chat-view">
