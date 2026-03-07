@@ -490,6 +490,20 @@ socket.on('public-room-event', (event) => {
   addPublicRoomEvent(event);
 });
 
+// ── Per-streamer chat room events ──
+socket.on('stream-chat-init', ({ streamerId, events = [] } = {}) => {
+  clearChat();
+  events.forEach((event) => addPublicRoomEvent(event));
+});
+
+socket.on('stream-chat-event', ({ streamerId, event } = {}) => {
+  addPublicRoomEvent(event);
+});
+
+socket.on('stream-room-users', ({ streamerId, users = [] } = {}) => {
+  renderOnlineUsers(users);
+});
+
 socket.on('online-users', ({ users = [] } = {}) => {
   renderOnlineUsers(users);
 });

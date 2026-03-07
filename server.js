@@ -867,8 +867,9 @@ const socketToChatSession = new Map(); // socketId -> chatId
 const notifiedJoins = new Set(); // prevent duplicate join webhooks per socket
 const activeLoginSessions = new Map(); // socketId -> { socketId, name, loginAt, lastSeenAt }
 const completedLoginSessions = []; // recent ended login sessions
-const publicRoomEvents = []; // recent public room system/user messages
+const publicRoomEvents = []; // recent public room system/user messages (legacy, kept for init)
 let publicRoomSpeakerBotId = null; // exactly one bot that replies in public room chat
+const streamChatEvents = new Map(); // streamerId → [{id, type, text, ...}] per-streamer chat history
 
 // ── Public Stream ──
 const publicStreamers = []; // ordered list of socket IDs currently streaming
@@ -1130,8 +1131,98 @@ function pushPublicRoomEvent(event) {
   if (publicRoomEvents.length > 300) {
     publicRoomEvents.shift();
   }
+  // Broadcast to all connected sockets (legacy global)
   io.emit('public-room-event', event);
   return event;
+}
+
+// ── Per-streamer chat ──
+function getStreamChatRoom(streamerId) {
+  return `stream:${streamerId}`;
+}
+
+function pushStreamChatEvent(streamerId, event) {
+  if (!event || !event.text || !streamerId) return null;
+  if (!streamChatEvents.has(streamerId)) {
+    streamChatEvents.set(streamerId, []);
+  }
+  const events = streamChatEvents.get(streamerId);
+  events.push(event);
+  if (events.length > 200) events.shift();
+  // Broadcast only to viewers in this streamer's room
+  io.to(getStreamChatRoom(streamerId)).emit('stream-chat-event', { streamerId, event });
+  return event;
+}
+
+function getStreamRoomUsers(streamerId) {
+  const room = getStreamChatRoom(streamerId);
+  const socketsInRoom = io.sockets.adapter.rooms.get(room);
+  const users = [];
+  if (socketsInRoom) {
+    for (const sid of socketsInRoom) {
+      const profile = userProfiles.get(sid)?.profile;
+      if (!profile?.name) continue;
+      users.push({
+        socketId: sid,
+        name: profile.name,
+        gender: (profile.gender || '').toLowerCase(),
+        isBot: false
+      });
+    }
+  }
+  // Also add the streamer if it's a bot
+  if (bots.has(streamerId)) {
+    const bp = botProfiles.get(streamerId);
+    if (bp) {
+      users.unshift({
+        socketId: streamerId,
+        name: bp.name || 'Bot',
+        gender: (bp.gender || 'female').toLowerCase(),
+        isBot: true
+      });
+    }
+  }
+  return users;
+}
+
+function emitStreamRoomUsers(streamerId) {
+  const room = getStreamChatRoom(streamerId);
+  const users = getStreamRoomUsers(streamerId);
+  io.to(room).emit('stream-room-users', { streamerId, users });
+}
+
+function joinStreamRoom(socket, streamerId) {
+  // Leave any previous stream room
+  leaveAllStreamRooms(socket);
+  const room = getStreamChatRoom(streamerId);
+  socket.join(room);
+  socket.data.currentStreamRoom = streamerId;
+  // Send chat history for this room
+  const history = streamChatEvents.get(streamerId) || [];
+  socket.emit('stream-chat-init', { streamerId, events: history.slice(-100) });
+  // Notify room of new viewer
+  const displayName = getSocketDisplayName(socket.id);
+  pushStreamChatEvent(streamerId, buildPublicRoomEvent({
+    type: 'system',
+    text: `${displayName} joined`
+  }));
+  emitStreamRoomUsers(streamerId);
+}
+
+function leaveAllStreamRooms(socket) {
+  const prevStreamerId = socket.data?.currentStreamRoom;
+  if (prevStreamerId) {
+    const room = getStreamChatRoom(prevStreamerId);
+    socket.leave(room);
+    socket.data.currentStreamRoom = null;
+    // Notify old room
+    const displayName = getSocketDisplayName(socket.id);
+    pushStreamChatEvent(prevStreamerId, buildPublicRoomEvent({
+      type: 'system',
+      text: `${displayName} left`
+    }));
+    emitStreamRoomUsers(prevStreamerId);
+  }
 }
 
 function getSocketDisplayName(socketId) {
@@ -1374,10 +1465,25 @@ function getPublicRoomSpeakerBotSocketId() {
 }
 
 function maybeEmitBotReplyToHumanPublicMessage(fromSocketId, text) {
+  // Find the streamer the human is watching
+  const streamerId = io.sockets.sockets.get(fromSocketId)?.data?.currentStreamRoom;
+
   // Don't let bots intervene when multiple real users are chatting
-  const humansInPublicRoom = Array.from(io.sockets.sockets.values())
-    .filter(s => s.data?.publicRoomJoined && !s.data?.isBot).length;
-  if (humansInPublicRoom > 1) return;
+  let humansCount = 0;
+  if (streamerId) {
+    const room = getStreamChatRoom(streamerId);
+    const socketsInRoom = io.sockets.adapter.rooms.get(room);
+    if (socketsInRoom) {
+      for (const sid of socketsInRoom) {
+        const s = io.sockets.sockets.get(sid);
+        if (s && !s.data?.isBot) humansCount++;
+      }
+    }
+  } else {
+    humansCount = Array.from(io.sockets.sockets.values())
+      .filter(s => s.data?.publicRoomJoined && !s.data?.isBot).length;
+  }
+  if (humansCount > 1) return;
 
   const speakerId = getPublicRoomSpeakerBotSocketId();
   if (!speakerId) return;
@@ -1394,18 +1500,29 @@ function maybeEmitBotReplyToHumanPublicMessage(fromSocketId, text) {
       const replyBody = await getPublicRoomBotReply(text, botProfile);
       const replyText = `${humanName}, ${replyBody}`;
 
-      pushPublicRoomEvent(buildPublicRoomEvent({
+      const replyEvent = buildPublicRoomEvent({
         type: 'message',
         text: replyText,
         socketId: speakerId,
         name: speakerName
-      }));
+      });
+
+      if (streamerId) {
+        pushStreamChatEvent(streamerId, replyEvent);
+      } else {
+        pushPublicRoomEvent(replyEvent);
+      }
     } catch (error) {
       console.warn('Skipping public room bot reply:', error.message);
-      pushPublicRoomEvent(buildPublicRoomEvent({
+      const errorEvent = buildPublicRoomEvent({
         type: 'system',
         text: `${speakerName} couldn't reply right now (Groq temporarily unavailable).`
-      }));
+      });
+      if (streamerId) {
+        pushStreamChatEvent(streamerId, errorEvent);
+      } else {
+        pushPublicRoomEvent(errorEvent);
+      }
     }
   }, 900);
 }
@@ -1483,9 +1600,15 @@ async function doBotConvoTurn() {
       // Start a fresh conversation — Bot A initiates
       if (!shouldBotsChat()) { botConvoInProgress = false; return; }
       const starter = botConvoStarters[Math.floor(Math.random() * botConvoStarters.length)];
-      pushPublicRoomEvent(buildPublicRoomEvent({
+      const starterEvent = buildPublicRoomEvent({
         type: 'message', text: starter, socketId: speakerA, name: nameA
-      }));
+      });
+      // Broadcast to speakerA's stream room (since they're a bot streamer)
+      if (publicStreamers.includes(speakerA)) {
+        pushStreamChatEvent(speakerA, starterEvent);
+      } else {
+        pushPublicRoomEvent(starterEvent);
+      }
       botConvoLastMessage = starter;
 
       // Bot B replies after a delay — but abort if human joined or spoke
@@ -1494,9 +1617,14 @@ async function doBotConvoTurn() {
         try {
           const reply = await getPublicRoomBotReply(`${nameA} said: "${starter}"`, profileB);
           if (botConvoGeneration !== gen || !shouldBotsChat()) { botConvoInProgress = false; return; }
-          pushPublicRoomEvent(buildPublicRoomEvent({
+          const replyEvent = buildPublicRoomEvent({
             type: 'message', text: reply, socketId: speakerB, name: nameB
-          }));
+          });
+          if (publicStreamers.includes(speakerB)) {
+            pushStreamChatEvent(speakerB, replyEvent);
+          } else {
+            pushPublicRoomEvent(replyEvent);
+          }
           botConvoLastMessage = reply;
         } catch (e) {
           console.warn('Bot-to-bot reply error:', e.message);
@@ -1509,9 +1637,14 @@ async function doBotConvoTurn() {
       if (!shouldBotsChat()) { botConvoInProgress = false; return; }
       const reply = await getPublicRoomBotReply(botConvoLastMessage, profileA);
       if (botConvoGeneration !== gen || !shouldBotsChat()) { botConvoInProgress = false; return; }
-      pushPublicRoomEvent(buildPublicRoomEvent({
+      const replyEvent = buildPublicRoomEvent({
         type: 'message', text: reply, socketId: speakerA, name: nameA
-      }));
+      });
+      if (publicStreamers.includes(speakerA)) {
+        pushStreamChatEvent(speakerA, replyEvent);
+      } else {
+        pushPublicRoomEvent(replyEvent);
+      }
       botConvoLastMessage = reply;
     }
   } catch (e) {
@@ -1963,14 +2096,20 @@ io.on('connection', (socket) => {
       recipientSocket.emit('coin-balance', { balance: getUserBalance(toSocketId) });
     }
 
-    // Broadcast tip as a public room event
-    pushPublicRoomEvent(buildPublicRoomEvent({
+    // Broadcast tip to the streamer's chat room
+    const tipStreamerId = socket.data?.currentStreamRoom;
+    const tipEvent = buildPublicRoomEvent({
       type: 'tip',
       text: `🪙 ${senderName} tipped ${recipientName} ${tipAmount} coins!`,
       amount: tipAmount,
       fromName: senderName,
       toName: recipientName
-    }));
+    });
+    if (tipStreamerId) {
+      pushStreamChatEvent(tipStreamerId, tipEvent);
+    } else {
+      pushPublicRoomEvent(tipEvent);
+    }
 
     console.log(`>>> TIP: ${senderName} → ${recipientName}: ${tipAmount} coins`);
   });
@@ -1987,15 +2126,28 @@ io.on('connection', (socket) => {
     const safeText = String(text || '').trim().slice(0, 500);
     if (!safeText) return;
 
-    pushPublicRoomEvent(buildPublicRoomEvent({
-      type: 'message',
-      text: safeText,
-      socketId: socket.id,
-      name: getSocketDisplayName(socket.id),
-      clientMsgId: typeof clientMsgId === 'string' ? clientMsgId.slice(0, 80) : null
-    }));
-
-    maybeEmitBotReplyToHumanPublicMessage(socket.id, safeText);
+    // Send to the per-streamer chat room the viewer is watching
+    const currentStreamerId = socket.data?.currentStreamRoom;
+    if (currentStreamerId) {
+      pushStreamChatEvent(currentStreamerId, buildPublicRoomEvent({
+        type: 'message',
+        text: safeText,
+        socketId: socket.id,
+        name: getSocketDisplayName(socket.id),
+        clientMsgId: typeof clientMsgId === 'string' ? clientMsgId.slice(0, 80) : null
+      }));
+      maybeEmitBotReplyToHumanPublicMessage(socket.id, safeText);
+    } else {
+      // Fallback: global public room (legacy, e.g. if user hasn't watched a specific streamer)
+      pushPublicRoomEvent(buildPublicRoomEvent({
+        type: 'message',
+        text: safeText,
+        socketId: socket.id,
+        name: getSocketDisplayName(socket.id),
+        clientMsgId: typeof clientMsgId === 'string' ? clientMsgId.slice(0, 80) : null
+      }));
+      maybeEmitBotReplyToHumanPublicMessage(socket.id, safeText);
+    }
   });
 
   // ── Public Stream handlers ──
@@ -2017,17 +2169,22 @@ io.on('connection', (socket) => {
     // Notify viewers who were watching this streamer
     io.emit('public-stream-update', { streamers: getPublicStreamersList() });
     emitPublicOnlineUsers();
-    // Disconnect all viewers watching this streamer
+    // Disconnect all viewers watching this streamer and leave their stream rooms
     for (const [viewerId, viewerIdx] of viewerStreamIndex.entries()) {
       if (viewerIdx === idx) {
         viewerStreamIndex.delete(viewerId);
         const viewerSocket = io.sockets.sockets.get(viewerId);
-        if (viewerSocket) viewerSocket.emit('public-stream-ended');
+        if (viewerSocket) {
+          leaveAllStreamRooms(viewerSocket);
+          viewerSocket.emit('public-stream-ended');
+        }
       } else if (viewerIdx > idx) {
         // Shift indexes down
         viewerStreamIndex.set(viewerId, viewerIdx - 1);
       }
     }
+    // Clean up chat history for this streamer
+    streamChatEvents.delete(socket.id);
   });
 
   socket.on('watch-public-stream', ({ streamerIndex } = {}) => {
@@ -2052,6 +2209,8 @@ io.on('connection', (socket) => {
     const bp = botProfiles.get(streamerId);
     const botVideoUrl = bp ? bp.botVideoUrl : null;
     const viewerCount = getViewerCount(streamerId);
+    // Join this streamer's chat room
+    joinStreamRoom(socket, streamerId);
     // Tell the viewer to connect to this streamer
     socket.emit('public-stream-ready', { streamerId, streamerName, streamerIndex: idx, botVideoUrl, viewerCount });
     // Broadcast updated viewer counts
@@ -2076,6 +2235,8 @@ io.on('connection', (socket) => {
     const bp = botProfiles.get(streamerId);
     const botVideoUrl = bp ? bp.botVideoUrl : null;
     const viewerCount = getViewerCount(streamerId);
+    // Join this streamer's chat room
+    joinStreamRoom(socket, streamerId);
     socket.emit('public-stream-ready', { streamerId, streamerName, streamerIndex: idx, botVideoUrl, viewerCount });
     io.emit('public-stream-update', { streamers: getPublicStreamersList() });
     if (!botVideoUrl) {
@@ -2113,6 +2274,8 @@ io.on('connection', (socket) => {
     const streamerId = publicStreamers[nextIdx];
     const streamerName = getSocketDisplayName(streamerId);
     const viewerCount = getViewerCount(streamerId);
+    // Join new streamer's chat room
+    joinStreamRoom(socket, streamerId);
     socket.emit('public-stream-ready', { streamerId, streamerName, streamerIndex: nextIdx, viewerCount });
     io.emit('public-stream-update', { streamers: getPublicStreamersList() });
     const streamerSocket = io.sockets.sockets.get(streamerId);
@@ -2136,6 +2299,8 @@ io.on('connection', (socket) => {
         streamerSocket.emit('public-stream-viewer-left', { viewerId: socket.id });
       }
     }
+    // Leave stream chat room
+    leaveAllStreamRooms(socket);
     viewerStreamIndex.delete(socket.id);
     io.emit('public-stream-update', { streamers: getPublicStreamersList() });
   });
@@ -2502,19 +2667,25 @@ io.on('connection', (socket) => {
     socketToUserId.delete(socket.id);
 
     // Clean up public stream state
+    leaveAllStreamRooms(socket);
     const streamerIdx = publicStreamers.indexOf(socket.id);
     if (streamerIdx !== -1) {
       publicStreamers.splice(streamerIdx, 1);
-      // Notify viewers who were watching this streamer
+      // Notify viewers who were watching this streamer and leave their stream rooms
       for (const [viewerId, viewerIdx] of viewerStreamIndex.entries()) {
         if (viewerIdx === streamerIdx) {
           viewerStreamIndex.delete(viewerId);
           const viewerSocket = io.sockets.sockets.get(viewerId);
-          if (viewerSocket) viewerSocket.emit('public-stream-ended');
+          if (viewerSocket) {
+            leaveAllStreamRooms(viewerSocket);
+            viewerSocket.emit('public-stream-ended');
+          }
         } else if (viewerIdx > streamerIdx) {
           viewerStreamIndex.set(viewerId, viewerIdx - 1);
         }
       }
+      // Clean up chat history for this streamer
+      streamChatEvents.delete(socket.id);
       io.emit('public-stream-update', { streamers: getPublicStreamersList() });
     }
     viewerStreamIndex.delete(socket.id);
