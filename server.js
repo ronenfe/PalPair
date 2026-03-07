@@ -874,6 +874,7 @@ const streamChatEvents = new Map(); // streamerId → [{id, type, text, ...}] pe
 // ── Public Stream ──
 const publicStreamers = []; // ordered list of socket IDs currently streaming
 const viewerStreamIndex = new Map(); // viewerSocketId → index in publicStreamers they're watching
+const streamerThumbnails = new Map(); // streamerId → base64 JPEG thumbnail
 
 // ── Virtual Coins / Tips ──
 const userBalances = new Map(); // userId → coin balance
@@ -980,7 +981,8 @@ function getPublicStreamersList() {
       socketId: id,
       name: getSocketDisplayName(id),
       viewerCount: getViewerCount(id),
-      botVideoUrl: bp ? bp.botVideoUrl : null
+      botVideoUrl: bp ? bp.botVideoUrl : null,
+      thumbnail: streamerThumbnails.get(id) || null
     };
   });
 }
@@ -2161,6 +2163,15 @@ io.on('connection', (socket) => {
     emitPublicOnlineUsers();
   });
 
+  // ── Streamer sends a thumbnail capture of their webcam ──
+  socket.on('stream-thumbnail', ({ data } = {}) => {
+    if (!data || typeof data !== 'string') return;
+    if (!publicStreamers.includes(socket.id)) return;
+    // Limit size (~100KB max base64)
+    if (data.length > 150000) return;
+    streamerThumbnails.set(socket.id, data);
+  });
+
   socket.on('stop-public-stream', () => {
     const idx = publicStreamers.indexOf(socket.id);
     if (idx === -1) return;
@@ -2183,8 +2194,9 @@ io.on('connection', (socket) => {
         viewerStreamIndex.set(viewerId, viewerIdx - 1);
       }
     }
-    // Clean up chat history for this streamer
+    // Clean up chat history and thumbnail for this streamer
     streamChatEvents.delete(socket.id);
+    streamerThumbnails.delete(socket.id);
   });
 
   socket.on('watch-public-stream', ({ streamerIndex } = {}) => {
@@ -2684,8 +2696,9 @@ io.on('connection', (socket) => {
           viewerStreamIndex.set(viewerId, viewerIdx - 1);
         }
       }
-      // Clean up chat history for this streamer
+      // Clean up chat history and thumbnail for this streamer
       streamChatEvents.delete(socket.id);
+      streamerThumbnails.delete(socket.id);
       io.emit('public-stream-update', { streamers: getPublicStreamersList() });
     }
     viewerStreamIndex.delete(socket.id);

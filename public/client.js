@@ -128,7 +128,17 @@ const streamersGrid = document.getElementById('streamersGrid');
 const streamersCards = document.getElementById('streamersCards');
 const streamersCountEl = document.getElementById('streamersCount');
 const noStreamersMsg = document.getElementById('noStreamersMsg');
+const collapseGridBtn = document.getElementById('collapseGridBtn');
 let lastKnownStreamers = [];
+
+// Collapse / expand streamers grid
+if (collapseGridBtn && streamersCards) {
+  collapseGridBtn.addEventListener('click', () => {
+    const collapsed = streamersCards.classList.toggle('collapsed');
+    collapseGridBtn.classList.toggle('collapsed', collapsed);
+    collapseGridBtn.title = collapsed ? 'Expand' : 'Collapse';
+  });
+}
 
 // Online users panel toggle
 if (usersToggleBtn && onlineUsersPanel) {
@@ -1002,6 +1012,8 @@ if (flipCameraBtnLive) {
   };
 }
 
+let thumbnailInterval = null;
+
 async function startPublicStream() {
   try {
     publicStreamLocalStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: useFrontCamera ? 'user' : 'environment' }, audio: true });
@@ -1019,6 +1031,8 @@ async function startPublicStream() {
     const shareBtn = document.getElementById('shareStreamBtn');
     if (shareBtn) shareBtn.style.display = 'inline-flex';
     socket.emit('start-public-stream');
+    // Start periodic thumbnail capture
+    startThumbnailCapture();
   } catch (e) {
     console.error('Failed to start public stream:', e);
   }
@@ -1031,6 +1045,8 @@ function stopPublicStream() {
   if (flipCameraBtnLive) flipCameraBtnLive.style.display = 'none';
   const shareBtn = document.getElementById('shareStreamBtn');
   if (shareBtn) shareBtn.style.display = 'none';
+  // Stop thumbnail capture
+  stopThumbnailCapture();
   socket.emit('stop-public-stream');
   // Close all viewer peer connections
   for (const [viewerId, viewerPC] of publicStreamPCs) {
@@ -1046,6 +1062,39 @@ function stopPublicStream() {
   if (!currentWatchingStreamerId) {
     if (publicStreamArea) publicStreamArea.style.display = 'none';
     if (publicStreamVideo) publicStreamVideo.srcObject = null;
+  }
+}
+
+function startThumbnailCapture() {
+  stopThumbnailCapture();
+  // Capture immediately, then every 5 seconds
+  captureThumbnail();
+  thumbnailInterval = setInterval(captureThumbnail, 5000);
+}
+
+function stopThumbnailCapture() {
+  if (thumbnailInterval) {
+    clearInterval(thumbnailInterval);
+    thumbnailInterval = null;
+  }
+}
+
+function captureThumbnail() {
+  if (!publicStreamVideo || !isStreaming) return;
+  const video = publicStreamVideo;
+  if (!video.videoWidth || !video.videoHeight) return;
+  try {
+    const canvas = document.createElement('canvas');
+    // Small thumbnail: 160px wide, keep aspect ratio
+    const scale = 160 / video.videoWidth;
+    canvas.width = 160;
+    canvas.height = Math.round(video.videoHeight * scale);
+    const ctx = canvas.getContext('2d');
+    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+    const dataUrl = canvas.toDataURL('image/jpeg', 0.6);
+    socket.emit('stream-thumbnail', { data: dataUrl });
+  } catch (e) {
+    // Canvas tainted or other error — ignore
   }
 }
 
@@ -1241,10 +1290,19 @@ function renderStreamersGrid(streamers) {
       card.classList.add('watching');
     }
     
-    // Build card background: video preview for bots, gradient + emoji for real streamers
+    // Build card background: video preview for bots, thumbnail/gradient for real streamers
     if (streamer.botVideoUrl) {
       card.innerHTML = `
         <video class="streamer-card-video" src="${streamer.botVideoUrl}" muted playsinline loop autoplay></video>
+        <span class="streamer-card-live">LIVE</span>
+        <div class="streamer-card-overlay">
+          <div class="streamer-card-name">${escapeHtml(streamer.name || 'Unknown')}</div>
+          <div class="streamer-card-viewers">👁 ${streamer.viewerCount || 0}</div>
+        </div>
+      `;
+    } else if (streamer.thumbnail) {
+      card.innerHTML = `
+        <img class="streamer-card-video" src="${streamer.thumbnail}" alt="${escapeHtml(streamer.name || '')}" />
         <span class="streamer-card-live">LIVE</span>
         <div class="streamer-card-overlay">
           <div class="streamer-card-name">${escapeHtml(streamer.name || 'Unknown')}</div>

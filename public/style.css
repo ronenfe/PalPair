@@ -1591,6 +1591,39 @@ body.chat-active:not(.random-active) .chat-container {
   padding: 12px 4px 8px;
 }
 
+.streamers-header-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.collapse-grid-btn {
+  background: rgba(255, 255, 255, 0.08);
+  border: none;
+  color: #CAC4D0;
+  font-size: 13px;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.2s, transform 0.3s;
+}
+
+.collapse-grid-btn:hover {
+  background: rgba(255, 255, 255, 0.14);
+}
+
+.collapse-grid-btn.collapsed {
+  transform: rotate(180deg);
+}
+
+.streamers-cards.collapsed {
+  display: none;
+}
+
 .streamers-grid-title {
   font-size: 16px;
   font-weight: 700;
