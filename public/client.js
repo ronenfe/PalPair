@@ -1282,7 +1282,12 @@ if (hideStreamBtn) {
       currentWatchingStreamerId = null;
       if (publicStreamViewerPC) { publicStreamViewerPC.close(); publicStreamViewerPC = null; }
     }
-    if (publicStreamVideo) publicStreamVideo.srcObject = null;
+    if (publicStreamVideo) {
+      publicStreamVideo.pause();
+      publicStreamVideo.srcObject = null;
+      publicStreamVideo.removeAttribute('src');
+      publicStreamVideo.load();
+    }
   });
 }
 
