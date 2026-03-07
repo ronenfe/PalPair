@@ -459,8 +459,8 @@
             <button id="buyCoinsBtn" class="buy-coins-btn" title="Buy coins">+</button>
             <button id="cashoutBtn" class="cashout-btn" title="Cash out">💸</button>
           </div>
-          <button id="goLiveBtn" class="go-live-btn" aria-label="Go live">📡 Go Live</button>
-          <button id="goRandomBtn" class="go-random-btn" aria-label="Go random">🎥 Go Random</button>
+          <button id="goLiveBtn" class="go-live-btn" data-i18n="goLive" aria-label="Go live">📡 Go Live</button>
+          <button id="goRandomBtn" class="go-random-btn" data-i18n="goRandom" aria-label="Go random">🎥 Go Random</button>
         </header>
 
         <!-- Public chat view -->
@@ -468,12 +468,12 @@
           <!-- Public Stream Area -->
           <div id="publicStreamArea" class="public-stream-area" style="display:none;">
             <div class="public-stream-header">
-              <span class="stream-live-badge">🔴 LIVE</span>
+              <span class="stream-live-badge">🔴 <span data-i18n="streamLive">LIVE</span></span>
               <span id="publicStreamName" class="stream-name">—</span>
               <span id="publicStreamViewerCount" class="stream-viewer-count">👁 0</span>
               <button id="shareStreamBtn" class="share-stream-btn" title="Share stream QR" style="display:none;">📲</button>
               <button id="fullscreenStreamBtn" class="fullscreen-stream-btn" title="Fullscreen">⛶</button>
-              <button id="nextStreamerBtn" class="next-streamer-btn" title="Next streamer">⏭ Next</button>
+              <button id="nextStreamerBtn" class="next-streamer-btn" data-i18n="nextStreamer" title="Next streamer">⏭ Next</button>
               <button id="hideStreamBtn" class="hide-stream-btn" title="Hide stream">✕</button>
             </div>
             <video id="publicStreamVideo" class="public-stream-video" autoplay playsinline></video>

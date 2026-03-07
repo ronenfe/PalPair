@@ -983,7 +983,7 @@ async function startPublicStream() {
   try {
     publicStreamLocalStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: useFrontCamera ? 'user' : 'environment' }, audio: true });
     isStreaming = true;
-    goLiveBtn.textContent = '⏹ Stop Live';
+    goLiveBtn.textContent = translate('stopLive');
     goLiveBtn.classList.add('is-live');
     // Show own stream
     if (publicStreamArea) publicStreamArea.style.display = 'flex';
@@ -1003,7 +1003,7 @@ async function startPublicStream() {
 
 function stopPublicStream() {
   isStreaming = false;
-  goLiveBtn.textContent = '📡 Go Live';
+  goLiveBtn.textContent = translate('goLive');
   goLiveBtn.classList.remove('is-live');
   if (flipCameraBtnLive) flipCameraBtnLive.style.display = 'none';
   const shareBtn = document.getElementById('shareStreamBtn');
