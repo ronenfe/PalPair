@@ -454,6 +454,59 @@
 
       <!-- Main Chat Interface (hidden until profile is saved) -->
       <div id="chatInterface" style="display:none">
+
+        <!-- ── TikTok-style Live Feed ── -->
+        <div id="ttFeed" class="tt-feed" style="display:none;" aria-label="Live feed">
+          <!-- Slide backgrounds (swiped vertically) -->
+          <div id="ttSlideContainer" class="tt-slide-container"></div>
+
+          <!-- Empty state -->
+          <div id="ttEmpty" class="tt-empty" style="display:none;">
+            <div class="tt-empty-icon">📡</div>
+            <p>No one is live right now</p>
+            <p class="tt-empty-sub">Be the first to go live!</p>
+          </div>
+
+          <!-- Overlay UI (always on top) -->
+          <div class="tt-overlay">
+            <!-- Top bar -->
+            <div class="tt-topbar">
+              <span class="tt-live-badge">🔴 LIVE</span>
+              <span id="ttOverlayName" class="tt-name"></span>
+              <span id="ttOverlayViewers" class="tt-viewers"></span>
+              <div class="tt-topbar-actions">
+                <button id="ttGoLiveBtn" class="tt-icon-btn" title="Go Live">📡 Go Live</button>
+                <button id="ttRandomBtn" class="tt-icon-btn" title="Random chat">🎲</button>
+                <div class="coin-balance tt-coins" id="ttCoinBalance" title="Your coins">🪙 <span id="ttCoinCount">0</span></div>
+              </div>
+            </div>
+
+            <!-- Navigation arrows (desktop) -->
+            <button id="ttPrevBtn" class="tt-nav-btn tt-prev" title="Previous streamer">▲</button>
+            <button id="ttNextBtn" class="tt-nav-btn tt-next" title="Next streamer">▼</button>
+
+            <!-- Slide indicator dots -->
+            <div id="ttDots" class="tt-dots"></div>
+
+            <!-- Bottom: chat + tips + input -->
+            <div class="tt-bottom">
+              <div id="ttChat" class="tt-chat-messages"></div>
+              <div class="tt-tip-row">
+                <button class="tip-btn" data-amount="50">🪙 50</button>
+                <button class="tip-btn" data-amount="100">🪙 100</button>
+                <button class="tip-btn" data-amount="500">🪙 500</button>
+                <button class="tip-btn" data-amount="1000">🪙 1K</button>
+                <button class="tip-btn" data-amount="5000">🚀 5K</button>
+              </div>
+              <div class="tt-input-row">
+                <input id="ttInput" type="text" placeholder="Say something..." maxlength="250" />
+                <button id="ttSendBtn">Send</button>
+              </div>
+            </div>
+          </div>
+        </div>
+        <!-- /TikTok Feed -->
+
         <header class="chat-header">
           <div class="coin-balance" id="coinBalance" title="Your coins">🪙 <span id="coinCount">0</span>
             <button id="buyCoinsBtn" class="buy-coins-btn" title="Buy coins">+</button>

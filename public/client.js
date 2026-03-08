@@ -287,6 +287,7 @@ saveProfileBtn.addEventListener('click', () => {
   chatInterface.style.display = 'flex';
   document.body.classList.add('chat-active');
   setRandomMode(false);
+  enterTtMode();
   chatInput.disabled = false;
   sendBtn.disabled = false;
   status(translate('statusPublicRoom'));
@@ -338,6 +339,7 @@ function setChatCollapsed(collapsed) {
 
 function setRandomMode(active) {
   isRunning = active;
+  if (active) exitTtMode(); else enterTtMode();
   document.body.classList.toggle('random-active', active);
 
   // Switch between public chat interface and private chat interface
@@ -1151,6 +1153,8 @@ async function startPublicStream() {
     isStreaming = true;
     goLiveBtn.textContent = translate('stopLive');
     goLiveBtn.classList.add('is-live');
+    const ttGoLiveBtnEl = document.getElementById('ttGoLiveBtn');
+    if (ttGoLiveBtnEl) ttGoLiveBtnEl.textContent = translate('stopLive');
     // Show own stream
     if (publicStreamArea) publicStreamArea.style.display = 'flex';
     if (publicStreamVideo) {
@@ -1173,6 +1177,8 @@ function stopPublicStream() {
   isStreaming = false;
   goLiveBtn.textContent = translate('goLive');
   goLiveBtn.classList.remove('is-live');
+  const ttGoLiveBtnEl = document.getElementById('ttGoLiveBtn');
+  if (ttGoLiveBtnEl) ttGoLiveBtnEl.textContent = translate('goLive');
   if (flipCameraBtnLive) flipCameraBtnLive.style.display = 'none';
   const shareBtn = document.getElementById('shareStreamBtn');
   if (shareBtn) shareBtn.style.display = 'none';
@@ -1194,6 +1200,7 @@ function stopPublicStream() {
     if (publicStreamArea) publicStreamArea.style.display = 'none';
     if (publicStreamVideo) publicStreamVideo.srcObject = null;
   }
+  if (!isRunning) enterTtMode();
 }
 
 function startThumbnailCapture() {
@@ -1391,6 +1398,7 @@ socket.on('public-stream-update', ({ streamers }) => {
   }
   // Render the streamers discovery grid
   renderStreamersGrid(streamers);
+  renderTikTokFeed(streamers);
   // If not currently watching and not streaming, and there are streamers, auto-watch first
   // Skip auto-watch if we have a pending watch-by-id request in flight
   if (!isStreaming && !currentWatchingStreamerId && !streamHiddenByUser && !pendingWatchByIdActive && streamers.length > 0) {
@@ -1840,8 +1848,311 @@ if (cashoutSubmitBtn) {
 }
 
 // ═══════════════════════════════════
+//  TikTok-style Live Feed
+// ═══════════════════════════════════
+
+const ttFeed          = document.getElementById('ttFeed');
+const ttSlideContainer= document.getElementById('ttSlideContainer');
+const ttEmptyEl       = document.getElementById('ttEmpty');
+const ttOverlayName   = document.getElementById('ttOverlayName');
+const ttOverlayViewers= document.getElementById('ttOverlayViewers');
+const ttChatEl        = document.getElementById('ttChat');
+const ttInputEl       = document.getElementById('ttInput');
+const ttSendBtnEl     = document.getElementById('ttSendBtn');
+const ttPrevBtnEl     = document.getElementById('ttPrevBtn');
+const ttNextBtnEl     = document.getElementById('ttNextBtn');
+const ttDotsEl        = document.getElementById('ttDots');
+const ttCoinCountEl   = document.getElementById('ttCoinCount');
+
+let ttStreamers    = [];
+let ttIndex        = 0;
+let ttSlideEls     = [];
+let ttFeedH        = window.innerHeight;
+let ttDragStartY   = 0;
+let ttDragDeltaY   = 0;
+let ttIsDragging   = false;
+let ttChatObserver = null;
+let ttActive       = false;
+
+function ttUpdatePos(animated, delta = 0) {
+  if (!ttSlideContainer) return;
+  ttFeedH = (ttFeed && ttFeed.clientHeight) || window.innerHeight;
+  const y = -ttIndex * ttFeedH + delta;
+  ttSlideContainer.style.transition = animated
+    ? 'transform 0.32s cubic-bezier(.4,0,.2,1)'
+    : 'none';
+  ttSlideContainer.style.transform = `translateY(${y}px)`;
+}
+
+function ttUpdateDots() {
+  if (!ttDotsEl) return;
+  ttDotsEl.innerHTML = '';
+  // Only show dots if ≤12 streamers (otherwise too many)
+  if (ttStreamers.length > 1 && ttStreamers.length <= 12) {
+    ttStreamers.forEach((_, i) => {
+      const dot = document.createElement('div');
+      dot.className = 'tt-dot' + (i === ttIndex ? ' active' : '');
+      ttDotsEl.appendChild(dot);
+    });
+  }
+}
+
+function ttUpdateOverlay(streamer) {
+  if (!streamer) return;
+  if (ttOverlayName)    ttOverlayName.textContent    = streamer.name || '—';
+  if (ttOverlayViewers) ttOverlayViewers.textContent = `👁 ${streamer.viewerCount || 0}`;
+}
+
+function ttGoTo(index, animated = true) {
+  if (!ttStreamers.length) return;
+  const prev = ttIndex;
+  ttIndex = Math.max(0, Math.min(ttStreamers.length - 1, index));
+
+  // Pause bot video in previous slide if it wasn't changed
+  const prevSlide = ttSlideEls[prev];
+  if (prevSlide) {
+    const v = prevSlide.querySelector('video');
+    if (v && v.src) v.pause();
+  }
+
+  ttUpdatePos(animated);
+  ttUpdateDots();
+
+  const streamer = ttStreamers[ttIndex];
+  if (!streamer) return;
+  ttUpdateOverlay(streamer);
+
+  // Play bot video in new active slide
+  const nextSlide = ttSlideEls[ttIndex];
+  if (nextSlide) {
+    const v = nextSlide.querySelector('video');
+    if (v && v.src) v.play().catch(() => {});
+  }
+
+  // Watch the new streamer
+  if (ttIndex !== prev || !currentWatchingStreamerId) {
+    streamHiddenByUser = false;
+    // Clear old stream video
+    if (publicStreamArea) publicStreamArea.classList.remove('tt-stream-live');
+    if (publicStreamVideo) {
+      publicStreamVideo.srcObject = null;
+      publicStreamVideo.removeAttribute('src');
+      publicStreamVideo.load();
+    }
+    socket.emit('watch-public-stream-by-id', { streamerId: streamer.socketId });
+  }
+}
+
+function renderTikTokFeed(streamers) {
+  if (!ttFeed || !ttSlideContainer) return;
+  ttStreamers = streamers || [];
+
+  if (ttStreamers.length === 0) {
+    if (ttEmptyEl) ttEmptyEl.style.display = 'flex';
+    ttSlideContainer.innerHTML = '';
+    ttSlideEls = [];
+    if (ttOverlayName)    ttOverlayName.textContent    = '';
+    if (ttOverlayViewers) ttOverlayViewers.textContent = '';
+    ttUpdateDots();
+    return;
+  }
+  if (ttEmptyEl) ttEmptyEl.style.display = 'none';
+
+  ttFeedH = (ttFeed && ttFeed.clientHeight) || window.innerHeight;
+
+  // Keep current streamer in view if it's still in list
+  if (currentWatchingStreamerId) {
+    const newIdx = ttStreamers.findIndex(s => s.socketId === currentWatchingStreamerId);
+    if (newIdx !== -1) ttIndex = newIdx;
+  }
+  if (ttIndex >= ttStreamers.length) ttIndex = ttStreamers.length - 1;
+
+  // Rebuild slides
+  ttSlideContainer.innerHTML = '';
+  ttSlideEls = [];
+
+  ttStreamers.forEach((streamer, i) => {
+    const slide = document.createElement('div');
+    slide.className = 'tt-slide';
+    slide.style.height = ttFeedH + 'px';
+    slide.dataset.id = streamer.socketId;
+
+    if (streamer.botVideoUrl) {
+      const vid = document.createElement('video');
+      vid.className = 'tt-slide-video';
+      vid.src = streamer.botVideoUrl;
+      vid.muted = true;
+      vid.loop  = true;
+      vid.setAttribute('playsinline', '');
+      if (i === ttIndex) vid.autoplay = true;
+      slide.appendChild(vid);
+    } else if (streamer.thumbnail) {
+      const img = document.createElement('img');
+      img.className = 'tt-slide-video';
+      img.src = streamer.thumbnail;
+      img.alt = streamer.name || '';
+      slide.appendChild(img);
+    } else {
+      const ph = document.createElement('div');
+      ph.className = 'tt-slide-placeholder';
+      ph.textContent = '📷';
+      slide.appendChild(ph);
+    }
+
+    ttSlideContainer.appendChild(slide);
+    ttSlideEls.push(slide);
+  });
+
+  ttUpdatePos(false);
+  ttUpdateDots();
+  ttUpdateOverlay(ttStreamers[ttIndex]);
+  startTtChatMirror();
+
+  // Play active slide's bot video
+  const activeSlide = ttSlideEls[ttIndex];
+  if (activeSlide) {
+    const v = activeSlide.querySelector('video');
+    if (v && v.src) v.play().catch(() => {});
+  }
+}
+
+function startTtChatMirror() {
+  if (ttChatObserver) { ttChatObserver.disconnect(); ttChatObserver = null; }
+  const src = document.getElementById('chatMessages');
+  if (!src || !ttChatEl) return;
+  ttChatObserver = new MutationObserver(() => mirrorTtChat());
+  ttChatObserver.observe(src, { childList: true });
+  mirrorTtChat();
+}
+
+function mirrorTtChat() {
+  if (!ttChatEl) return;
+  const src = document.getElementById('chatMessages');
+  if (!src) return;
+  const msgs = src.querySelectorAll('.chat-message');
+  ttChatEl.innerHTML = '';
+  const start = Math.max(0, msgs.length - 25);
+  for (let i = start; i < msgs.length; i++) {
+    ttChatEl.appendChild(msgs[i].cloneNode(true));
+  }
+  ttChatEl.scrollTop = ttChatEl.scrollHeight;
+}
+
+function enterTtMode() {
+  if (!ttFeed) return;
+  ttActive = true;
+  ttFeed.style.display = 'flex';
+  document.body.classList.add('tt-mode');
+  // Sync coin balance display
+  if (ttCoinCountEl && coinCountEl) ttCoinCountEl.textContent = coinCountEl.textContent;
+}
+
+function exitTtMode() {
+  if (!ttFeed) return;
+  ttActive = false;
+  ttFeed.style.display = 'none';
+  document.body.classList.remove('tt-mode');
+}
+
+// ── Drag / Swipe gesture ──
+function onTtStart(y) {
+  if (!ttActive || isStreaming) return;
+  ttIsDragging = true;
+  ttDragStartY = y;
+  ttDragDeltaY = 0;
+  if (ttSlideContainer) ttSlideContainer.style.transition = 'none';
+}
+function onTtMove(y) {
+  if (!ttIsDragging) return;
+  ttDragDeltaY = y - ttDragStartY;
+  ttUpdatePos(false, ttDragDeltaY);
+}
+function onTtEnd() {
+  if (!ttIsDragging) return;
+  ttIsDragging = false;
+  ttFeedH = (ttFeed && ttFeed.clientHeight) || window.innerHeight;
+  const threshold = ttFeedH * 0.22;
+  if (ttDragDeltaY < -threshold)       ttGoTo(ttIndex + 1);
+  else if (ttDragDeltaY > threshold)   ttGoTo(ttIndex - 1);
+  else                                  ttUpdatePos(true);
+  ttDragDeltaY = 0;
+}
+
+if (ttFeed) {
+  // Touch
+  ttFeed.addEventListener('touchstart', e => { if (e.touches.length === 1) onTtStart(e.touches[0].clientY); }, { passive: true });
+  ttFeed.addEventListener('touchmove',  e => { if (e.touches.length === 1) { e.preventDefault(); onTtMove(e.touches[0].clientY); } }, { passive: false });
+  ttFeed.addEventListener('touchend',   onTtEnd, { passive: true });
+
+  // Mouse (desktop)
+  ttFeed.addEventListener('mousedown', e => { if (!e.target.closest('.tt-overlay')) onTtStart(e.clientY); });
+  window.addEventListener('mousemove', e => { if (ttIsDragging) onTtMove(e.clientY); });
+  window.addEventListener('mouseup',   () => { if (ttIsDragging) onTtEnd(); });
+
+  // Nav buttons
+  if (ttPrevBtnEl) ttPrevBtnEl.addEventListener('click', () => ttGoTo(ttIndex - 1));
+  if (ttNextBtnEl) ttNextBtnEl.addEventListener('click', () => ttGoTo(ttIndex + 1));
+
+  // Chat send
+  function sendTtChat() {
+    if (!ttInputEl) return;
+    const text = ttInputEl.value.trim();
+    if (!text || !currentWatchingStreamerId) return;
+    const clientMsgId = `msg_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+    pendingPublicMessageIds.add(clientMsgId);
+    addChatMessage(text, 'local');
+    socket.emit('public-chat-message', { text, clientMsgId });
+    ttInputEl.value = '';
+  }
+  if (ttSendBtnEl) ttSendBtnEl.addEventListener('click', sendTtChat);
+  if (ttInputEl)   ttInputEl.addEventListener('keypress', e => { if (e.key === 'Enter') sendTtChat(); });
+
+  // Go Live / Random buttons inside TikTok feed
+  const ttGoLiveEl  = document.getElementById('ttGoLiveBtn');
+  const ttRandomEl  = document.getElementById('ttRandomBtn');
+  if (ttGoLiveEl)  ttGoLiveEl.addEventListener('click',  () => { if (goLiveBtn) goLiveBtn.click(); });
+  if (ttRandomEl)  ttRandomEl.addEventListener('click',  () => { if (goRandomBtn) goRandomBtn.click(); });
+
+  // Resize: update slide heights
+  window.addEventListener('resize', () => {
+    ttFeedH = (ttFeed && ttFeed.clientHeight) || window.innerHeight;
+    ttSlideEls.forEach(s => { s.style.height = ttFeedH + 'px'; });
+    ttUpdatePos(false);
+  });
+
+  // Tip buttons inside TikTok feed — reuse existing tip-btn logic
+  ttFeed.querySelectorAll('.tip-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const amount = parseInt(btn.dataset.amount, 10);
+      if (!amount || !currentWatchingStreamerId) return;
+      socket.emit('send-tip', { streamerId: currentWatchingStreamerId, amount });
+    });
+  });
+}
+
+// ── Mark stream as live when video is actually playing ──
+if (publicStreamVideo) {
+  publicStreamVideo.addEventListener('playing', () => {
+    if (ttActive && publicStreamArea) publicStreamArea.classList.add('tt-stream-live');
+  });
+  publicStreamVideo.addEventListener('pause', () => {
+    if (publicStreamArea) publicStreamArea.classList.remove('tt-stream-live');
+  });
+  publicStreamVideo.addEventListener('emptied', () => {
+    if (publicStreamArea) publicStreamArea.classList.remove('tt-stream-live');
+  });
+}
+
+// Sync coin balance into TikTok overlay
+const _origCoinBalance = socket.listeners ? null : null;
+socket.on('coin-balance', () => {
+  if (ttCoinCountEl && coinCountEl) ttCoinCountEl.textContent = coinCountEl.textContent;
+});
+
+// ═══════════════════════════════════
 //  Fullscreen Stream
 // ═══════════════════════════════════
+
 
 const fullscreenStreamBtn = document.getElementById('fullscreenStreamBtn');
 const fullscreenChat = document.getElementById('fullscreenChat');
