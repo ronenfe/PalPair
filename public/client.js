@@ -1155,7 +1155,7 @@ async function startPublicStream() {
     goLiveBtn.classList.add('is-live');
     const ttGoLiveBtnEl = document.getElementById('ttGoLiveBtn');
     if (ttGoLiveBtnEl) ttGoLiveBtnEl.textContent = translate('stopLive');
-    // Show own stream
+    // Show own stream fullscreen (in tt-mode this covers the slide layer)
     if (publicStreamArea) publicStreamArea.style.display = 'flex';
     if (publicStreamVideo) {
       publicStreamVideo.srcObject = publicStreamLocalStream;
@@ -1163,6 +1163,20 @@ async function startPublicStream() {
     }
     if (publicStreamName) publicStreamName.textContent = 'You (Live)';
     if (flipCameraBtnLive) flipCameraBtnLive.style.display = 'flex';
+    // In TikTok mode: show camera in the dedicated self-view element and pause slide videos
+    if (ttActive) {
+      const ttSelfVideo = document.getElementById('ttSelfVideo');
+      if (ttSelfVideo) {
+        ttSelfVideo.srcObject = publicStreamLocalStream;
+        ttSelfVideo.style.display = '';
+      }
+      if (ttOverlayName) ttOverlayName.textContent = 'You (Live)';
+      if (ttOverlayViewers) ttOverlayViewers.textContent = '🔴 LIVE';
+      ttSlideEls.forEach(slide => {
+        const v = slide.querySelector('video');
+        if (v) v.pause();
+      });
+    }
     const shareBtn = document.getElementById('shareStreamBtn');
     if (shareBtn) shareBtn.style.display = 'inline-flex';
     socket.emit('start-public-stream');
@@ -1199,6 +1213,19 @@ function stopPublicStream() {
   if (!currentWatchingStreamerId) {
     if (publicStreamArea) publicStreamArea.style.display = 'none';
     if (publicStreamVideo) publicStreamVideo.srcObject = null;
+  }
+  // In TikTok mode: remove fullscreen live overlay and resume current slide video
+  if (ttActive) {
+    const ttSelfVideo = document.getElementById('ttSelfVideo');
+    if (ttSelfVideo) { ttSelfVideo.style.display = 'none'; ttSelfVideo.srcObject = null; }
+    if (publicStreamArea) publicStreamArea.classList.remove('tt-stream-live');
+    const curSlide = ttSlideEls[ttIndex];
+    if (curSlide) {
+      const v = curSlide.querySelector('video');
+      if (v && v.src) v.play().catch(() => {});
+    }
+    // Reset overlay to current streamer info
+    ttUpdateOverlay(ttStreamers[ttIndex]);
   }
   if (!isRunning) enterTtMode();
 }
@@ -1922,9 +1949,9 @@ function ttGoTo(index, animated = true) {
   if (!streamer) return;
   ttUpdateOverlay(streamer);
 
-  // Play bot video in new active slide
+  // Play bot video in new active slide (only when not broadcasting)
   const nextSlide = ttSlideEls[ttIndex];
-  if (nextSlide) {
+  if (nextSlide && !isStreaming) {
     const v = nextSlide.querySelector('video');
     if (v && v.src) v.play().catch(() => {});
   }
@@ -1984,7 +2011,7 @@ function renderTikTokFeed(streamers) {
       vid.muted = true;
       vid.loop  = true;
       vid.setAttribute('playsinline', '');
-      if (i === ttIndex) vid.autoplay = true;
+      if (i === ttIndex && !isStreaming) vid.autoplay = true;
       slide.appendChild(vid);
     } else if (streamer.thumbnail) {
       const img = document.createElement('img');
@@ -2008,9 +2035,9 @@ function renderTikTokFeed(streamers) {
   ttUpdateOverlay(ttStreamers[ttIndex]);
   startTtChatMirror();
 
-  // Play active slide's bot video
+  // Play active slide's bot video (not while user is live)
   const activeSlide = ttSlideEls[ttIndex];
-  if (activeSlide) {
+  if (activeSlide && !isStreaming) {
     const v = activeSlide.querySelector('video');
     if (v && v.src) v.play().catch(() => {});
   }

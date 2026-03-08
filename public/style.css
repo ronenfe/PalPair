@@ -2928,6 +2928,16 @@ body.tt-mode .chat-input-wrap {
 }
 .tt-input-row button:hover { background: #e68900; }
 
+/* Self-view when user is live */
+.tt-self-video {
+  position: absolute;
+  inset: 0;
+  z-index: 501;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
 /* Empty state */
 .tt-empty {
   position: absolute;
