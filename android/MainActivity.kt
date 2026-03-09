@@ -61,6 +61,31 @@ class MainActivity : AppCompatActivity() {
             cacheMode = WebSettings.LOAD_NO_CACHE
         }
 
+        // Inject CSS to suppress native play-button overlay on all video elements
+        webView.webViewClient = object : WebViewClient() {
+            override fun onPageFinished(view: WebView?, url: String?) {
+                val poster = "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7"
+                view?.evaluateJavascript(
+                    """(function(){
+                        var POSTER = '$poster';
+                        // Add poster to all existing video elements
+                        document.querySelectorAll('video').forEach(function(v){
+                            if (!v.getAttribute('poster')) v.setAttribute('poster', POSTER);
+                        });
+                        // Patch createElement so every future <video> also gets a poster
+                        var _orig = document.createElement.bind(document);
+                        document.createElement = function(tag) {
+                            var el = _orig(tag);
+                            if (typeof tag === 'string' && tag.toLowerCase() === 'video') {
+                                el.setAttribute('poster', POSTER);
+                            }
+                            return el;
+                        };
+                    })()""", null
+                )
+            }
+        }
+
         // Handle camera/mic permission requests from the web page
         webView.webChromeClient = object : WebChromeClient() {
             override fun onPermissionRequest(request: PermissionRequest?) {

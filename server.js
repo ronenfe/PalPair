@@ -140,12 +140,18 @@ app.use((req, res, next) => {
 });
 
 app.use(express.static(path.join(__dirname, 'public'), {
-  etag: false,
-  lastModified: false,
-  setHeaders: (res) => {
-    res.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
-    res.set('Pragma', 'no-cache');
-    res.set('Expires', '0');
+  etag: true,
+  lastModified: true,
+  setHeaders: (res, filePath) => {
+    if (filePath.endsWith('.mp4') || filePath.endsWith('.webm') || filePath.endsWith('.ogg')) {
+      // Allow browsers to cache video files for 1 hour and support byte-range requests
+      res.set('Cache-Control', 'public, max-age=3600');
+      res.set('Accept-Ranges', 'bytes');
+    } else {
+      res.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+      res.set('Pragma', 'no-cache');
+      res.set('Expires', '0');
+    }
   }
 }));
 
@@ -1014,6 +1020,21 @@ function triggerAllBotStreams() {
     }
   }
   if (added > 0) {
+    io.emit('public-stream-update', { streamers: getPublicStreamersList() });
+    emitPublicOnlineUsers();
+  }
+}
+
+function hasRealStreamers() {
+  return publicStreamers.some(id => !botProfiles.has(id));
+}
+
+function removeBotStreams() {
+  const before = publicStreamers.length;
+  for (let i = publicStreamers.length - 1; i >= 0; i--) {
+    if (botProfiles.has(publicStreamers[i])) publicStreamers.splice(i, 1);
+  }
+  if (publicStreamers.length !== before) {
     io.emit('public-stream-update', { streamers: getPublicStreamersList() });
     emitPublicOnlineUsers();
   }
@@ -2220,6 +2241,8 @@ io.on('connection', (socket) => {
     publicStreamers.push(socket.id);
     const streamerName = getSocketDisplayName(socket.id);
     console.log(`>>> ${socket.id} started public stream (${streamerName})`);
+    // Remove bots while a real user is live
+    removeBotStreams();
     // Notify all clients that a new streamer is available
     io.emit('public-stream-update', { streamers: getPublicStreamersList() });
     emitPublicOnlineUsers();
@@ -2259,6 +2282,10 @@ io.on('connection', (socket) => {
     // Clean up chat history and thumbnail for this streamer
     streamChatEvents.delete(socket.id);
     streamerThumbnails.delete(socket.id);
+    // If no real users left, restore bots
+    if (!hasRealStreamers()) {
+      setTimeout(() => triggerAllBotStreams(), 500);
+    }
   });
 
   socket.on('watch-public-stream', ({ streamerIndex } = {}) => {
@@ -2762,6 +2789,10 @@ io.on('connection', (socket) => {
       streamChatEvents.delete(socket.id);
       streamerThumbnails.delete(socket.id);
       io.emit('public-stream-update', { streamers: getPublicStreamersList() });
+      // If no real users left, restore bots
+      if (!hasRealStreamers()) {
+        setTimeout(() => triggerAllBotStreams(), 500);
+      }
     }
     viewerStreamIndex.delete(socket.id);
     io.emit('public-stream-update', { streamers: getPublicStreamersList() });

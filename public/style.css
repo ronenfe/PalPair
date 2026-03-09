@@ -39,6 +39,10 @@
   box-sizing: border-box;
 }
 
+video {
+  background: #000;
+}
+
 :root {
   --app-height: 95vh;
   --stage-side-gap: 12px;
@@ -456,6 +460,31 @@ body.chat-active .videos .video-wrap:nth-child(2) {
   display: block;
   object-fit: cover;
   object-position: center top;
+}
+
+/* Hide the browser's native gray play circle overlay */
+.video-wrap video::-webkit-media-controls,
+.video-wrap video::-webkit-media-controls-overlay-play-button,
+.video-wrap video::-webkit-media-controls-panel,
+.video-wrap video::-webkit-media-controls-play-button,
+.tt-slide-video::-webkit-media-controls,
+.tt-slide-video::-webkit-media-controls-overlay-play-button,
+.tt-slide-video::-webkit-media-controls-panel,
+.tt-slide-video::-webkit-media-controls-play-button,
+.tt-self-video::-webkit-media-controls,
+.tt-self-video::-webkit-media-controls-overlay-play-button,
+.tt-self-video::-webkit-media-controls-panel,
+.tt-self-video::-webkit-media-controls-play-button,
+.streamer-card-video::-webkit-media-controls,
+.streamer-card-video::-webkit-media-controls-overlay-play-button,
+.streamer-card-video::-webkit-media-controls-panel,
+.streamer-card-video::-webkit-media-controls-play-button,
+.public-stream-video::-webkit-media-controls,
+.public-stream-video::-webkit-media-controls-overlay-play-button,
+.public-stream-video::-webkit-media-controls-panel,
+.public-stream-video::-webkit-media-controls-play-button {
+  display: none !important;
+  -webkit-appearance: none;
 }
 
 #remoteVideo {
@@ -2927,6 +2956,11 @@ body.tt-mode .chat-input-wrap {
   transition: background .15s;
 }
 .tt-input-row button:hover { background: #e68900; }
+
+.tt-mute-btn.muted {
+  background: rgba(220,50,50,0.85);
+  outline: 2px solid #ff4444;
+}
 
 /* Self-view when user is live */
 .tt-self-video {

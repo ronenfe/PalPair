@@ -461,7 +461,10 @@
           <div id="ttSlideContainer" class="tt-slide-container"></div>
 
           <!-- Self-view when broadcasting live -->
-          <video id="ttSelfVideo" class="tt-self-video" autoplay playsinline muted style="display:none;"></video>
+          <video id="ttSelfVideo" class="tt-self-video" autoplay playsinline muted style="display:none;" poster="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7"></video>
+
+          <!-- Incoming real-user stream when watching -->
+          <video id="ttStreamVideo" class="tt-self-video" autoplay playsinline style="display:none;" poster="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7"></video>
 
           <!-- Empty state -->
           <div id="ttEmpty" class="tt-empty" style="display:none;">
@@ -478,6 +481,7 @@
               <span id="ttOverlayName" class="tt-name"></span>
               <span id="ttOverlayViewers" class="tt-viewers"></span>
               <div class="tt-topbar-actions">
+                <button id="ttMuteMicBtn" class="tt-icon-btn tt-mute-btn" title="Mute mic" style="display:none;">🎙️</button>
                 <button id="ttGoLiveBtn" class="tt-icon-btn" title="Go Live">📡 Go Live</button>
                 <button id="ttRandomBtn" class="tt-icon-btn" title="Random chat">🎲</button>
                 <div class="coin-balance tt-coins" id="ttCoinBalance" title="Your coins">🪙 <span id="ttCoinCount">0</span></div>
@@ -550,7 +554,7 @@
               <button id="fullscreenStreamBtn" class="fullscreen-stream-btn" title="Fullscreen">⛶</button>
               <button id="hideStreamBtn" class="hide-stream-btn" title="Hide stream">✕</button>
             </div>
-            <video id="publicStreamVideo" class="public-stream-video" autoplay playsinline></video>
+            <video id="publicStreamVideo" class="public-stream-video" autoplay playsinline poster="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7"></video>
             <button id="flipCameraBtnLive" class="flip-camera-btn" aria-label="Flip camera" title="Flip Camera" style="display:none;">🔄</button>
             <div class="stream-tip-bar">
               <button class="tip-btn" data-amount="50">🪙 50</button>
@@ -614,11 +618,11 @@
         <section id="privateChatSection" class="chat-view">
           <div class="videos">
             <div class="video-wrap">
-              <video id="localVideo" autoplay muted playsinline></video>
+              <video id="localVideo" autoplay muted playsinline poster="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7"></video>
               <button id="flipCameraBtn" class="flip-camera-btn" aria-label="Flip camera" title="Flip Camera">🔄</button>
             </div>
             <div class="video-wrap">
-              <video id="remoteVideo" autoplay playsinline></video>
+              <video id="remoteVideo" autoplay playsinline poster="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7"></video>
               <div id="remotePlaceholder" class="video-placeholder"></div>
             </div>
           </div>

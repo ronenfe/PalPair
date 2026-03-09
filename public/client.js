@@ -1218,6 +1218,10 @@ function stopPublicStream() {
   if (ttActive) {
     const ttSelfVideo = document.getElementById('ttSelfVideo');
     if (ttSelfVideo) { ttSelfVideo.style.display = 'none'; ttSelfVideo.srcObject = null; }
+    // Hide mute button and restore mic
+    const ttMuteMicBtn = document.getElementById('ttMuteMicBtn');
+    if (ttMuteMicBtn) ttMuteMicBtn.style.display = 'none';
+    if (publicStreamLocalStream) publicStreamLocalStream.getAudioTracks().forEach(t => t.enabled = true);
     if (publicStreamArea) publicStreamArea.classList.remove('tt-stream-live');
     const curSlide = ttSlideEls[ttIndex];
     if (curSlide) {
@@ -1305,6 +1309,11 @@ socket.on('public-stream-ready', ({ streamerId, streamerName, streamerIndex, bot
     socket.emit('stop-watching-public-stream');
     return;
   }
+  // Don't become a viewer while broadcasting — ignore inbound stream-ready
+  if (isStreaming) {
+    socket.emit('stop-watching-public-stream');
+    return;
+  }
   // Close existing viewer PC
   if (publicStreamViewerPC) {
     publicStreamViewerPC.close();
@@ -1345,6 +1354,14 @@ socket.on('public-stream-ready', ({ streamerId, streamerName, streamerIndex, bot
       publicStreamVideo.srcObject = e.streams[0];
       if (!isStreaming) publicStreamVideo.muted = false;
     }
+    // In TikTok mode: show stream in the dedicated in-feed element (escapes stacking context)
+    if (ttActive) {
+      const ttStreamVideo = document.getElementById('ttStreamVideo');
+      if (ttStreamVideo) {
+        ttStreamVideo.srcObject = e.streams[0];
+        ttStreamVideo.style.display = '';
+      }
+    }
   };
 });
 
@@ -1360,6 +1377,9 @@ socket.on('public-stream-ended', () => {
     publicStreamViewerPC.close();
     publicStreamViewerPC = null;
   }
+  // Clear TikTok in-feed stream video
+  const ttStreamVideo = document.getElementById('ttStreamVideo');
+  if (ttStreamVideo) { ttStreamVideo.style.display = 'none'; ttStreamVideo.srcObject = null; }
   // Clear room users and close panel
   renderOnlineUsers([]);
   if (onlineUsersPanel) onlineUsersPanel.classList.remove('open');
@@ -1462,7 +1482,7 @@ function renderStreamersGrid(streamers) {
     // Build card background: video preview for bots, thumbnail/gradient for real streamers
     if (streamer.botVideoUrl) {
       card.innerHTML = `
-        <video class="streamer-card-video" src="${streamer.botVideoUrl}" muted playsinline loop autoplay></video>
+        <video class="streamer-card-video" src="${streamer.botVideoUrl}" muted playsinline loop autoplay poster="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7"></video>
         <span class="streamer-card-live">LIVE</span>
         <div class="streamer-card-overlay">
           <div class="streamer-card-name">${escapeHtml(streamer.name || 'Unknown')}</div>
@@ -1950,15 +1970,14 @@ function ttGoTo(index, animated = true) {
   ttUpdateOverlay(streamer);
 
   // Play bot video in new active slide (only when not broadcasting)
-  const nextSlide = ttSlideEls[ttIndex];
-  if (nextSlide && !isStreaming) {
-    const v = nextSlide.querySelector('video');
-    if (v && v.src) v.play().catch(() => {});
-  }
+  ttLoadAdjacentVideos(ttIndex);
 
-  // Watch the new streamer
-  if (ttIndex !== prev || !currentWatchingStreamerId) {
+  // Watch the new streamer (never while broadcasting — would compete for bandwidth)
+  if (!isStreaming && (ttIndex !== prev || !currentWatchingStreamerId)) {
     streamHiddenByUser = false;
+    // Hide incoming stream video when switching slides
+    const ttStreamVideo = document.getElementById('ttStreamVideo');
+    if (ttStreamVideo) { ttStreamVideo.style.display = 'none'; ttStreamVideo.srcObject = null; }
     // Clear old stream video
     if (publicStreamArea) publicStreamArea.classList.remove('tt-stream-live');
     if (publicStreamVideo) {
@@ -2007,11 +2026,12 @@ function renderTikTokFeed(streamers) {
     if (streamer.botVideoUrl) {
       const vid = document.createElement('video');
       vid.className = 'tt-slide-video';
-      vid.src = streamer.botVideoUrl;
+      vid.dataset.src = streamer.botVideoUrl; // lazy — src set only when nearby
       vid.muted = true;
       vid.loop  = true;
+      vid.preload = 'none';
       vid.setAttribute('playsinline', '');
-      if (i === ttIndex && !isStreaming) vid.autoplay = true;
+      vid.setAttribute('poster', 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7');
       slide.appendChild(vid);
     } else if (streamer.thumbnail) {
       const img = document.createElement('img');
@@ -2034,13 +2054,31 @@ function renderTikTokFeed(streamers) {
   ttUpdateDots();
   ttUpdateOverlay(ttStreamers[ttIndex]);
   startTtChatMirror();
+  ttLoadAdjacentVideos(ttIndex);
+}
 
-  // Play active slide's bot video (not while user is live)
-  const activeSlide = ttSlideEls[ttIndex];
-  if (activeSlide && !isStreaming) {
-    const v = activeSlide.querySelector('video');
-    if (v && v.src) v.play().catch(() => {});
-  }
+// Load src only for current slide and its immediate neighbours; unload the rest
+function ttLoadAdjacentVideos(index) {
+  ttSlideEls.forEach((slide, i) => {
+    const v = slide.querySelector('video[data-src]');
+    if (!v) return;
+    const nearby = Math.abs(i - index) <= 1;
+    if (nearby) {
+      if (!v.src || v.src !== v.dataset.src) {
+        v.style.display = 'block';
+        v.src = v.dataset.src;
+        v.load();
+      }
+      if (i === index && !isStreaming) v.play().catch(() => {});
+      else v.pause();
+    } else {
+      // Unload to free bandwidth/memory
+      v.pause();
+      v.removeAttribute('src');
+      v.load();
+      v.style.display = 'none';
+    }
+  });
 }
 
 function startTtChatMirror() {
@@ -2134,11 +2172,22 @@ if (ttFeed) {
   if (ttSendBtnEl) ttSendBtnEl.addEventListener('click', sendTtChat);
   if (ttInputEl)   ttInputEl.addEventListener('keypress', e => { if (e.key === 'Enter') sendTtChat(); });
 
-  // Go Live / Random buttons inside TikTok feed
+  // Go Live / Random / Mute buttons inside TikTok feed
   const ttGoLiveEl  = document.getElementById('ttGoLiveBtn');
   const ttRandomEl  = document.getElementById('ttRandomBtn');
+  const ttMuteMicEl = document.getElementById('ttMuteMicBtn');
   if (ttGoLiveEl)  ttGoLiveEl.addEventListener('click',  () => { if (goLiveBtn) goLiveBtn.click(); });
   if (ttRandomEl)  ttRandomEl.addEventListener('click',  () => { if (goRandomBtn) goRandomBtn.click(); });
+  if (ttMuteMicEl) ttMuteMicEl.addEventListener('click', () => {
+    if (!publicStreamLocalStream) return;
+    const audioTrack = publicStreamLocalStream.getAudioTracks()[0];
+    if (!audioTrack) return;
+    audioTrack.enabled = !audioTrack.enabled;
+    const muted = !audioTrack.enabled;
+    ttMuteMicEl.textContent = muted ? '🔇' : '🎙️';
+    ttMuteMicEl.classList.toggle('muted', muted);
+    ttMuteMicEl.title = muted ? 'Unmute mic' : 'Mute mic';
+  });
 
   // Resize: update slide heights
   window.addEventListener('resize', () => {
