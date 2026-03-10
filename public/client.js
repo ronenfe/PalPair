@@ -1605,6 +1605,12 @@ let paypalClientId = null;
 const isNativeApp = !!(window.FlashLiveApp || window.PalpairApp);
 
 // Open modal
+const ttCoinBalanceEl = document.getElementById('ttCoinBalance');
+if (ttCoinBalanceEl) {
+  ttCoinBalanceEl.style.cursor = 'pointer';
+  ttCoinBalanceEl.addEventListener('click', () => { if (buyCoinsBtn) buyCoinsBtn.click(); });
+}
+
 if (buyCoinsBtn) {
   buyCoinsBtn.addEventListener('click', async () => {
     buyCoinsModal.style.display = 'flex';
