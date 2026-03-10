@@ -2220,9 +2220,22 @@ if (ttChatEl) {
 
 if (ttFeed) {
   // Touch
-  ttFeed.addEventListener('touchstart', e => { if (e.touches.length === 1) onTtStart(e.touches[0].clientY); }, { passive: true });
-  ttFeed.addEventListener('touchmove',  e => { if (e.touches.length === 1) { e.preventDefault(); onTtMove(e.touches[0].clientY); } }, { passive: false });
-  ttFeed.addEventListener('touchend',   onTtEnd, { passive: true });
+  ttFeed.addEventListener('touchstart', e => {
+    if (e.touches.length !== 1) return;
+    // Don't start a slide-drag from scrollable child elements
+    if (e.target.closest('.tt-tip-row') || e.target.closest('.tt-chat-messages')) return;
+    onTtStart(e.touches[0].clientY);
+  }, { passive: true });
+  ttFeed.addEventListener('touchmove', e => {
+    if (e.touches.length !== 1) return;
+    // Allow native horizontal scroll inside the tip row
+    if (e.target.closest('.tt-tip-row')) return;
+    // Allow the chat's own drag handler to run
+    if (e.target.closest('.tt-chat-messages')) return;
+    e.preventDefault();
+    onTtMove(e.touches[0].clientY);
+  }, { passive: false });
+  ttFeed.addEventListener('touchend', onTtEnd, { passive: true });
 
   // Mouse (desktop)
   ttFeed.addEventListener('mousedown', e => { if (!e.target.closest('.tt-overlay')) onTtStart(e.clientY); });

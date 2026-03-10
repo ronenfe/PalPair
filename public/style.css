@@ -2911,7 +2911,6 @@ body.tt-mode .chat-input-wrap {
   flex-wrap: nowrap;
   overflow-x: auto;
   scrollbar-width: none;
-  padding-right: 14px; /* prevent last button clipping against parent padding */
 }
 .tt-tip-row::-webkit-scrollbar { display: none; }
 .tt-tip-row .tip-btn {
@@ -2926,6 +2925,11 @@ body.tt-mode .chat-input-wrap {
   backdrop-filter: blur(4px);
   -webkit-backdrop-filter: blur(4px);
   transition: background .15s;
+}
+.tt-tip-row::after {
+  content: '';
+  flex-shrink: 0;
+  width: 14px; /* spacer so last button isn't clipped by parent padding */
 }
 .tt-tip-row .tip-btn:hover { background: rgba(255,255,255,.3); }
 
