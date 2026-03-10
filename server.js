@@ -373,6 +373,69 @@ function initVirtualBots() {
   }
 }
 
+// ── Partner Room: Suki ──
+// Suki always appears as the first stream slot.  When she is offline the slot
+// plays suki.mp4 (bot).  When she logs in and goes live the bot slot is hidden
+// and her real socket takes the first position instead.
+const SUKI_BOT_ID = 'partner-suki';
+const SUKI_CREDENTIALS = { name: 'suki', age: 28, gender: 'female', country: 'CN' };
+let sukiLiveSocketId = null; // set while Suki is broadcasting live
+
+function isSukiSocket(socket) {
+  const p = userProfiles.get(socket.id)?.profile || {};
+  return (
+    String(p.name || '').toLowerCase().trim() === 'suki' &&
+    (Number(p.age) === 28) &&
+    String(p.gender || '').toLowerCase() === 'female' &&
+    String(p.country || '').toUpperCase() === 'CN'
+  );
+}
+
+function initSukiSlot() {
+  bots.add(SUKI_BOT_ID);
+  botProfiles.set(SUKI_BOT_ID, {
+    name: 'Suki',
+    fullName: 'Suki',
+    age: 28,
+    gender: 'female',
+    country: 'CN',
+    countryName: 'China',
+    botVideoUrl: '/videos/suki.mp4',
+    isSukiSlot: true
+  });
+  userProfiles.set(SUKI_BOT_ID, {
+    profile: { name: 'Suki', age: 28, gender: 'female', country: 'CN' },
+    filters: { minAge: 18, maxAge: 100, gender: 'any', country: 'any' }
+  });
+  // Insert at position 0 so Suki is always the first stream
+  if (!publicStreamers.includes(SUKI_BOT_ID)) {
+    publicStreamers.unshift(SUKI_BOT_ID);
+  }
+  console.log('>>> Suki partner slot initialised (showing suki.mp4)');
+}
+
+function sukiGoLive(socketId) {
+  if (sukiLiveSocketId === socketId) return;
+  sukiLiveSocketId = socketId;
+  // Remove the offline bot slot and put Suki's real socket at position 0
+  const botIdx = publicStreamers.indexOf(SUKI_BOT_ID);
+  if (botIdx !== -1) publicStreamers.splice(botIdx, 1);
+  if (!publicStreamers.includes(socketId)) publicStreamers.unshift(socketId);
+  io.emit('public-stream-update', { streamers: getPublicStreamersList() });
+  console.log(`>>> Suki is now LIVE (${socketId})`);
+}
+
+function sukiGoOffline() {
+  if (!sukiLiveSocketId) return;
+  const liveIdx = publicStreamers.indexOf(sukiLiveSocketId);
+  if (liveIdx !== -1) publicStreamers.splice(liveIdx, 1);
+  sukiLiveSocketId = null;
+  // Restore the offline bot slot at position 0
+  if (!publicStreamers.includes(SUKI_BOT_ID)) publicStreamers.unshift(SUKI_BOT_ID);
+  io.emit('public-stream-update', { streamers: getPublicStreamersList() });
+  console.log('>>> Suki went offline — restoring suki.mp4 slot');
+}
+
 function getPersonaByBotId(botId) {
   const idx = Number(botId) - 1;
   if (Number.isInteger(idx) && idx >= 0 && idx < botPersonas.length) {
@@ -1026,12 +1089,15 @@ function triggerAllBotStreams() {
 }
 
 function hasRealStreamers() {
-  return publicStreamers.some(id => !botProfiles.has(id));
+  // Suki's offline bot slot doesn't count as a "real" streamer
+  return publicStreamers.some(id => !botProfiles.has(id) && id !== SUKI_BOT_ID);
 }
 
 function removeBotStreams() {
   const before = publicStreamers.length;
   for (let i = publicStreamers.length - 1; i >= 0; i--) {
+    // Never remove Suki's offline slot — it stays unless she goes live herself
+    if (publicStreamers[i] === SUKI_BOT_ID) continue;
     if (botProfiles.has(publicStreamers[i])) publicStreamers.splice(i, 1);
   }
   if (publicStreamers.length !== before) {
@@ -1976,16 +2042,18 @@ function cleanupStaleEntries() {
     }
   }
   
-  // Clean up userProfiles for disconnected users
+  // Clean up userProfiles for disconnected users (skip virtual bot IDs)
   for (const key of userProfiles.keys()) {
+    if (virtualBotIds.includes(key) || key === SUKI_BOT_ID) continue;
     if (!connectedSockets.has(key)) {
       userProfiles.delete(key);
       cleaned++;
     }
   }
   
-  // Clean up searching for disconnected users
+  // Clean up searching for disconnected users (skip virtual bot IDs)
   for (const key of searching.keys()) {
+    if (virtualBotIds.includes(key) || key === SUKI_BOT_ID) continue;
     if (!connectedSockets.has(key)) {
       searching.delete(key);
       cleaned++;
@@ -2244,11 +2312,18 @@ io.on('connection', (socket) => {
   // ── Public Stream handlers ──
   socket.on('start-public-stream', () => {
     if (publicStreamers.includes(socket.id)) return; // already streaming
+
+    // If this is Suki going live, use the dedicated partner-room logic
+    if (isSukiSocket(socket)) {
+      sukiGoLive(socket.id);
+      emitPublicOnlineUsers();
+      return;
+    }
+
     publicStreamers.push(socket.id);
     const streamerName = getSocketDisplayName(socket.id);
     console.log(`>>> ${socket.id} started public stream (${streamerName})`);
-    // Remove bots while a real user is live
-    removeBotStreams();
+    // Real streamers get their own slot alongside bots/Suki — don't remove bots
     // Notify all clients that a new streamer is available
     io.emit('public-stream-update', { streamers: getPublicStreamersList() });
     emitPublicOnlineUsers();
@@ -2264,6 +2339,15 @@ io.on('connection', (socket) => {
   });
 
   socket.on('stop-public-stream', () => {
+    // If Suki stops broadcasting, restore her offline slot
+    if (socket.id === sukiLiveSocketId) {
+      sukiGoOffline();
+      streamChatEvents.delete(socket.id);
+      streamerThumbnails.delete(socket.id);
+      emitPublicOnlineUsers();
+      return;
+    }
+
     const idx = publicStreamers.indexOf(socket.id);
     if (idx === -1) return;
     publicStreamers.splice(idx, 1);
@@ -2295,6 +2379,7 @@ io.on('connection', (socket) => {
   });
 
   socket.on('watch-public-stream', ({ streamerIndex } = {}) => {
+    if (!socket.data.publicRoomJoined) return; // must have set profile first
     // Viewer wants to watch a specific streamer by index
     const idx = typeof streamerIndex === 'number' ? streamerIndex : 0;
     if (idx < 0 || idx >= publicStreamers.length) {
@@ -2333,6 +2418,7 @@ io.on('connection', (socket) => {
 
   // ── Watch specific streamer by socket ID (QR / share link) ──
   socket.on('watch-public-stream-by-id', ({ streamerId } = {}) => {
+    if (!socket.data.publicRoomJoined) return; // must have set profile first
     if (!streamerId) { socket.emit('public-stream-ended'); return; }
     const idx = publicStreamers.indexOf(streamerId);
     if (idx === -1) { socket.emit('public-stream-ended'); return; }
@@ -2775,6 +2861,14 @@ io.on('connection', (socket) => {
 
     // Clean up public stream state
     leaveAllStreamRooms(socket);
+
+    // If Suki disconnects while live, restore her offline bot slot
+    if (socket.id === sukiLiveSocketId) {
+      sukiGoOffline();
+      streamChatEvents.delete(socket.id);
+      streamerThumbnails.delete(socket.id);
+    }
+
     const streamerIdx = publicStreamers.indexOf(socket.id);
     if (streamerIdx !== -1) {
       publicStreamers.splice(streamerIdx, 1);
@@ -2803,7 +2897,7 @@ io.on('connection', (socket) => {
     viewerStreamIndex.delete(socket.id);
     io.emit('public-stream-update', { streamers: getPublicStreamersList() });
 
-    if (wasInPublicRoom) {
+    if (wasInPublicRoom && publicRoomName && publicRoomName !== 'Guest') {
       pushPublicRoomEvent(buildPublicRoomEvent({
         type: 'system',
         text: `${publicRoomName} left the public room`
@@ -2837,6 +2931,8 @@ server.listen(PORT, '0.0.0.0', () => {
   
   // Initialize virtual bots (no Puppeteer needed)
   initVirtualBots();
+  // Initialize Suki's partner slot (always first, shows suki.mp4 when offline)
+  initSukiSlot();
 
   // Clean up when server stops
   process.on('SIGINT', () => {
