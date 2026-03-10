@@ -2177,7 +2177,7 @@ io.on('connection', (socket) => {
       }));
       maybeEmitBotReplyToHumanPublicMessage(socket.id, safeText);
     } else {
-      // Fallback: global public room (legacy, e.g. if user hasn't watched a specific streamer)
+      // Fallback: global public room (user not watching any stream)
       pushPublicRoomEvent(buildPublicRoomEvent({
         type: 'message',
         text: safeText,

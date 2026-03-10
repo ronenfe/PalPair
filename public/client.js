@@ -1457,24 +1457,45 @@ socket.on('public-stream-update', ({ streamers }) => {
 
 function renderStreamersGrid(streamers) {
   if (!streamersCards || !streamersCountEl) return;
-  
+
   // Update count
   streamersCountEl.textContent = `${streamers.length} live`;
-  
-  // Clear existing cards (except the no-streamers message)
-  const existingCards = streamersCards.querySelectorAll('.streamer-card');
-  existingCards.forEach(c => c.remove());
-  
+
   if (streamers.length === 0) {
+    const existingCards = streamersCards.querySelectorAll('.streamer-card');
+    existingCards.forEach(c => c.remove());
     if (noStreamersMsg) noStreamersMsg.style.display = '';
     return;
   }
-  
+
   if (noStreamersMsg) noStreamersMsg.style.display = 'none';
-  
+
+  // If only viewer counts changed (same streamers, same URLs), update in-place
+  // to avoid restarting the preview videos in each card.
+  const existingCards = Array.from(streamersCards.querySelectorAll('.streamer-card'));
+  const structureUnchanged =
+    existingCards.length === streamers.length &&
+    streamers.every((s, i) => existingCards[i]?.dataset.streamerId === s.socketId);
+
+  if (structureUnchanged) {
+    streamers.forEach((streamer, i) => {
+      const viewersEl = existingCards[i].querySelector('.streamer-card-viewers');
+      if (viewersEl) viewersEl.textContent = `👁 ${streamer.viewerCount || 0}`;
+      if (streamer.socketId === currentWatchingStreamerId) {
+        existingCards[i].classList.add('watching');
+      } else {
+        existingCards[i].classList.remove('watching');
+      }
+    });
+    return;
+  }
+
+  // Full rebuild (streamer joined, left, or changed)
+  existingCards.forEach(c => c.remove());
   streamers.forEach((streamer) => {
     const card = document.createElement('div');
     card.className = 'streamer-card';
+    card.dataset.streamerId = streamer.socketId;
     if (streamer.socketId === currentWatchingStreamerId) {
       card.classList.add('watching');
     }
@@ -1918,12 +1939,12 @@ let ttFeedH        = window.innerHeight;
 let ttDragStartY   = 0;
 let ttDragDeltaY   = 0;
 let ttIsDragging   = false;
-let ttChatObserver = null;
-let ttActive       = false;
+let ttChatObserver    = null;
+let ttActive          = false;
+let ttChatUserScrolled = false; // true when user has scrolled up in chat
 
 function ttUpdatePos(animated, delta = 0) {
   if (!ttSlideContainer) return;
-  ttFeedH = (ttFeed && ttFeed.clientHeight) || window.innerHeight;
   const y = -ttIndex * ttFeedH + delta;
   ttSlideContainer.style.transition = animated
     ? 'transform 0.32s cubic-bezier(.4,0,.2,1)'
@@ -1991,9 +2012,10 @@ function ttGoTo(index, animated = true) {
 
 function renderTikTokFeed(streamers) {
   if (!ttFeed || !ttSlideContainer) return;
-  ttStreamers = streamers || [];
+  const newStreamers = streamers || [];
 
-  if (ttStreamers.length === 0) {
+  if (newStreamers.length === 0) {
+    ttStreamers = newStreamers;
     if (ttEmptyEl) ttEmptyEl.style.display = 'flex';
     ttSlideContainer.innerHTML = '';
     ttSlideEls = [];
@@ -2003,6 +2025,27 @@ function renderTikTokFeed(streamers) {
     return;
   }
   if (ttEmptyEl) ttEmptyEl.style.display = 'none';
+
+  // If only viewer counts changed (same streamers, same video URLs), skip full
+  // rebuild — a full rebuild destroys and re-creates <video> elements, causing
+  // every watching device to restart the stream from scratch.
+  const structureUnchanged =
+    newStreamers.length === ttStreamers.length &&
+    newStreamers.every((s, i) =>
+      ttStreamers[i] &&
+      s.socketId    === ttStreamers[i].socketId &&
+      s.botVideoUrl === ttStreamers[i].botVideoUrl &&
+      s.thumbnail   === ttStreamers[i].thumbnail
+    );
+
+  if (structureUnchanged && ttSlideEls.length > 0) {
+    // Only refresh viewer-count overlay and name, keep video playing
+    ttStreamers = newStreamers;
+    ttUpdateOverlay(ttStreamers[ttIndex]);
+    return;
+  }
+
+  ttStreamers = newStreamers;
 
   ttFeedH = (ttFeed && ttFeed.clientHeight) || window.innerHeight;
 
@@ -2100,7 +2143,7 @@ function mirrorTtChat() {
   for (let i = start; i < msgs.length; i++) {
     ttChatEl.appendChild(msgs[i].cloneNode(true));
   }
-  ttChatEl.scrollTop = ttChatEl.scrollHeight;
+  if (!ttChatUserScrolled) ttChatEl.scrollTop = ttChatEl.scrollHeight;
 }
 
 function enterTtMode() {
@@ -2135,12 +2178,66 @@ function onTtMove(y) {
 function onTtEnd() {
   if (!ttIsDragging) return;
   ttIsDragging = false;
-  ttFeedH = (ttFeed && ttFeed.clientHeight) || window.innerHeight;
   const threshold = ttFeedH * 0.22;
   if (ttDragDeltaY < -threshold)       ttGoTo(ttIndex + 1);
   else if (ttDragDeltaY > threshold)   ttGoTo(ttIndex - 1);
   else                                  ttUpdatePos(true);
   ttDragDeltaY = 0;
+}
+
+// ── TikTok chat drag-to-scroll ──
+if (ttChatEl) {
+  let chatDragStartY = 0;
+  let chatDragScrollTop = 0;
+  let chatDragging = false;
+
+  function chatAtBottom() {
+    return ttChatEl.scrollTop >= ttChatEl.scrollHeight - ttChatEl.clientHeight - 10;
+  }
+
+  // Touch
+  ttChatEl.addEventListener('touchstart', e => {
+    if (e.touches.length !== 1) return;
+    chatDragStartY = e.touches[0].clientY;
+    chatDragScrollTop = ttChatEl.scrollTop;
+    chatDragging = true;
+  }, { passive: true });
+
+  ttChatEl.addEventListener('touchmove', e => {
+    if (!chatDragging || e.touches.length !== 1) return;
+    e.stopPropagation(); // prevent TikTok slide-swipe
+    e.preventDefault();  // prevent page scroll
+    const dy = chatDragStartY - e.touches[0].clientY;
+    ttChatEl.scrollTop = chatDragScrollTop + dy;
+    ttChatUserScrolled = !chatAtBottom();
+  }, { passive: false });
+
+  ttChatEl.addEventListener('touchend', () => {
+    chatDragging = false;
+    ttChatUserScrolled = !chatAtBottom();
+  }, { passive: true });
+
+  // Mouse (desktop)
+  ttChatEl.addEventListener('mousedown', e => {
+    chatDragStartY = e.clientY;
+    chatDragScrollTop = ttChatEl.scrollTop;
+    chatDragging = true;
+    e.stopPropagation(); // prevent TikTok slide-swipe
+    e.preventDefault();
+  });
+
+  window.addEventListener('mousemove', e => {
+    if (!chatDragging) return;
+    const dy = chatDragStartY - e.clientY;
+    ttChatEl.scrollTop = chatDragScrollTop + dy;
+    ttChatUserScrolled = !chatAtBottom();
+  });
+
+  window.addEventListener('mouseup', () => {
+    if (!chatDragging) return;
+    chatDragging = false;
+    ttChatUserScrolled = !chatAtBottom();
+  });
 }
 
 if (ttFeed) {

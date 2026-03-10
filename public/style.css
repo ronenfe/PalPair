@@ -2882,10 +2882,12 @@ body.tt-mode .chat-input-wrap {
   display: flex;
   flex-direction: column;
   gap: 2px;
-  pointer-events: none;
+  pointer-events: auto;
+  cursor: grab;
   mask-image: linear-gradient(to bottom, transparent 0%, black 30%);
   -webkit-mask-image: linear-gradient(to bottom, transparent 0%, black 30%);
 }
+.tt-chat-messages:active { cursor: grabbing; }
 .tt-chat-messages .chat-message {
   background: none !important;
   backdrop-filter: none !important;
