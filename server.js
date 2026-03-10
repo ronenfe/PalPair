@@ -1239,12 +1239,15 @@ function joinStreamRoom(socket, streamerId) {
   // Send chat history for this room
   const history = streamChatEvents.get(streamerId) || [];
   socket.emit('stream-chat-init', { streamerId, events: history.slice(-100) });
-  // Notify room of new viewer
-  const displayName = getSocketDisplayName(socket.id);
-  pushStreamChatEvent(streamerId, buildPublicRoomEvent({
-    type: 'system',
-    text: `${displayName} joined`
-  }));
+  // Notify room of new viewer — use cached publicRoomName so we always have
+  // the real name even if userProfiles isn't set yet (race on reconnect).
+  const displayName = socket.data.publicRoomName || getSocketDisplayName(socket.id);
+  if (displayName && displayName !== 'Guest') {
+    pushStreamChatEvent(streamerId, buildPublicRoomEvent({
+      type: 'system',
+      text: `${displayName} joined`
+    }));
+  }
   emitStreamRoomUsers(streamerId);
 }
 
@@ -1254,12 +1257,15 @@ function leaveAllStreamRooms(socket) {
     const room = getStreamChatRoom(prevStreamerId);
     socket.leave(room);
     socket.data.currentStreamRoom = null;
-    // Notify old room
-    const displayName = getSocketDisplayName(socket.id);
-    pushStreamChatEvent(prevStreamerId, buildPublicRoomEvent({
-      type: 'system',
-      text: `${displayName} left`
-    }));
+    // Use socket.data.publicRoomName — userProfiles may already be deleted
+    // by the time this is called from the disconnect handler.
+    const displayName = socket.data.publicRoomName || getSocketDisplayName(socket.id);
+    if (displayName && displayName !== 'Guest') {
+      pushStreamChatEvent(prevStreamerId, buildPublicRoomEvent({
+        type: 'system',
+        text: `${displayName} left`
+      }));
+    }
     emitStreamRoomUsers(prevStreamerId);
   }
 }

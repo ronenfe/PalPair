@@ -203,6 +203,7 @@ let pendingWatchByIdActive = false;
 // User profile and filters
 let userProfile = null;
 let userFilters = null;
+let profileReady = false; // true only after user submits the login form
 
 // Load saved form values from localStorage
 function loadSavedFormValues() {
@@ -277,6 +278,7 @@ saveProfileBtn.addEventListener('click', () => {
 
   // Send profile to server
   socket.emit('set-profile', { profile: userProfile, filters: userFilters });
+  profileReady = true;
 
   // Show chat interface and hide profile view
   if (profileContainer) {
@@ -875,10 +877,8 @@ function addChatMessage(text, sender, target, serverTimestamp) {
   } else {
     targetDiv = (isRunning && otherId) ? privateChatMessages : chatMessages;
   }
-  targetDiv.appendChild(div);
 
   const messageText = String(text || '');
-  const shouldType = sender === 'remote' && messageText.length > 0;
 
   // Timestamp — use server timestamp if available, else current time
   const ts = serverTimestamp ? new Date(serverTimestamp) : new Date();
@@ -887,41 +887,19 @@ function addChatMessage(text, sender, target, serverTimestamp) {
   timeSpan.className = 'chat-timestamp';
   timeSpan.textContent = timeStr;
 
-  if (!shouldType) {
-    div.textContent = messageText;
-    div.appendChild(timeSpan);
-    // Update chat history buffer after content is set
-    if (targetDiv === chatMessages) {
-      publicChatHistory += div.outerHTML;
-    } else {
-      privateChatHistory += div.outerHTML;
-    }
-    targetDiv.scrollTop = targetDiv.scrollHeight;
-    return;
+  // Always set full content BEFORE appending to DOM.
+  // This prevents the MutationObserver (mirrorTtChat) from ever seeing an empty div.
+  div.textContent = messageText;
+  div.appendChild(timeSpan);
+  targetDiv.appendChild(div);
+
+  // Update chat history buffer
+  if (targetDiv === chatMessages) {
+    publicChatHistory += div.outerHTML;
+  } else {
+    privateChatHistory += div.outerHTML;
   }
-
-  const maxTypingDurationMs = 1400;
-  const perCharDelay = Math.max(12, Math.min(36, Math.floor(maxTypingDurationMs / messageText.length)));
-  let currentIndex = 0;
-
-  const step = () => {
-    currentIndex += 1;
-    div.textContent = messageText.slice(0, currentIndex);
-    div.appendChild(timeSpan);
-    targetDiv.scrollTop = targetDiv.scrollHeight;
-    // Update buffer for typing effect
-    if (targetDiv === chatMessages) {
-      publicChatHistory = targetDiv.innerHTML;
-    } else {
-      privateChatHistory = targetDiv.innerHTML;
-    }
-
-    if (currentIndex < messageText.length) {
-      setTimeout(step, perCharDelay);
-    }
-  };
-
-  setTimeout(step, 80);
+  requestAnimationFrame(() => { targetDiv.scrollTop = targetDiv.scrollHeight; });
 }
 
 function clearChat() {
@@ -1448,7 +1426,7 @@ socket.on('public-stream-update', ({ streamers }) => {
   renderTikTokFeed(streamers);
   // If not currently watching and not streaming, and there are streamers, auto-watch first
   // Skip auto-watch if we have a pending watch-by-id request in flight
-  if (!isStreaming && !currentWatchingStreamerId && !streamHiddenByUser && !pendingWatchByIdActive && streamers.length > 0) {
+  if (profileReady && !isStreaming && !currentWatchingStreamerId && !streamHiddenByUser && !pendingWatchByIdActive && streamers.length > 0) {
     socket.emit('watch-public-stream', { streamerIndex: 0 });
   }
   // If no streamers left, reset the hidden flag so next stream auto-shows

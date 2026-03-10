@@ -2911,6 +2911,7 @@ body.tt-mode .chat-input-wrap {
   flex-wrap: nowrap;
   overflow-x: auto;
   scrollbar-width: none;
+  padding-right: 14px; /* prevent last button clipping against parent padding */
 }
 .tt-tip-row::-webkit-scrollbar { display: none; }
 .tt-tip-row .tip-btn {
