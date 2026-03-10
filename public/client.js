@@ -1945,6 +1945,7 @@ let ttChatUserScrolled = false; // true when user has scrolled up in chat
 
 function ttUpdatePos(animated, delta = 0) {
   if (!ttSlideContainer) return;
+  ttFeedH = (ttFeed && ttFeed.clientHeight) || window.innerHeight;
   const y = -ttIndex * ttFeedH + delta;
   ttSlideContainer.style.transition = animated
     ? 'transform 0.32s cubic-bezier(.4,0,.2,1)'
@@ -2063,7 +2064,6 @@ function renderTikTokFeed(streamers) {
   ttStreamers.forEach((streamer, i) => {
     const slide = document.createElement('div');
     slide.className = 'tt-slide';
-    slide.style.height = ttFeedH + 'px';
     slide.dataset.id = streamer.socketId;
 
     if (streamer.botVideoUrl) {
@@ -2288,8 +2288,6 @@ if (ttFeed) {
 
   // Resize: update slide heights
   window.addEventListener('resize', () => {
-    ttFeedH = (ttFeed && ttFeed.clientHeight) || window.innerHeight;
-    ttSlideEls.forEach(s => { s.style.height = ttFeedH + 'px'; });
     ttUpdatePos(false);
   });
 
