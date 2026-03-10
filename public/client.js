@@ -1154,9 +1154,21 @@ async function startPublicStream() {
         const v = slide.querySelector('video');
         if (v) v.pause();
       });
+      // Snap TT feed to slide 0 (Suki's own slot) — isStreaming is already true
+      // so ttGoTo won't trigger watch-public-stream-by-id
+      ttGoTo(0, false);
+      // ttGoTo calls ttUpdateOverlay which overwrites our labels — restore them
+      if (ttOverlayName) ttOverlayName.textContent = 'You (Live)';
+      if (ttOverlayViewers) ttOverlayViewers.textContent = '🔴 LIVE';
     }
     const shareBtn = document.getElementById('shareStreamBtn');
     if (shareBtn) shareBtn.style.display = 'inline-flex';
+    // If we were watching someone else, close that connection before going live
+    if (publicStreamViewerPC) {
+      publicStreamViewerPC.close();
+      publicStreamViewerPC = null;
+    }
+    currentWatchingStreamerId = null;
     socket.emit('start-public-stream');
     // Start periodic thumbnail capture
     startThumbnailCapture();
