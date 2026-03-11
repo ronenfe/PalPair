@@ -620,6 +620,13 @@ body.chat-active .control-btn {
   background: rgba(0, 0, 0, 0.75);
 }
 
+.mute-mic-btn-live {
+  right: 48px;
+}
+.mute-mic-btn-live.muted {
+  background: rgba(220, 53, 69, 0.75);
+}
+
 .go-random-btn {
   position: relative;
   z-index: 10;
@@ -2878,6 +2885,8 @@ body.tt-mode .chat-input-wrap {
   display: flex;
   align-items: center;
   justify-content: center;
+  pointer-events: auto;
+  touch-action: manipulation;
 }
 .tt-nav-btn:hover { background: rgba(255,255,255,.35); }
 .tt-prev { top: 50%; transform: translateY(calc(-50% - 28px)); }

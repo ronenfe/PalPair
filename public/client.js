@@ -1133,6 +1133,21 @@ if (goLiveBtn) {
   };
 }
 
+// ── Mute Mic (live broadcast) ──
+const muteMicBtnLive = document.getElementById('muteMicBtnLive');
+if (muteMicBtnLive) {
+  muteMicBtnLive.onclick = () => {
+    if (!publicStreamLocalStream) return;
+    const audioTrack = publicStreamLocalStream.getAudioTracks()[0];
+    if (!audioTrack) return;
+    audioTrack.enabled = !audioTrack.enabled;
+    const muted = !audioTrack.enabled;
+    muteMicBtnLive.textContent = muted ? '🔇' : '🎙️';
+    muteMicBtnLive.classList.toggle('muted', muted);
+    muteMicBtnLive.title = muted ? 'Unmute mic' : 'Mute mic';
+  };
+}
+
 // ── Flip Camera (live broadcast) ──
 const flipCameraBtnLive = document.getElementById('flipCameraBtnLive');
 if (flipCameraBtnLive) {
@@ -1182,6 +1197,7 @@ async function startPublicStream() {
     }
     if (publicStreamName) publicStreamName.textContent = 'You (Live)';
     if (flipCameraBtnLive) flipCameraBtnLive.style.display = 'flex';
+    if (muteMicBtnLive) { muteMicBtnLive.style.display = 'flex'; muteMicBtnLive.textContent = '🎙️'; muteMicBtnLive.classList.remove('muted'); }
     // In TikTok mode: show camera in the dedicated self-view element and pause slide videos
     if (ttActive) {
       const ttSelfVideo = document.getElementById('ttSelfVideo');
@@ -1191,6 +1207,8 @@ async function startPublicStream() {
       }
       if (ttOverlayName) ttOverlayName.textContent = 'You (Live)';
       if (ttOverlayViewers) ttOverlayViewers.textContent = '🔴 LIVE';
+      const ttMuteMicBtnEl = document.getElementById('ttMuteMicBtn');
+      if (ttMuteMicBtnEl) { ttMuteMicBtnEl.style.display = 'flex'; ttMuteMicBtnEl.textContent = '🎙️'; ttMuteMicBtnEl.classList.remove('muted'); }
       ttSlideEls.forEach(slide => {
         const v = slide.querySelector('video');
         if (v) v.pause();
@@ -1199,10 +1217,8 @@ async function startPublicStream() {
     }
     const shareBtn = document.getElementById('shareStreamBtn');
     if (shareBtn) shareBtn.style.display = 'inline-flex';
-    // Hide nav arrows and disable random buttons while broadcasting
-    if (ttPrevBtnEl) ttPrevBtnEl.style.display = 'none';
-    if (ttNextBtnEl) ttNextBtnEl.style.display = 'none';
-    if (ttDotsEl) ttDotsEl.style.display = 'none';
+    // Hide nav arrows/dots and disable random buttons while broadcasting
+    ttUpdateDots();
     if (goRandomBtn) goRandomBtn.disabled = true;
     const ttRandomEl2 = document.getElementById('ttRandomBtn');
     if (ttRandomEl2) ttRandomEl2.disabled = true;
@@ -1227,12 +1243,11 @@ function stopPublicStream() {
   const ttGoLiveBtnEl = document.getElementById('ttGoLiveBtn');
   if (ttGoLiveBtnEl) ttGoLiveBtnEl.textContent = translate('goLive');
   if (flipCameraBtnLive) flipCameraBtnLive.style.display = 'none';
+  if (muteMicBtnLive) { muteMicBtnLive.style.display = 'none'; muteMicBtnLive.textContent = '🎙️'; muteMicBtnLive.classList.remove('muted'); }
   const shareBtn = document.getElementById('shareStreamBtn');
   if (shareBtn) shareBtn.style.display = 'none';
-  // Restore nav arrows and random buttons after broadcasting stops
-  if (ttPrevBtnEl) ttPrevBtnEl.style.display = '';
-  if (ttNextBtnEl) ttNextBtnEl.style.display = '';
-  if (ttDotsEl) ttDotsEl.style.display = '';
+  // Restore nav arrows/dots and random buttons after broadcasting stops
+  ttUpdateDots();
   if (goRandomBtn) goRandomBtn.disabled = false;
   const ttRandomEl2 = document.getElementById('ttRandomBtn');
   if (ttRandomEl2) ttRandomEl2.disabled = false;
@@ -2010,6 +2025,14 @@ function ttUpdatePos(animated, delta = 0) {
 
 function ttUpdateDots() {
   if (!ttDotsEl) return;
+  // Hide nav UI entirely while broadcasting
+  if (isStreaming) {
+    ttDotsEl.style.display = 'none';
+    if (ttPrevBtnEl) ttPrevBtnEl.style.display = 'none';
+    if (ttNextBtnEl) ttNextBtnEl.style.display = 'none';
+    return;
+  }
+  ttDotsEl.style.display = '';
   ttDotsEl.innerHTML = '';
   // Only show dots if ≤12 streamers (otherwise too many)
   if (ttStreamers.length > 1 && ttStreamers.length <= 12) {
@@ -2019,6 +2042,9 @@ function ttUpdateDots() {
       ttDotsEl.appendChild(dot);
     });
   }
+  // Show/hide nav arrows based on position
+  if (ttPrevBtnEl) ttPrevBtnEl.style.display = (ttIndex > 0) ? 'flex' : 'none';
+  if (ttNextBtnEl) ttNextBtnEl.style.display = (ttIndex < ttStreamers.length - 1) ? 'flex' : 'none';
 }
 
 function ttUpdateOverlay(streamer) {
@@ -2301,8 +2327,8 @@ if (ttFeed) {
   // Touch
   ttFeed.addEventListener('touchstart', e => {
     if (e.touches.length !== 1) return;
-    // Don't start a slide-drag from scrollable child elements
-    if (e.target.closest('.tt-tip-row') || e.target.closest('.tt-chat-messages')) return;
+    // Don't start a slide-drag from scrollable child elements or nav buttons
+    if (e.target.closest('.tt-tip-row') || e.target.closest('.tt-chat-messages') || e.target.closest('.tt-nav-btn')) return;
     onTtStart(e.touches[0].clientY);
   }, { passive: true });
   ttFeed.addEventListener('touchmove', e => {
@@ -2311,6 +2337,8 @@ if (ttFeed) {
     if (e.target.closest('.tt-tip-row')) return;
     // Allow the chat's own drag handler to run
     if (e.target.closest('.tt-chat-messages')) return;
+    // If drag didn't start (e.g. touch on a nav button), don't cancel the tap
+    if (!ttIsDragging) return;
     e.preventDefault();
     onTtMove(e.touches[0].clientY);
   }, { passive: false });
@@ -2321,9 +2349,17 @@ if (ttFeed) {
   window.addEventListener('mousemove', e => { if (ttIsDragging) onTtMove(e.clientY); });
   window.addEventListener('mouseup',   () => { if (ttIsDragging) onTtEnd(); });
 
-  // Nav buttons
-  if (ttPrevBtnEl) ttPrevBtnEl.addEventListener('click', () => ttGoTo(ttIndex - 1));
-  if (ttNextBtnEl) ttNextBtnEl.addEventListener('click', () => ttGoTo(ttIndex + 1));
+  // Nav buttons — click + direct touchend for reliable mobile behaviour
+  function ttPrevAction(e) { e.stopPropagation(); ttGoTo(ttIndex - 1); }
+  function ttNextAction(e) { e.stopPropagation(); ttGoTo(ttIndex + 1); }
+  if (ttPrevBtnEl) {
+    ttPrevBtnEl.addEventListener('click', ttPrevAction);
+    ttPrevBtnEl.addEventListener('touchend', e => { e.preventDefault(); ttPrevAction(e); }, { passive: false });
+  }
+  if (ttNextBtnEl) {
+    ttNextBtnEl.addEventListener('click', ttNextAction);
+    ttNextBtnEl.addEventListener('touchend', e => { e.preventDefault(); ttNextAction(e); }, { passive: false });
+  }
 
   // Chat send
   function sendTtChat() {
