@@ -1154,12 +1154,7 @@ async function startPublicStream() {
         const v = slide.querySelector('video');
         if (v) v.pause();
       });
-      // Snap TT feed to slide 0 (Suki's own slot) — isStreaming is already true
-      // so ttGoTo won't trigger watch-public-stream-by-id
-      ttGoTo(0, false);
-      // ttGoTo calls ttUpdateOverlay which overwrites our labels — restore them
-      if (ttOverlayName) ttOverlayName.textContent = 'You (Live)';
-      if (ttOverlayViewers) ttOverlayViewers.textContent = '🔴 LIVE';
+      // TT feed navigation to our own slot is handled by the isSelf public-stream-ready event from server
     }
     const shareBtn = document.getElementById('shareStreamBtn');
     if (shareBtn) shareBtn.style.display = 'inline-flex';
@@ -1293,7 +1288,17 @@ socket.on('public-stream-viewer-left', ({ viewerId }) => {
 });
 
 // ── Viewer: server tells us which streamer to connect to ──
-socket.on('public-stream-ready', ({ streamerId, streamerName, streamerIndex, botVideoUrl, viewerCount }) => {
+socket.on('public-stream-ready', ({ streamerId, streamerName, streamerIndex, botVideoUrl, viewerCount, isSelf }) => {
+  // Server confirmed our own stream is live — navigate TT feed to our slot
+  if (isSelf) {
+    if (ttActive) {
+      ttGoTo(streamerIndex, true);
+      // Restore our labels since ttGoTo → ttUpdateOverlay overwrites them
+      if (ttOverlayName) ttOverlayName.textContent = 'You (Live)';
+      if (ttOverlayViewers) ttOverlayViewers.textContent = '🔴 LIVE';
+    }
+    return;
+  }
   // If user has hidden the stream, don't show it
   if (streamHiddenByUser) {
     socket.emit('stop-watching-public-stream');

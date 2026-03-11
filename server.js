@@ -427,7 +427,18 @@ function sukiGoLive(socketId) {
 
   // SUKI_BOT_ID stays at index 0 in publicStreamers — we never swap it out.
   // Suki's real socket joins the partner room so she receives chat.
-  if (sukiSocket) sukiSocket.join(getStreamChatRoom(SUKI_BOT_ID));
+  if (sukiSocket) {
+    sukiSocket.join(getStreamChatRoom(SUKI_BOT_ID));
+    // Tell Suki's client to navigate to her own slot (index 0)
+    sukiSocket.emit('public-stream-ready', {
+      streamerId: socketId,
+      streamerName: 'Suki',
+      streamerIndex: 0,
+      botVideoUrl: null,
+      viewerCount: 0,
+      isSelf: true
+    });
+  }
 
   // Notify all viewers already in the room to switch to live WebRTC
   const roomSockets = io.sockets.adapter.rooms.get(getStreamChatRoom(SUKI_BOT_ID));
@@ -1154,6 +1165,63 @@ function removeBotStreams() {
     io.emit('public-stream-update', { streamers: getPublicStreamersList() });
     emitPublicOnlineUsers();
   }
+}
+
+// When a real user starts broadcasting:
+// – pull all virtual bot slots out of publicStreamers
+// – redirect every viewer who was watching a bot to the real streamer
+// – have virtual bots join the streamer's chat room (they appear as live viewers)
+function consolidateBotsToStreamer(realStreamerId) {
+  const realStreamerIdx = publicStreamers.indexOf(realStreamerId);
+  if (realStreamerIdx === -1) return;
+  const streamerName = getSocketDisplayName(realStreamerId);
+
+  // Collect bot indexes before we splice anything
+  const botIndexes = new Set();
+  for (let i = 0; i < publicStreamers.length; i++) {
+    if (publicStreamers[i] !== SUKI_BOT_ID && botProfiles.has(publicStreamers[i])) {
+      botIndexes.add(i);
+    }
+  }
+  if (botIndexes.size === 0) return;
+
+  // Move every viewer watching a bot slot → real streamer slot
+  for (const [viewerId, viewerIdx] of viewerStreamIndex.entries()) {
+    if (!botIndexes.has(viewerIdx)) continue;
+    const viewerSocket = io.sockets.sockets.get(viewerId);
+    if (!viewerSocket) continue;
+    viewerStreamIndex.set(viewerId, realStreamerIdx);
+    joinStreamRoom(viewerSocket, realStreamerId); // leaves old bot room, joins real streamer room
+    const viewerCount = getViewerCount(realStreamerId);
+    viewerSocket.emit('public-stream-ready', {
+      streamerId: realStreamerId,
+      streamerName,
+      streamerIndex: realStreamerIdx,
+      botVideoUrl: null,
+      viewerCount
+    });
+    // Tell the real streamer to send an offer to this viewer
+    const streamerSocket = io.sockets.sockets.get(realStreamerId);
+    if (streamerSocket) streamerSocket.emit('public-stream-viewer-joined', { viewerId });
+  }
+
+  // Remove virtual bot slots from publicStreamers (SUKI_BOT_ID stays)
+  for (let i = publicStreamers.length - 1; i >= 0; i--) {
+    if (publicStreamers[i] !== SUKI_BOT_ID && botProfiles.has(publicStreamers[i])) {
+      publicStreamers.splice(i, 1);
+    }
+  }
+
+  // Bots join the real streamer's chat room (appear in viewer list)
+  for (const botId of virtualBotIds) {
+    const botSocket = io.sockets.sockets.get(botId);
+    if (botSocket) {
+      joinStreamRoom(botSocket, realStreamerId);
+      viewerStreamIndex.set(botId, publicStreamers.indexOf(realStreamerId));
+    }
+  }
+
+  console.log(`>>> Bots consolidated into streamer ${realStreamerId} (${streamerName})`);
 }
 
 const joinWebhookStats = {
@@ -2384,8 +2452,21 @@ io.on('connection', (socket) => {
     publicStreamers.push(socket.id);
     const streamerName = getSocketDisplayName(socket.id);
     console.log(`>>> ${socket.id} started public stream (${streamerName})`);
-    // Real streamers get their own slot alongside bots/Suki — don't remove bots
-    // Notify all clients that a new streamer is available
+    // Pull all virtual bots out of publicStreamers and move their viewers to this streamer
+    consolidateBotsToStreamer(socket.id);
+    // Put the streamer in their own chat room so they receive chat messages
+    joinStreamRoom(socket, socket.id);
+    // Tell the streamer's client which slot they're at so the TT feed can navigate there
+    const myIdx = publicStreamers.indexOf(socket.id);
+    socket.emit('public-stream-ready', {
+      streamerId: socket.id,
+      streamerName,
+      streamerIndex: myIdx,
+      botVideoUrl: null,
+      viewerCount: 0,
+      isSelf: true
+    });
+    // Notify all clients of the updated streamer list
     io.emit('public-stream-update', { streamers: getPublicStreamersList() });
     emitPublicOnlineUsers();
   });
@@ -2424,7 +2505,10 @@ io.on('connection', (socket) => {
         const viewerSocket = io.sockets.sockets.get(viewerId);
         if (viewerSocket) {
           leaveAllStreamRooms(viewerSocket);
-          viewerSocket.emit('public-stream-ended');
+          // Don't send public-stream-ended to virtual bots — they'll get re-added as streamers
+          if (!botProfiles.has(viewerId)) {
+            viewerSocket.emit('public-stream-ended');
+          }
         }
       } else if (viewerIdx > idx) {
         // Shift indexes down
@@ -2434,7 +2518,7 @@ io.on('connection', (socket) => {
     // Clean up chat history and thumbnail for this streamer
     streamChatEvents.delete(socket.id);
     streamerThumbnails.delete(socket.id);
-    // If no real users left, restore bots
+    // If no real users left, restore bots as streamers
     if (!hasRealStreamers()) {
       setTimeout(() => triggerAllBotStreams(), 500);
     }
@@ -2589,6 +2673,12 @@ io.on('connection', (socket) => {
     // Don't search if already paired
     if (pairs.has(socket.id)) {
       console.log('>>> already paired, ignoring');
+      return;
+    }
+
+    // Suki is a partner broadcaster — she does not enter random chat
+    if (isSukiSocket(socket)) {
+      console.log('>>> Suki socket blocked from random chat find');
       return;
     }
     
@@ -2888,8 +2978,8 @@ io.on('connection', (socket) => {
       lastPartner.set(partner, socket.id);
       console.log(`>>> set lastPartner: ${socket.id} -> ${partner}`);
       
-      // If partner is a bot, add it back to searching pool
-      if (bots.has(partner)) {
+      // If partner is a virtual bot, add it back to searching pool (not Suki's slot)
+      if (virtualBotIds.includes(partner)) {
         searching.add(partner);
         console.log(`>>> re-added bot ${partner} to searching pool`);
       }
@@ -2918,8 +3008,8 @@ io.on('connection', (socket) => {
       pairs.delete(partner);
       pairs.delete(socket.id);
       
-      // If partner is a bot, add it back to searching pool
-      if (bots.has(partner)) {
+      // If partner is a virtual bot, add it back to searching pool (not Suki's slot)
+      if (virtualBotIds.includes(partner)) {
         searching.add(partner);
         console.log(`>>> re-added bot ${partner} to searching pool after disconnect`);
       }
@@ -2958,7 +3048,10 @@ io.on('connection', (socket) => {
           const viewerSocket = io.sockets.sockets.get(viewerId);
           if (viewerSocket) {
             leaveAllStreamRooms(viewerSocket);
-            viewerSocket.emit('public-stream-ended');
+            // Don't send public-stream-ended to virtual bots — they'll get re-added as streamers
+            if (!botProfiles.has(viewerId)) {
+              viewerSocket.emit('public-stream-ended');
+            }
           }
         } else if (viewerIdx > streamerIdx) {
           viewerStreamIndex.set(viewerId, viewerIdx - 1);
