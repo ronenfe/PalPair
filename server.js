@@ -1381,8 +1381,11 @@ function getStreamRoomUsers(streamerId) {
   const room = getStreamChatRoom(streamerId);
   const socketsInRoom = io.sockets.adapter.rooms.get(room);
   const users = [];
+  // Exclude the streamer's own socket — they're the host, not a viewer
+  const streamerSocketId = (streamerId === SUKI_BOT_ID) ? sukiLiveSocketId : streamerId;
   if (socketsInRoom) {
     for (const sid of socketsInRoom) {
+      if (streamerSocketId && sid === streamerSocketId) continue;
       const profile = userProfiles.get(sid)?.profile;
       if (!profile?.name) continue;
       users.push({
@@ -1393,8 +1396,8 @@ function getStreamRoomUsers(streamerId) {
       });
     }
   }
-  // Also add the streamer if it's a bot
-  if (bots.has(streamerId)) {
+  // Also add the streamer if it's a bot (but not Suki's slot — she's a real girl)
+  if (bots.has(streamerId) && streamerId !== SUKI_BOT_ID) {
     const bp = botProfiles.get(streamerId);
     if (bp) {
       users.unshift({

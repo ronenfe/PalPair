@@ -18,9 +18,11 @@ import com.android.billingclient.api.*
  *    webView.addJavascriptInterface(billingBridge, "FlashLiveApp")
  *
  * 3. Define your product IDs in Google Play Console matching these:
- *    - flashlive_coins_100  ($1.00 → 100 coins)
- *    - flashlive_coins_600  ($5.00 → 600 coins)
- *    - flashlive_coins_1500 ($10.00 → 1,500 coins)
+ *    - paypal_coins_100   ($0.99 → 100 coins)
+ *    - paypal_coins_500   ($4.99 → 500 coins)
+ *    - paypal_coins_2000  ($19.99 → 2,000 coins)
+ *    - paypal_coins_5000  ($49.99 → 5,000 coins)
+ *    - paypal_coins_10000 ($99.99 → 10,000 coins)
  */
 class BillingBridge(
     private val activity: Activity,
@@ -32,9 +34,11 @@ class BillingBridge(
 
         // Map web package IDs to Google Play product IDs
         val PRODUCT_MAP = mapOf(
-            "pack_100" to "flashlive_coins_100",
-            "pack_600" to "flashlive_coins_600",
-            "pack_1500" to "flashlive_coins_1500"
+            "pack_100"   to "paypal_coins_100",
+            "pack_500"   to "paypal_coins_500",
+            "pack_2000"  to "paypal_coins_2000",
+            "pack_5000"  to "paypal_coins_5000",
+            "pack_10000" to "paypal_coins_10000"
         )
     }
 

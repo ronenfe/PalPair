@@ -1199,6 +1199,13 @@ async function startPublicStream() {
     }
     const shareBtn = document.getElementById('shareStreamBtn');
     if (shareBtn) shareBtn.style.display = 'inline-flex';
+    // Hide nav arrows and disable random buttons while broadcasting
+    if (ttPrevBtnEl) ttPrevBtnEl.style.display = 'none';
+    if (ttNextBtnEl) ttNextBtnEl.style.display = 'none';
+    if (ttDotsEl) ttDotsEl.style.display = 'none';
+    if (goRandomBtn) goRandomBtn.disabled = true;
+    const ttRandomEl2 = document.getElementById('ttRandomBtn');
+    if (ttRandomEl2) ttRandomEl2.disabled = true;
     // If we were watching someone else, close that connection before going live
     if (publicStreamViewerPC) {
       publicStreamViewerPC.close();
@@ -1222,6 +1229,13 @@ function stopPublicStream() {
   if (flipCameraBtnLive) flipCameraBtnLive.style.display = 'none';
   const shareBtn = document.getElementById('shareStreamBtn');
   if (shareBtn) shareBtn.style.display = 'none';
+  // Restore nav arrows and random buttons after broadcasting stops
+  if (ttPrevBtnEl) ttPrevBtnEl.style.display = '';
+  if (ttNextBtnEl) ttNextBtnEl.style.display = '';
+  if (ttDotsEl) ttDotsEl.style.display = '';
+  if (goRandomBtn) goRandomBtn.disabled = false;
+  const ttRandomEl2 = document.getElementById('ttRandomBtn');
+  if (ttRandomEl2) ttRandomEl2.disabled = false;
   // Stop thumbnail capture
   stopThumbnailCapture();
   socket.emit('stop-public-stream');
