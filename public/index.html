@@ -479,7 +479,12 @@
             <div class="tt-topbar">
               <span class="tt-live-badge">🔴 LIVE</span>
               <span id="ttOverlayName" class="tt-name"></span>
-              <span id="ttOverlayViewers" class="tt-viewers"></span>
+              <span id="ttOverlayViewers" class="tt-viewers tt-viewers-clickable"></span>
+              <!-- Viewer list popup -->
+              <div id="ttViewerPopup" class="tt-viewer-popup" style="display:none;">
+                <div class="tt-viewer-popup-header">👁 Viewers</div>
+                <ul id="ttViewerList" class="tt-viewer-list"></ul>
+              </div>
               <div class="tt-topbar-actions">
                 <button id="ttMuteMicBtn" class="tt-icon-btn tt-mute-btn" title="Mute mic" style="display:none;">🎙️</button>
                 <button id="ttGoLiveBtn" class="tt-icon-btn" title="Go Live">📡 Go Live</button>

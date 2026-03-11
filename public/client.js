@@ -129,6 +129,9 @@ const publicStreamArea = document.getElementById('publicStreamArea');
 const publicStreamVideo = document.getElementById('publicStreamVideo');
 const publicStreamName = document.getElementById('publicStreamName');
 const publicStreamViewerCount = document.getElementById('publicStreamViewerCount');
+const ttOverlayViewers= document.getElementById('ttOverlayViewers');
+const ttViewerPopup   = document.getElementById('ttViewerPopup');
+const ttViewerList    = document.getElementById('ttViewerList');
 const nextStreamerBtn = document.getElementById('nextStreamerBtn');
 const hideStreamBtn = document.getElementById('hideStreamBtn');
 const coinCountEl = document.getElementById('coinCount');
@@ -529,6 +532,7 @@ socket.on('stream-chat-event', ({ streamerId, event } = {}) => {
 
 socket.on('stream-room-users', ({ streamerId, users = [] } = {}) => {
   renderOnlineUsers(users);
+  renderTtViewerList(users);
 });
 
 // Ignore global online-users when in a stream room — room-scoped events handle it
@@ -976,6 +980,43 @@ function renderOnlineUsers(users = []) {
     }
 
     onlineUsersList.appendChild(item);
+  });
+}
+
+function renderTtViewerList(users = []) {
+  if (!ttViewerList) return;
+  ttViewerList.innerHTML = '';
+  const viewers = users.filter(u => !u.streaming);
+  if (!viewers.length) {
+    const li = document.createElement('li');
+    li.textContent = 'No viewers yet';
+    li.style.color = 'rgba(255,255,255,.5)';
+    ttViewerList.appendChild(li);
+    return;
+  }
+  viewers.forEach(u => {
+    const li = document.createElement('li');
+    const gender = String(u.gender || '').toLowerCase();
+    const emoji = u.isBot ? '🤖' : (gender === 'male' ? '👨' : (gender === 'female' ? '👩‍🦰' : '👤'));
+    li.textContent = `${emoji} ${u.socketId === socket.id ? u.name + ' (You)' : u.name}`;
+    ttViewerList.appendChild(li);
+  });
+}
+
+// Toggle TT viewer popup on eye click
+if (ttOverlayViewers && ttViewerPopup) {
+  ttOverlayViewers.addEventListener('click', (e) => {
+    e.stopPropagation();
+    const isOpen = ttViewerPopup.style.display !== 'none';
+    ttViewerPopup.style.display = isOpen ? 'none' : 'block';
+  });
+  // Close when clicking elsewhere in the overlay
+  document.addEventListener('click', (e) => {
+    if (ttViewerPopup && ttViewerPopup.style.display !== 'none') {
+      if (!ttViewerPopup.contains(e.target) && e.target !== ttOverlayViewers) {
+        ttViewerPopup.style.display = 'none';
+      }
+    }
   });
 }
 
@@ -1924,7 +1965,6 @@ const ttFeed          = document.getElementById('ttFeed');
 const ttSlideContainer= document.getElementById('ttSlideContainer');
 const ttEmptyEl       = document.getElementById('ttEmpty');
 const ttOverlayName   = document.getElementById('ttOverlayName');
-const ttOverlayViewers= document.getElementById('ttOverlayViewers');
 const ttChatEl        = document.getElementById('ttChat');
 const ttInputEl       = document.getElementById('ttInput');
 const ttSendBtnEl     = document.getElementById('ttSendBtn');
@@ -1971,6 +2011,8 @@ function ttUpdateOverlay(streamer) {
   if (!streamer) return;
   if (ttOverlayName)    ttOverlayName.textContent    = streamer.name || '—';
   if (ttOverlayViewers) ttOverlayViewers.textContent = `👁 ${streamer.viewerCount || 0}`;
+  // Close viewer popup when switching slides
+  if (ttViewerPopup) ttViewerPopup.style.display = 'none';
 }
 
 function ttGoTo(index, animated = true) {
