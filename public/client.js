@@ -1397,7 +1397,7 @@ socket.on('public-stream-ready', ({ streamerId, streamerName, streamerIndex, bot
       publicStreamVideo.srcObject = null;
       publicStreamVideo.src = botVideoUrl;
       publicStreamVideo.loop = false;
-      publicStreamVideo.muted = false;
+      publicStreamVideo.muted = true;
       publicStreamVideo.play().catch(e => console.log('Bot stream play failed:', e));
     }
     return;
