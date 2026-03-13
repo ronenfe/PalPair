@@ -2277,10 +2277,6 @@ io.on('connection', (socket) => {
 
       if (!socket.data.publicRoomJoined) {
         socket.data.publicRoomJoined = true;
-        pushPublicRoomEvent(buildPublicRoomEvent({
-          type: 'system',
-          text: `${displayName} joined the public room`
-        }));
       }
 
       // Ensure all bots are streaming
