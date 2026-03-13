@@ -1141,6 +1141,12 @@ if (dmCloseBtn) {
 socket.on('private-message', (msg) => {
   if (!msg || !msg.from || !msg.text) return;
   addDmMessage(msg);
+  // Auto-open the DM panel when a message arrives
+  const partnerId = msg.from === socket.id ? msg.to : msg.from;
+  const partnerName = msg.fromName || msg.toName || partnerId;
+  if (!currentDmPartnerId) {
+    openDmPanel(partnerId, partnerName);
+  }
 });
 
 // ═══════════════════════════════════
@@ -1242,6 +1248,8 @@ async function startPublicStream() {
     }
     const shareBtn = document.getElementById('shareStreamBtn');
     if (shareBtn) shareBtn.style.display = 'inline-flex';
+    const ttShareBtn = document.getElementById('ttShareBtn');
+    if (ttShareBtn) ttShareBtn.style.display = 'inline-flex';
     // Hide nav arrows/dots and disable random buttons while broadcasting
     ttUpdateDots();
     if (goRandomBtn) goRandomBtn.disabled = true;
@@ -1271,6 +1279,8 @@ function stopPublicStream() {
   if (muteMicBtnLive) { muteMicBtnLive.style.display = 'none'; muteMicBtnLive.textContent = '🎙️'; muteMicBtnLive.classList.remove('muted'); }
   const shareBtn = document.getElementById('shareStreamBtn');
   if (shareBtn) shareBtn.style.display = 'none';
+  const ttShareBtn = document.getElementById('ttShareBtn');
+  if (ttShareBtn) ttShareBtn.style.display = 'none';
   // Restore nav arrows/dots and random buttons after broadcasting stops
   ttUpdateDots();
   if (goRandomBtn) goRandomBtn.disabled = false;
@@ -2682,6 +2692,13 @@ if (shareStreamBtn) {
     }
     qrLinkEl.textContent = streamUrl;
     qrModal.style.display = 'flex';
+  });
+}
+
+const ttShareBtnEl = document.getElementById('ttShareBtn');
+if (ttShareBtnEl) {
+  ttShareBtnEl.addEventListener('click', () => {
+    if (shareStreamBtn) shareStreamBtn.click();
   });
 }
 
