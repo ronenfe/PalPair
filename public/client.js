@@ -201,6 +201,7 @@ let publicStreamLocalStream = null;
 const publicStreamPCs = new Map(); // viewerId → RTCPeerConnection (streamer-side)
 let publicStreamViewerPC = null;    // single PC for viewer-side
 let currentWatchingStreamerId = null;
+let isStreamMuted = false;
 let pendingWatchByIdActive = false;
 
 // User profile and filters
@@ -1417,6 +1418,7 @@ socket.on('public-stream-ready', ({ streamerId, streamerName, streamerIndex, bot
       publicStreamVideo.srcObject = null;
       publicStreamVideo.src = botVideoUrl;
       publicStreamVideo.loop = false;
+      publicStreamVideo.muted = isStreamMuted;
       publicStreamVideo.play().catch(e => console.log('Bot stream play failed:', e));
     }
     return;
@@ -1436,7 +1438,7 @@ socket.on('public-stream-ready', ({ streamerId, streamerName, streamerIndex, bot
   publicStreamViewerPC.ontrack = (e) => {
     if (publicStreamVideo) {
       publicStreamVideo.srcObject = e.streams[0];
-      if (!isStreaming) publicStreamVideo.muted = false;
+      if (!isStreaming) publicStreamVideo.muted = isStreamMuted;
     }
     // In TikTok mode: show stream in the dedicated in-feed element (escapes stacking context)
     if (ttActive) {
@@ -1642,9 +1644,10 @@ const muteStreamBtn = document.getElementById('muteStreamBtn');
 if (muteStreamBtn) {
   muteStreamBtn.addEventListener('click', () => {
     if (!publicStreamVideo) return;
-    publicStreamVideo.muted = !publicStreamVideo.muted;
-    muteStreamBtn.textContent = publicStreamVideo.muted ? '🔇' : '🔊';
-    muteStreamBtn.title = publicStreamVideo.muted ? 'Unmute stream' : 'Mute stream';
+    isStreamMuted = !publicStreamVideo.muted;
+    publicStreamVideo.muted = isStreamMuted;
+    muteStreamBtn.textContent = isStreamMuted ? '🔇' : '🔊';
+    muteStreamBtn.title = isStreamMuted ? 'Unmute stream' : 'Mute stream';
   });
 }
 
@@ -2426,10 +2429,11 @@ if (ttFeed) {
     // Mute the viewer stream video (ttStreamVideo or publicStreamVideo in TT mode)
     const streamVid = document.getElementById('ttStreamVideo') || publicStreamVideo;
     if (!streamVid) return;
-    streamVid.muted = !streamVid.muted;
-    if (publicStreamVideo) publicStreamVideo.muted = streamVid.muted;
-    ttMuteStreamEl.textContent = streamVid.muted ? '🔇' : '🔊';
-    ttMuteStreamEl.title = streamVid.muted ? 'Unmute stream' : 'Mute stream';
+    isStreamMuted = !streamVid.muted;
+    streamVid.muted = isStreamMuted;
+    if (publicStreamVideo) publicStreamVideo.muted = isStreamMuted;
+    ttMuteStreamEl.textContent = isStreamMuted ? '🔇' : '🔊';
+    ttMuteStreamEl.title = isStreamMuted ? 'Unmute stream' : 'Mute stream';
   });
   if (ttMuteMicEl) ttMuteMicEl.addEventListener('click', () => {
     if (!publicStreamLocalStream) return;
