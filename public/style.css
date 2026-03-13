@@ -2674,12 +2674,16 @@ body.stream-fake-fullscreen-active {
   flex-shrink: 0;
   position: relative;
   overflow: hidden;
-  background: #111;
+  background: radial-gradient(ellipse at 50% 30%, #1e1040 0%, #0a0a14 100%);
 }
+.tt-slide:nth-child(2n)   { background: radial-gradient(ellipse at 50% 30%, #1a2a10 0%, #080e08 100%); }
+.tt-slide:nth-child(3n)   { background: radial-gradient(ellipse at 50% 30%, #2a1020 0%, #100808 100%); }
+.tt-slide:nth-child(4n)   { background: radial-gradient(ellipse at 50% 30%, #101828 0%, #080a14 100%); }
 
 .tt-slide-video {
   position: absolute;
   inset: 0;
+  z-index: 3;
   width: 100%;
   height: 100%;
   object-fit: cover;
@@ -2689,49 +2693,42 @@ body.stream-fake-fullscreen-active {
 .tt-slide-placeholder {
   position: absolute;
   inset: 0;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  background: radial-gradient(ellipse at 50% 30%, #2a1a4e 0%, #0d0d1a 100%);
+  color: #444;
+}
+.tt-slide-avatar {
+  width: 80px;
+  height: 80px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #7c3aed, #db2777);
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 5rem;
-  background: radial-gradient(ellipse at 50% 40%, #1a1a2e 0%, #000 100%);
-  color: #444;
+  font-size: 2.2rem;
+  font-weight: 700;
+  color: #fff;
+  box-shadow: 0 4px 24px rgba(124,58,237,0.4);
+}
+.tt-slide-pname {
+  color: rgba(255,255,255,0.75);
+  font-size: 1rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
 }
 
-/* ── publicStreamArea in TikTok mode ── */
+/* ── publicStreamArea in TikTok mode — always hidden ── */
+/* In TT mode the live stream is shown inside #ttStreamVideo which lives
+   inside #ttFeed and participates in the swipe gesture. publicStreamArea
+   is a root-level fixed overlay that would sit above ttFeed and block swiping. */
 body.tt-mode #publicStreamArea {
-  position: fixed !important;
-  inset: 0 !important;
-  z-index: 501 !important;
-  background: transparent !important;
-  border: none !important;
-  border-radius: 0 !important;
-  margin: 0 !important;
-  width: 100% !important;
-  height: 100% !important;
-  display: flex !important;
-}
-body.tt-mode #publicStreamArea .public-stream-header,
-body.tt-mode #publicStreamArea .stream-tip-bar,
-body.tt-mode #publicStreamArea .fullscreen-chat-overlay,
-body.tt-mode #publicStreamArea .fullscreen-chat-input-wrap,
-body.tt-mode #publicStreamArea .flip-camera-btn {
-  display: none !important;
-}
-body.tt-mode #publicStreamVideo {
-  width: 100% !important;
-  height: 100% !important;
-  max-height: none !important;
-  object-fit: cover !important;
-}
-/* When stream area is showing but no video yet: transparent so slide bg shows thru */
-body.tt-mode #publicStreamArea:not(.tt-stream-live) {
-  opacity: 0;
-  pointer-events: none;
-}
-body.tt-mode #publicStreamArea.tt-stream-live {
-  opacity: 1;
-  pointer-events: auto;
-  transition: opacity 0.3s ease;
+  opacity: 0 !important;
+  pointer-events: none !important;
 }
 
 /* Hide existing header/grid/chat when tt feed is active */
@@ -3038,6 +3035,28 @@ body.tt-mode .chat-input-wrap {
   height: 100%;
   object-fit: cover;
   transform: scaleX(-1); /* mirror self-view like a selfie camera */
+}
+
+/* Incoming stream overlay (viewer watching someone) — NOT mirrored */
+.tt-stream-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 501;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: opacity 0.32s ease;
+}
+
+/* Blurred thumbnail backdrop for real-user slides */
+.tt-slide-blur-bg {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  background-size: cover;
+  background-position: center;
+  filter: blur(18px) brightness(0.55) saturate(1.4);
+  transform: scale(1.08); /* prevent blur edge artifacts */
 }
 
 /* Empty state */

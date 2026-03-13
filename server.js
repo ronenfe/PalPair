@@ -2485,6 +2485,8 @@ io.on('connection', (socket) => {
     // Limit size (~100KB max base64)
     if (data.length > 150000) return;
     streamerThumbnails.set(socket.id, data);
+    // Push updated thumbnail to all viewers immediately
+    io.emit('public-stream-update', { streamers: getPublicStreamersList() });
   });
 
   socket.on('stop-public-stream', () => {

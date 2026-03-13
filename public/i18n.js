@@ -25,7 +25,7 @@
   const translations = {
     en: {
       title: 'FlashLive - Live Streaming',
-      subtitle: 'Watch & broadcast live',
+      subtitle: 'Watch & stream live',
       peopleOnline: 'people online now',
       safetyNote: 'FlashLive - Random Video Chat allows users to report child safety concerns in-app. To learn more about reporting requirements, visit the <a href="/help-center.html" target="_blank" rel="noopener">Help center</a>.',
       yourProfile: 'Your Profile',

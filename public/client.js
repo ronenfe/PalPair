@@ -1339,9 +1339,14 @@ function stopThumbnailCapture() {
 }
 
 function captureThumbnail() {
-  if (!publicStreamVideo || !isStreaming) return;
-  const video = publicStreamVideo;
-  if (!video.videoWidth || !video.videoHeight) return;
+  if (!isStreaming) return;
+  // In TT mode the broadcaster preview lives in ttSelfVideo; fall back to publicStreamVideo
+  let video = publicStreamVideo;
+  const ttSelfVideo = document.getElementById('ttSelfVideo');
+  if (ttSelfVideo && ttSelfVideo.srcObject && (!video || !video.videoWidth)) {
+    video = ttSelfVideo;
+  }
+  if (!video || !video.videoWidth || !video.videoHeight) return;
   try {
     const canvas = document.createElement('canvas');
     // Small thumbnail: 160px wide, keep aspect ratio
@@ -1467,11 +1472,13 @@ socket.on('public-stream-ready', ({ streamerId, streamerName, streamerIndex, bot
       publicStreamVideo.srcObject = e.streams[0];
       if (!isStreaming) publicStreamVideo.muted = isStreamMuted;
     }
-    // In TikTok mode: show stream in the dedicated in-feed element (escapes stacking context)
+    // In TikTok mode: show stream inside ttFeed so it participates in the swipe gesture
     if (ttActive) {
       const ttStreamVideo = document.getElementById('ttStreamVideo');
       if (ttStreamVideo) {
         ttStreamVideo.srcObject = e.streams[0];
+        ttStreamVideo.muted = isStreamMuted;
+        ttStreamVideo.style.transform = ''; // clear any leftover drag offset
         ttStreamVideo.style.display = '';
       }
     }
@@ -2066,10 +2073,15 @@ function ttUpdatePos(animated, delta = 0) {
   if (!ttSlideContainer) return;
   ttFeedH = (ttFeed && ttFeed.clientHeight) || window.innerHeight;
   const y = -ttIndex * ttFeedH + delta;
-  ttSlideContainer.style.transition = animated
-    ? 'transform 0.32s cubic-bezier(.4,0,.2,1)'
-    : 'none';
+  const transition = animated ? 'transform 0.32s cubic-bezier(.4,0,.2,1)' : 'none';
+  ttSlideContainer.style.transition = transition;
   ttSlideContainer.style.transform = `translateY(${y}px)`;
+  // Keep the live-stream overlay in sync during drag so it slides with the current slide
+  const ttSV = document.getElementById('ttStreamVideo');
+  if (ttSV) {
+    ttSV.style.transition = transition;
+    ttSV.style.transform = delta ? `translateY(${delta}px)` : 'none';
+  }
 }
 
 function ttUpdateDots() {
@@ -2140,9 +2152,17 @@ function ttGoTo(index, animated = true) {
   // Watch the new streamer (never while broadcasting — would compete for bandwidth)
   if (!isStreaming && (ttIndex !== prev || !currentWatchingStreamerId)) {
     streamHiddenByUser = false;
-    // Hide incoming stream video when switching slides
+    // Delay hiding the stream overlay until the slide animation finishes (320ms)
+    // so there's no black flash mid-swipe. We fade it out, then clear srcObject.
     const ttStreamVideo = document.getElementById('ttStreamVideo');
-    if (ttStreamVideo) { ttStreamVideo.style.display = 'none'; ttStreamVideo.srcObject = null; }
+    if (ttStreamVideo && ttStreamVideo.srcObject) {
+      ttStreamVideo.style.opacity = '0';
+      setTimeout(() => {
+        ttStreamVideo.style.display = 'none';
+        ttStreamVideo.style.opacity = '';
+        ttStreamVideo.srcObject = null;
+      }, 350);
+    }
     // Clear old stream video
     if (publicStreamArea) publicStreamArea.classList.remove('tt-stream-live');
     if (publicStreamVideo) {
@@ -2170,20 +2190,43 @@ function renderTikTokFeed(streamers) {
   }
   if (ttEmptyEl) ttEmptyEl.style.display = 'none';
 
-  // If only viewer counts changed (same streamers, same video URLs), skip full
-  // rebuild — a full rebuild destroys and re-creates <video> elements, causing
+  // If only viewer counts / thumbnails changed (same streamers, same video URLs), skip
+  // full rebuild — a full rebuild destroys and re-creates <video> elements, causing
   // every watching device to restart the stream from scratch.
   const structureUnchanged =
     newStreamers.length === ttStreamers.length &&
     newStreamers.every((s, i) =>
       ttStreamers[i] &&
       s.socketId    === ttStreamers[i].socketId &&
-      s.botVideoUrl === ttStreamers[i].botVideoUrl &&
-      s.thumbnail   === ttStreamers[i].thumbnail
+      s.botVideoUrl === ttStreamers[i].botVideoUrl
     );
 
   if (structureUnchanged && ttSlideEls.length > 0) {
-    // Only refresh viewer-count overlay and name, keep video playing
+    // Update thumbnails in-place for real-user slides (no full rebuild)
+    newStreamers.forEach((s, i) => {
+      if (s.botVideoUrl || s.thumbnail === ttStreamers[i].thumbnail) return;
+      const slide = ttSlideEls[i];
+      if (!slide) return;
+      if (s.thumbnail) {
+        // Update or create blurred background
+        let bg = slide.querySelector('.tt-slide-blur-bg');
+        if (!bg) {
+          bg = document.createElement('div');
+          bg.className = 'tt-slide-blur-bg';
+          slide.appendChild(bg);
+        }
+        bg.style.backgroundImage = `url('${s.thumbnail}')`;
+        // Update or create sharp thumbnail
+        let img = slide.querySelector('img.tt-slide-video');
+        if (!img) {
+          img = document.createElement('img');
+          img.className = 'tt-slide-video';
+          img.alt = s.name || '';
+          slide.appendChild(img);
+        }
+        img.src = s.thumbnail;
+      }
+    });
     ttStreamers = newStreamers;
     ttUpdateOverlay(ttStreamers[ttIndex]);
     return;
@@ -2217,19 +2260,34 @@ function renderTikTokFeed(streamers) {
       vid.loop  = true;
       vid.preload = 'none';
       vid.setAttribute('playsinline', '');
-      vid.setAttribute('poster', 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7');
+      // No transparent poster — slide background shows through instead
       slide.appendChild(vid);
-    } else if (streamer.thumbnail) {
-      const img = document.createElement('img');
-      img.className = 'tt-slide-video';
-      img.src = streamer.thumbnail;
-      img.alt = streamer.name || '';
-      slide.appendChild(img);
-    } else {
+      // Avatar behind the video so there's no black flash while it loads
       const ph = document.createElement('div');
       ph.className = 'tt-slide-placeholder';
-      ph.textContent = '📷';
+      const initial = (streamer.name || '?')[0].toUpperCase();
+      ph.innerHTML = `<div class="tt-slide-avatar">${initial}</div><div class="tt-slide-pname">${streamer.name || ''}</div>`;
+      slide.insertBefore(ph, vid);
+    } else {
+      // Real-user slide: always add avatar placeholder as base layer
+      const ph = document.createElement('div');
+      ph.className = 'tt-slide-placeholder';
+      const initial = (streamer.name || '?')[0].toUpperCase();
+      ph.innerHTML = `<div class="tt-slide-avatar">${initial}</div><div class="tt-slide-pname">${streamer.name || ''}</div>`;
       slide.appendChild(ph);
+      if (streamer.thumbnail) {
+        // Blurred background behind everything
+        const bg = document.createElement('div');
+        bg.className = 'tt-slide-blur-bg';
+        bg.style.backgroundImage = `url('${streamer.thumbnail}')`;
+        slide.appendChild(bg);
+        // Sharp thumbnail on top of blur
+        const img = document.createElement('img');
+        img.className = 'tt-slide-video';
+        img.src = streamer.thumbnail;
+        img.alt = streamer.name || '';
+        slide.appendChild(img);
+      }
     }
 
     ttSlideContainer.appendChild(slide);
