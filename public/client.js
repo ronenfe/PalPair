@@ -1669,7 +1669,7 @@ const muteStreamBtn = document.getElementById('muteStreamBtn');
 if (muteStreamBtn) {
   muteStreamBtn.addEventListener('click', () => {
     if (!publicStreamVideo) return;
-    isStreamMuted = !publicStreamVideo.muted;
+    isStreamMuted = !isStreamMuted;
     publicStreamVideo.muted = isStreamMuted;
     localStorage.setItem('streamMuted', isStreamMuted);
     muteStreamBtn.textContent = isStreamMuted ? '🔇' : '🔊';
@@ -2449,7 +2449,7 @@ if (ttFeed) {
     // Mute the viewer stream video (ttStreamVideo or publicStreamVideo in TT mode)
     const streamVid = document.getElementById('ttStreamVideo') || publicStreamVideo;
     if (!streamVid) return;
-    isStreamMuted = !streamVid.muted;
+    isStreamMuted = !isStreamMuted;
     streamVid.muted = isStreamMuted;
     if (publicStreamVideo) publicStreamVideo.muted = isStreamMuted;
     localStorage.setItem('streamMuted', isStreamMuted);
