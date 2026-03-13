@@ -1386,6 +1386,13 @@ function getStreamRoomUsers(streamerId) {
   if (socketsInRoom) {
     for (const sid of socketsInRoom) {
       if (streamerSocketId && sid === streamerSocketId) continue;
+      const isViewerBot = bots.has(sid);
+      if (isViewerBot) {
+        // Include bots so users can DM them
+        const bp = botProfiles.get(sid);
+        if (bp) users.push({ socketId: sid, name: bp.name || 'Bot', gender: (bp.gender || 'female').toLowerCase(), isBot: true });
+        continue;
+      }
       const profile = userProfiles.get(sid)?.profile;
       if (!profile?.name) continue;
       users.push({

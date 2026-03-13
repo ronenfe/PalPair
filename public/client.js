@@ -609,7 +609,6 @@ socket.on('matched', async ({ otherId: id, initiator, isBot, botProfile, botVide
     remoteVideo.srcObject = null;
     remoteVideo.src = botVideoUrl;
     remoteVideo.loop = false;
-    remoteVideo.muted = true;
     remoteVideo.style.display = 'block';
     if (remotePlaceholder) remotePlaceholder.style.display = 'none';
     remoteVideo.play().catch(e => console.log('Bot video play failed:', e));
@@ -928,6 +927,8 @@ function renderOnlineUsers(users = []) {
   }
 
   users.forEach((user) => {
+    if (user.isBot && user.socketId !== socket.id) return; // hide bots
+    if (user.streaming && user.socketId !== socket.id) return; // streamer shown in feed, not list
     const item = document.createElement('li');
     item.className = 'online-user-item';
 
@@ -986,7 +987,7 @@ function renderOnlineUsers(users = []) {
 function renderTtViewerList(users = []) {
   if (!ttViewerList) return;
   ttViewerList.innerHTML = '';
-  const viewers = users.filter(u => !u.streaming);
+  const viewers = users.filter(u => !u.streaming && !u.isBot);
   if (!viewers.length) {
     const li = document.createElement('li');
     li.textContent = 'No viewers yet';
@@ -999,6 +1000,14 @@ function renderTtViewerList(users = []) {
     const gender = String(u.gender || '').toLowerCase();
     const emoji = u.isBot ? '🤖' : (gender === 'male' ? '👨' : (gender === 'female' ? '👩‍🦰' : '👤'));
     li.textContent = `${emoji} ${u.socketId === socket.id ? u.name + ' (You)' : u.name}`;
+    if (u.socketId !== socket.id) {
+      li.style.cursor = 'pointer';
+      li.title = `Message ${u.name}`;
+      li.addEventListener('click', () => {
+        if (ttViewerPopup) ttViewerPopup.style.display = 'none';
+        openDmPanel(u.socketId, u.name);
+      });
+    }
     ttViewerList.appendChild(li);
   });
 }
@@ -1387,7 +1396,18 @@ socket.on('public-stream-ready', ({ streamerId, streamerName, streamerIndex, bot
   currentWatchingStreamerId = streamerId;
   pendingWatchByIdActive = false;
   if (publicStreamArea) publicStreamArea.style.display = 'flex';
-  if (publicStreamName) publicStreamName.textContent = streamerName;
+  if (publicStreamName) {
+    publicStreamName.textContent = streamerName;
+    if (!botVideoUrl) {
+      publicStreamName.style.cursor = 'pointer';
+      publicStreamName.title = `Message ${streamerName}`;
+      publicStreamName.onclick = () => openDmPanel(streamerId, streamerName);
+    } else {
+      publicStreamName.style.cursor = '';
+      publicStreamName.title = '';
+      publicStreamName.onclick = null;
+    }
+  }
   if (publicStreamViewerCount) publicStreamViewerCount.textContent = `👁 ${viewerCount || 0}`;
   if (publicStreamVideo && !isStreaming) publicStreamVideo.muted = false;
 
@@ -1397,7 +1417,6 @@ socket.on('public-stream-ready', ({ streamerId, streamerName, streamerIndex, bot
       publicStreamVideo.srcObject = null;
       publicStreamVideo.src = botVideoUrl;
       publicStreamVideo.loop = false;
-      publicStreamVideo.muted = true;
       publicStreamVideo.play().catch(e => console.log('Bot stream play failed:', e));
     }
     return;
@@ -1619,6 +1638,16 @@ if (nextStreamerBtn) {
 }
 
 // ── Hide stream button ──
+const muteStreamBtn = document.getElementById('muteStreamBtn');
+if (muteStreamBtn) {
+  muteStreamBtn.addEventListener('click', () => {
+    if (!publicStreamVideo) return;
+    publicStreamVideo.muted = !publicStreamVideo.muted;
+    muteStreamBtn.textContent = publicStreamVideo.muted ? '🔇' : '🔊';
+    muteStreamBtn.title = publicStreamVideo.muted ? 'Unmute stream' : 'Mute stream';
+  });
+}
+
 if (hideStreamBtn) {
   hideStreamBtn.addEventListener('click', (e) => {
     e.stopPropagation();
@@ -2049,7 +2078,18 @@ function ttUpdateDots() {
 
 function ttUpdateOverlay(streamer) {
   if (!streamer) return;
-  if (ttOverlayName)    ttOverlayName.textContent    = streamer.name || '—';
+  if (ttOverlayName) {
+    ttOverlayName.textContent = streamer.name || '—';
+    if (!streamer.isBot && streamer.socketId !== socket.id) {
+      ttOverlayName.style.cursor = 'pointer';
+      ttOverlayName.title = `Message ${streamer.name}`;
+      ttOverlayName.onclick = () => openDmPanel(streamer.socketId, streamer.name);
+    } else {
+      ttOverlayName.style.cursor = '';
+      ttOverlayName.title = '';
+      ttOverlayName.onclick = null;
+    }
+  }
   if (ttOverlayViewers) ttOverlayViewers.textContent = `👁 ${streamer.viewerCount || 0}`;
   // Close viewer popup when switching slides
   if (ttViewerPopup) ttViewerPopup.style.display = 'none';
@@ -2379,8 +2419,18 @@ if (ttFeed) {
   const ttGoLiveEl  = document.getElementById('ttGoLiveBtn');
   const ttRandomEl  = document.getElementById('ttRandomBtn');
   const ttMuteMicEl = document.getElementById('ttMuteMicBtn');
+  const ttMuteStreamEl = document.getElementById('ttMuteStreamBtn');
   if (ttGoLiveEl)  ttGoLiveEl.addEventListener('click',  () => { if (goLiveBtn) goLiveBtn.click(); });
   if (ttRandomEl)  ttRandomEl.addEventListener('click',  () => { if (goRandomBtn) goRandomBtn.click(); });
+  if (ttMuteStreamEl) ttMuteStreamEl.addEventListener('click', () => {
+    // Mute the viewer stream video (ttStreamVideo or publicStreamVideo in TT mode)
+    const streamVid = document.getElementById('ttStreamVideo') || publicStreamVideo;
+    if (!streamVid) return;
+    streamVid.muted = !streamVid.muted;
+    if (publicStreamVideo) publicStreamVideo.muted = streamVid.muted;
+    ttMuteStreamEl.textContent = streamVid.muted ? '🔇' : '🔊';
+    ttMuteStreamEl.title = streamVid.muted ? 'Unmute stream' : 'Mute stream';
+  });
   if (ttMuteMicEl) ttMuteMicEl.addEventListener('click', () => {
     if (!publicStreamLocalStream) return;
     const audioTrack = publicStreamLocalStream.getAudioTracks()[0];

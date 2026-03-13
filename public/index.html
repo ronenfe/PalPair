@@ -14,9 +14,7 @@
         <header class="profile-header">
           <h1>FlashLive</h1>
           <p class="subtitle" data-i18n="subtitle">Watch & broadcast live</p>
-          <div id="userCounter" class="user-counter-wrap">
-            <span class="counter-chip"><span id="userCount">0</span>&nbsp;<span data-i18n="peopleOnline">people online now</span></span>
-          </div>
+
         </header>
 
         <div id="profileForm" class="profile-form">
@@ -486,6 +484,7 @@
                 <ul id="ttViewerList" class="tt-viewer-list"></ul>
               </div>
               <div class="tt-topbar-actions">
+                <button id="ttMuteStreamBtn" class="tt-icon-btn" title="Mute stream">🔊</button>
                 <button id="ttMuteMicBtn" class="tt-icon-btn tt-mute-btn" title="Mute mic" style="display:none;">🎙️</button>
                 <button id="ttGoLiveBtn" class="tt-icon-btn" title="Go Live">📡 Go Live</button>
                 <button id="ttRandomBtn" class="tt-icon-btn" title="Random chat">🎲</button>
@@ -555,6 +554,7 @@
               <span id="publicStreamName" class="stream-name">—</span>
               <span id="publicStreamViewerCount" class="stream-viewer-count">👁 0</span>
               <button id="shareStreamBtn" class="share-stream-btn" title="Share stream QR" style="display:none;">📲</button>
+              <button id="muteStreamBtn" class="hide-stream-btn" title="Mute stream">🔊</button>
               <button id="usersToggleBtn" class="users-toggle-btn-inline" aria-label="Room viewers" title="Room viewers">👥</button>
               <button id="fullscreenStreamBtn" class="fullscreen-stream-btn" title="Fullscreen">⛶</button>
               <button id="hideStreamBtn" class="hide-stream-btn" title="Hide stream">✕</button>
