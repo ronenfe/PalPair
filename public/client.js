@@ -2279,7 +2279,9 @@ function mirrorTtChat() {
   if (!src) return;
   const msgs = src.querySelectorAll('.chat-message');
   ttChatEl.innerHTML = '';
-  const start = Math.max(0, msgs.length - 25);
+  const h = window.innerHeight;
+  const limit = h <= 500 ? 5 : h <= 700 ? 10 : 25;
+  const start = Math.max(0, msgs.length - limit);
   for (let i = start; i < msgs.length; i++) {
     ttChatEl.appendChild(msgs[i].cloneNode(true));
   }

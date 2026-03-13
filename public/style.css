@@ -2941,6 +2941,12 @@ body.tt-mode .chat-input-wrap {
   mask-image: linear-gradient(to bottom, transparent 0%, black 30%);
   -webkit-mask-image: linear-gradient(to bottom, transparent 0%, black 30%);
 }
+@media (max-height: 700px) {
+  .tt-chat-messages { max-height: 16vh; }
+}
+@media (max-height: 500px) {
+  .tt-chat-messages { max-height: 10vh; }
+}
 .tt-chat-messages:active { cursor: grabbing; }
 .tt-chat-messages .chat-message {
   background: none !important;
