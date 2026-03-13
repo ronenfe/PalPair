@@ -1422,6 +1422,8 @@ socket.on('public-stream-ready', ({ streamerId, streamerName, streamerIndex, bot
   currentWatchingStreamerId = streamerId;
   pendingWatchByIdActive = false;
   if (publicStreamArea) publicStreamArea.style.display = 'flex';
+  const _ttShareBtnV = document.getElementById('ttShareBtn');
+  if (_ttShareBtnV) _ttShareBtnV.style.display = 'inline-flex';
   if (publicStreamName) {
     publicStreamName.textContent = streamerName;
     if (streamerId !== socket.id) {
@@ -1484,6 +1486,7 @@ socket.on('watch-public-stream-redirect', ({ streamerIndex }) => {
 socket.on('public-stream-ended', () => {
   currentWatchingStreamerId = null;
   pendingWatchByIdActive = false;
+  if (!isStreaming) { const _ttShareBtnV = document.getElementById('ttShareBtn'); if (_ttShareBtnV) _ttShareBtnV.style.display = 'none'; }
   if (publicStreamViewerPC) {
     publicStreamViewerPC.close();
     publicStreamViewerPC = null;
@@ -2700,7 +2703,22 @@ if (shareStreamBtn) {
 const ttShareBtnEl = document.getElementById('ttShareBtn');
 if (ttShareBtnEl) {
   ttShareBtnEl.addEventListener('click', () => {
-    if (shareStreamBtn) shareStreamBtn.click();
+    const shareId = isStreaming ? socket.id : currentWatchingStreamerId;
+    if (!shareId) return;
+    const streamUrl = `${window.location.origin}?watch=${shareId}`;
+    if (qrCanvas) qrCanvas.innerHTML = '';
+    if (window.QRCode && qrCanvas) {
+      new QRCode(qrCanvas, {
+        text: streamUrl,
+        width: 220,
+        height: 220,
+        colorDark: '#E6E1E5',
+        colorLight: '#1C1B1F',
+        correctLevel: QRCode.CorrectLevel.M
+      });
+    }
+    if (qrLinkEl) qrLinkEl.textContent = streamUrl;
+    if (qrModal) qrModal.style.display = 'flex';
   });
 }
 
