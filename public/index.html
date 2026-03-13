@@ -516,6 +516,20 @@
         </div>
         <!-- /TikTok Feed -->
 
+        <!-- DM Panel (inside TT feed layer so it appears above overlay) -->
+        <aside class="dm-panel" id="dmPanel">
+          <div class="dm-panel-header">
+            <button id="dmBackBtn" class="dm-back-btn" title="Back">←</button>
+            <span id="dmPartnerName" class="dm-partner-name">—</span>
+            <button id="dmCloseBtn" class="dm-close-btn" title="Close">✕</button>
+          </div>
+          <div id="dmMessages" class="dm-messages"></div>
+          <div class="dm-input-wrap">
+            <input id="dmInput" type="text" placeholder="Type a message..." maxlength="500" />
+            <button id="dmSendBtn">Send</button>
+          </div>
+        </aside>
+
         <!-- Hidden functional elements needed by JS -->
         <div style="display:none">
           <div class="coin-balance" id="coinBalance">🪙 <span id="coinCount">0</span>
@@ -566,19 +580,7 @@
               <h3 class="online-users-title">Room viewers</h3>
               <ul id="onlineUsersList" class="online-users-list"></ul>
             </aside>
-            <!-- Private DM Panel -->
-            <aside class="dm-panel" id="dmPanel">
-              <div class="dm-panel-header">
-                <button id="dmBackBtn" class="dm-back-btn" title="Back">←</button>
-                <span id="dmPartnerName" class="dm-partner-name">—</span>
-                <button id="dmCloseBtn" class="dm-close-btn" title="Close">✕</button>
-              </div>
-              <div id="dmMessages" class="dm-messages"></div>
-              <div class="dm-input-wrap">
-                <input id="dmInput" type="text" placeholder="Type a message..." maxlength="500" />
-                <button id="dmSendBtn">Send</button>
-              </div>
-            </aside>
+            <!-- Private DM Panel removed (moved to TT feed layer) -->
           </div>
         </section>
 

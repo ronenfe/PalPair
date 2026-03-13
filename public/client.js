@@ -214,7 +214,7 @@ let publicStreamLocalStream = null;
 const publicStreamPCs = new Map(); // viewerId → RTCPeerConnection (streamer-side)
 let publicStreamViewerPC = null;    // single PC for viewer-side
 let currentWatchingStreamerId = null;
-let isStreamMuted = false;
+let isStreamMuted = localStorage.getItem('streamMuted') === 'true';
 let pendingWatchByIdActive = false;
 
 // User profile and filters
@@ -1661,6 +1661,7 @@ if (muteStreamBtn) {
     if (!publicStreamVideo) return;
     isStreamMuted = !publicStreamVideo.muted;
     publicStreamVideo.muted = isStreamMuted;
+    localStorage.setItem('streamMuted', isStreamMuted);
     muteStreamBtn.textContent = isStreamMuted ? '🔇' : '🔊';
     muteStreamBtn.title = isStreamMuted ? 'Unmute stream' : 'Mute stream';
   });
@@ -2426,6 +2427,10 @@ if (ttFeed) {
   const ttRandomEl  = document.getElementById('ttRandomBtn');
   const ttMuteMicEl = document.getElementById('ttMuteMicBtn');
   const ttMuteStreamEl = document.getElementById('ttMuteStreamBtn');
+  if (ttMuteStreamEl) {
+    ttMuteStreamEl.textContent = isStreamMuted ? '🔇' : '🔊';
+    ttMuteStreamEl.title = isStreamMuted ? 'Unmute stream' : 'Mute stream';
+  }
   if (ttGoLiveEl)  ttGoLiveEl.addEventListener('click',  () => { if (goLiveBtn) goLiveBtn.click(); });
   if (ttRandomEl)  ttRandomEl.addEventListener('click',  () => { if (goRandomBtn) goRandomBtn.click(); });
   if (ttMuteStreamEl) ttMuteStreamEl.addEventListener('click', () => {
@@ -2435,6 +2440,7 @@ if (ttFeed) {
     isStreamMuted = !streamVid.muted;
     streamVid.muted = isStreamMuted;
     if (publicStreamVideo) publicStreamVideo.muted = isStreamMuted;
+    localStorage.setItem('streamMuted', isStreamMuted);
     ttMuteStreamEl.textContent = isStreamMuted ? '🔇' : '🔊';
     ttMuteStreamEl.title = isStreamMuted ? 'Unmute stream' : 'Mute stream';
   });

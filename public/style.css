@@ -910,17 +910,17 @@ body.chat-active .videos .video-wrap:nth-child(2) #status {
 
 /* ── Private DM Panel ── */
 .dm-panel {
-  position: absolute;
-  top: 0;
+  position: fixed;
+  top: env(safe-area-inset-top, 0px);
   right: 0;
-  bottom: 0;
+  bottom: env(safe-area-inset-bottom, 0px);
   width: 280px;
   max-width: 85%;
   background: #1C1B1F;
   color: #E6E1E5;
   display: flex;
   flex-direction: column;
-  z-index: 12;
+  z-index: 600;
   transform: translateX(100%);
   transition: transform 0.25s ease;
   border-left: 1px solid #49454F;
