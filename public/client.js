@@ -147,6 +147,19 @@ const noStreamersMsg = document.getElementById('noStreamersMsg');
 const collapseGridBtn = document.getElementById('collapseGridBtn');
 let lastKnownStreamers = [];
 
+// TikTok feed elements (declared here to avoid TDZ when enterTtMode is called early)
+const ttFeed          = document.getElementById('ttFeed');
+const ttSlideContainer= document.getElementById('ttSlideContainer');
+const ttEmptyEl       = document.getElementById('ttEmpty');
+const ttOverlayName   = document.getElementById('ttOverlayName');
+const ttChatEl        = document.getElementById('ttChat');
+const ttInputEl       = document.getElementById('ttInput');
+const ttSendBtnEl     = document.getElementById('ttSendBtn');
+const ttPrevBtnEl     = document.getElementById('ttPrevBtn');
+const ttNextBtnEl     = document.getElementById('ttNextBtn');
+const ttDotsEl        = document.getElementById('ttDots');
+const ttCoinCountEl   = document.getElementById('ttCoinCount');
+
 // Collapse / expand streamers grid
 if (collapseGridBtn && streamersCards) {
   collapseGridBtn.addEventListener('click', () => {
@@ -184,7 +197,7 @@ window.addEventListener('orientationchange', () => {
 });
 
 // Initialize video display state
-remoteVideo.style.display = 'none';
+if (remoteVideo) remoteVideo.style.display = 'none';
 if (remotePlaceholder) {
   remotePlaceholder.style.display = 'block';
 }
@@ -344,9 +357,10 @@ function setChatCollapsed(collapsed) {
 }
 
 function setRandomMode(active) {
-  isRunning = active;
-  if (active) exitTtMode(); else enterTtMode();
-  document.body.classList.toggle('random-active', active);
+  if (active) return; // random chat removed — always stay in TT mode
+  isRunning = false;
+  enterTtMode();
+  document.body.classList.remove('random-active');
 
   // Switch between public chat interface and private chat interface
   if (active) {
@@ -405,8 +419,8 @@ function setRandomMode(active) {
   }
 
   if (!active) {
-    nextBtn.disabled = true;
-    reportBtn.disabled = true;
+    if (nextBtn) nextBtn.disabled = true;
+    if (reportBtn) reportBtn.disabled = true;
     if (pc) {
       pc.close();
       pc = null;
@@ -417,7 +431,7 @@ function setRandomMode(active) {
       localStream.getTracks().forEach((t) => t.stop());
       localStream = null;
     }
-    localVideo.srcObject = null;
+    if (localVideo) localVideo.srcObject = null;
     setAiPartnerBadge(false);
   }
 }
@@ -460,7 +474,7 @@ if (goRandomBtn) {
         localVideo.srcObject = localStream;
         
         // Ensure remote video is hidden when starting
-        remoteVideo.style.display = 'none';
+        if (remoteVideo) remoteVideo.style.display = 'none';
         if (remotePlaceholder) {
           remotePlaceholder.style.display = 'block';
         }
@@ -482,7 +496,7 @@ if (stopRandomBtn) {
   };
 }
 
-nextBtn.onclick = () => {
+if (nextBtn) nextBtn.onclick = () => {
   if (!isRunning) return;
   // Find next partner while already connected
   console.log('>>> Find Next button clicked, otherId:', otherId);
@@ -495,7 +509,7 @@ nextBtn.onclick = () => {
   if (pc) pc.close();
   pc = null;
   otherId = null;
-  nextBtn.disabled = true;
+  if (nextBtn) nextBtn.disabled = true;
   clearRemoteVideo();
   socket.emit('find');
 };
@@ -572,7 +586,7 @@ socket.on('matched', async ({ otherId: id, initiator, isBot, botProfile, botVide
   clearRemoteVideo();
   
   // Ensure remote video is hidden until track arrives
-  remoteVideo.style.display = 'none';
+  if (remoteVideo) remoteVideo.style.display = 'none';
   if (remotePlaceholder) {
     remotePlaceholder.style.display = 'block';
   }
@@ -676,7 +690,7 @@ socket.on('report-received', () => {
   addChatMessage(translate('reportSubmitted'), 'system');
 });
 
-reportBtn.onclick = () => {
+if (reportBtn) reportBtn.onclick = () => {
   const details = prompt(translate('reportPrompt'));
   if (!details || !details.trim()) return;
 
@@ -836,6 +850,7 @@ async function createPeerConnection(targetId, initiator) {
 
 function status(s) {
   console.log('>>> STATUS:', s);
+  if (!statusEl) return;
   // Hide the whole status element when in public room
   if (s === translate('statusPublicRoom') || s === 'Back in public room') {
     statusEl.style.display = 'none';
@@ -907,11 +922,11 @@ function addChatMessage(text, sender, target, serverTimestamp) {
 }
 
 function clearChat() {
-  chatMessages.innerHTML = '';
-  privateChatMessages.innerHTML = '';
+  if (chatMessages) chatMessages.innerHTML = '';
+  if (privateChatMessages) privateChatMessages.innerHTML = '';
   publicChatHistory = '';
   privateChatHistory = '';
-  chatInput.value = '';
+  if (chatInput) chatInput.value = '';
   if (privateChatInput) privateChatInput.value = '';
 }
 
@@ -1399,7 +1414,7 @@ socket.on('public-stream-ready', ({ streamerId, streamerName, streamerIndex, bot
   if (publicStreamArea) publicStreamArea.style.display = 'flex';
   if (publicStreamName) {
     publicStreamName.textContent = streamerName;
-    if (!botVideoUrl) {
+    if (streamerId !== socket.id) {
       publicStreamName.style.cursor = 'pointer';
       publicStreamName.title = `Message ${streamerName}`;
       publicStreamName.onclick = () => openDmPanel(streamerId, streamerName);
@@ -2022,18 +2037,6 @@ if (cashoutSubmitBtn) {
 //  TikTok-style Live Feed
 // ═══════════════════════════════════
 
-const ttFeed          = document.getElementById('ttFeed');
-const ttSlideContainer= document.getElementById('ttSlideContainer');
-const ttEmptyEl       = document.getElementById('ttEmpty');
-const ttOverlayName   = document.getElementById('ttOverlayName');
-const ttChatEl        = document.getElementById('ttChat');
-const ttInputEl       = document.getElementById('ttInput');
-const ttSendBtnEl     = document.getElementById('ttSendBtn');
-const ttPrevBtnEl     = document.getElementById('ttPrevBtn');
-const ttNextBtnEl     = document.getElementById('ttNextBtn');
-const ttDotsEl        = document.getElementById('ttDots');
-const ttCoinCountEl   = document.getElementById('ttCoinCount');
-
 let ttStreamers    = [];
 let ttIndex        = 0;
 let ttSlideEls     = [];
@@ -2083,7 +2086,7 @@ function ttUpdateOverlay(streamer) {
   if (!streamer) return;
   if (ttOverlayName) {
     ttOverlayName.textContent = streamer.name || '—';
-    if (!streamer.isBot && streamer.socketId !== socket.id) {
+    if (streamer.socketId !== socket.id) {
       ttOverlayName.style.cursor = 'pointer';
       ttOverlayName.title = `Message ${streamer.name}`;
       ttOverlayName.onclick = () => openDmPanel(streamer.socketId, streamer.name);

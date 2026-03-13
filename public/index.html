@@ -486,7 +486,6 @@
                 <button id="ttMuteStreamBtn" class="tt-icon-btn" title="Mute stream">🔊</button>
                 <button id="ttMuteMicBtn" class="tt-icon-btn tt-mute-btn" title="Mute mic" style="display:none;">🎙️</button>
                 <button id="ttGoLiveBtn" class="tt-icon-btn" title="Go Live">📡 Go Live</button>
-                <button id="ttRandomBtn" class="tt-icon-btn" title="Random chat">🎲</button>
                 <div class="coin-balance tt-coins" id="ttCoinBalance" title="Your coins">🪙 <span id="ttCoinCount">0</span></div>
               </div>
             </div>
@@ -517,31 +516,15 @@
         </div>
         <!-- /TikTok Feed -->
 
-        <header class="chat-header">
-          <div class="coin-balance" id="coinBalance" title="Your coins">🪙 <span id="coinCount">0</span>
-            <button id="buyCoinsBtn" class="buy-coins-btn" title="Buy coins">+</button>
-            <button id="cashoutBtn" class="cashout-btn" title="Cash out">💸</button>
+        <!-- Hidden functional elements needed by JS -->
+        <div style="display:none">
+          <div class="coin-balance" id="coinBalance">🪙 <span id="coinCount">0</span>
+            <button id="buyCoinsBtn">+</button>
+            <button id="cashoutBtn">💸</button>
           </div>
-          <button id="goLiveBtn" class="go-live-btn" data-i18n="goLive" aria-label="Go live">📡 Go Live</button>
-          <button id="goRandomBtn" class="go-random-btn go-random-secondary" data-i18n="goRandom" aria-label="Go random">🎲 Random</button>
-        </header>
-
-        <!-- Live Streamers Discovery Grid -->
-        <div id="streamersGrid" class="streamers-grid">
-          <div class="streamers-grid-header">
-            <h2 class="streamers-grid-title">🔴 Live Now</h2>
-            <div class="streamers-header-right">
-              <span id="streamersCount" class="streamers-count">0 live</span>
-              <button id="collapseGridBtn" class="collapse-grid-btn" title="Collapse">▲</button>
-            </div>
-          </div>
-          <div id="streamersCards" class="streamers-cards">
-            <div class="no-streamers-msg" id="noStreamersMsg">
-              <span class="no-streamers-icon">📡</span>
-              <p>No one is live right now</p>
-              <p class="no-streamers-sub">Be the first to go live!</p>
-            </div>
-          </div>
+          <button id="goLiveBtn">Go Live</button>
+          <button id="goRandomBtn">Random</button>
+          <div id="streamersGrid"><div id="streamersCards"></div></div>
         </div>
 
         <!-- Public chat view -->
@@ -612,43 +595,7 @@
         </div>
       </div>
 
-      <!-- Private random chat interface (separate div, hidden until Go Random) -->
-      <div id="privateChatInterface" style="display:none">
-          <div class="controls controls-overlay">
-              <button id="nextBtn" class="control-btn control-primary" disabled aria-label="Find next partner" title="Find Next">⏭</button>
-              <button id="reportBtn" class="control-btn control-danger" aria-label="Report concern" title="Report">⚑</button>
-              <button id="chatToggleBtn" class="control-btn control-secondary" aria-label="Collapse chat" title="Collapse Chat">💬</button>
-              <button id="stopRandomBtn" class="control-btn stop-random-btn" aria-label="Stop random" title="Stop Random">⏹</button>
-          </div>
-        <section id="privateChatSection" class="chat-view">
-          <div class="videos">
-            <div class="video-wrap">
-              <video id="localVideo" autoplay muted playsinline poster="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7"></video>
-              <button id="flipCameraBtn" class="flip-camera-btn" aria-label="Flip camera" title="Flip Camera">🔄</button>
-            </div>
-            <div class="video-wrap">
-              <video id="remoteVideo" autoplay playsinline poster="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7"></video>
-              <div id="remotePlaceholder" class="video-placeholder"></div>
-            </div>
-          </div>
 
-          <p id="status" data-i18n="idle">Idle</p>
-
-          <div class="private-chat-panel" id="privateChatPanel">
-            <div id="privateChatMessages" class="chat-messages"></div>
-            <div class="private-chat-input-wrap">
-              <input 
-                id="privateChatInput" 
-                type="text" 
-                placeholder="Type a message..."
-                data-i18n-placeholder="typeMessage" 
-                disabled
-              />
-              <button id="privateSendBtn" data-i18n="send" disabled>Send</button>
-            </div>
-          </div>
-        </section>
-      </div>
 
     <!-- Buy Coins Modal -->
     <div id="buyCoinsModal" class="modal-overlay" style="display:none;">
