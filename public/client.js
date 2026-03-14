@@ -1173,7 +1173,7 @@ if (muteMicBtnLive) {
     if (!audioTrack) return;
     audioTrack.enabled = !audioTrack.enabled;
     const muted = !audioTrack.enabled;
-    muteMicBtnLive.textContent = muted ? '🔇' : '🎙️';
+    muteMicBtnLive.textContent = '\uD83C\uDF99\uFE0F';
     muteMicBtnLive.classList.toggle('muted', muted);
     muteMicBtnLive.title = muted ? 'Unmute mic' : 'Mute mic';
   };
@@ -2523,7 +2523,7 @@ if (ttFeed) {
     if (!audioTrack) return;
     audioTrack.enabled = !audioTrack.enabled;
     const muted = !audioTrack.enabled;
-    ttMuteMicEl.textContent = muted ? '🔇' : '🎙️';
+    ttMuteMicEl.textContent = '\uD83C\uDF99\uFE0F';
     ttMuteMicEl.classList.toggle('muted', muted);
     ttMuteMicEl.title = muted ? 'Unmute mic' : 'Mute mic';
   });
