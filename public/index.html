@@ -477,11 +477,6 @@
             <div class="tt-topbar">
               <span id="ttOverlayName" class="tt-name"></span>
               <span id="ttOverlayViewers" class="tt-viewers tt-viewers-clickable"></span>
-              <!-- Viewer list popup -->
-              <div id="ttViewerPopup" class="tt-viewer-popup" style="display:none;">
-                <div class="tt-viewer-popup-header">👁 Viewers</div>
-                <ul id="ttViewerList" class="tt-viewer-list"></ul>
-              </div>
               <div class="tt-topbar-actions">
                 <button id="ttMuteStreamBtn" class="tt-icon-btn" title="Mute stream">🔊</button>
                 <button id="ttMuteMicBtn" class="tt-icon-btn tt-mute-btn" title="Mute mic" style="display:none;">🎙️</button>
@@ -491,6 +486,12 @@
                 <button id="ttGoLiveBtn" class="tt-icon-btn" title="Go Live">📡 Go Live</button>
                 <div class="coin-balance tt-coins" id="ttCoinBalance" title="Your coins">🪙 <span id="ttCoinCount">0</span></div>
               </div>
+            </div>
+
+            <!-- Viewer list popup (sibling of topbar so overflow-x:auto doesn't clip it) -->
+            <div id="ttViewerPopup" class="tt-viewer-popup" style="display:none;">
+              <div class="tt-viewer-popup-header">👁 Viewers</div>
+              <ul id="ttViewerList" class="tt-viewer-list"></ul>
             </div>
 
             <!-- Navigation arrows (desktop) -->

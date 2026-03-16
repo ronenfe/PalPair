@@ -1354,6 +1354,7 @@ async function startPublicStream() {
     { const el = document.getElementById('longLegsBtnLive'); if (el) el.style.display = 'flex'; }
     { const el = document.getElementById('ttLongLegsBtn'); if (el) el.style.display = 'inline-flex'; }
     if (isBeautifyOn || isLongLegsOn) startBeautifyProcessing();
+    if (ttFeed) ttFeed.classList.add('tt-is-streaming');
     // In TikTok mode: show camera in the dedicated self-view element and pause slide videos
     if (ttActive) {
       const ttSelfVideo = document.getElementById('ttSelfVideo');
@@ -1362,7 +1363,7 @@ async function startPublicStream() {
         ttSelfVideo.style.display = '';
       }
       if (ttOverlayName) ttOverlayName.textContent = 'You (Live)';
-      if (ttOverlayViewers) ttOverlayViewers.textContent = '🔴 LIVE';
+      if (ttOverlayViewers) ttOverlayViewers.textContent = '� 0';
       const ttMuteMicBtnEl = document.getElementById('ttMuteMicBtn');
       if (ttMuteMicBtnEl) { ttMuteMicBtnEl.style.display = 'flex'; ttMuteMicBtnEl.textContent = '🎙️'; ttMuteMicBtnEl.classList.remove('muted'); }
       ttSlideEls.forEach(slide => {
@@ -1407,6 +1408,7 @@ function stopPublicStream() {
   { const el = document.getElementById('ttBeautifyBtn'); if (el) el.style.display = 'none'; }
   { const el = document.getElementById('longLegsBtnLive'); if (el) el.style.display = 'none'; }
   { const el = document.getElementById('ttLongLegsBtn'); if (el) el.style.display = 'none'; }
+  if (ttFeed) ttFeed.classList.remove('tt-is-streaming');
   const shareBtn = document.getElementById('shareStreamBtn');
   if (shareBtn) shareBtn.style.display = 'none';
   const ttShareBtn = document.getElementById('ttShareBtn');
@@ -1542,7 +1544,7 @@ socket.on('public-stream-ready', ({ streamerId, streamerName, streamerIndex, bot
       ttGoTo(streamerIndex, true);
       // Restore our labels since ttGoTo → ttUpdateOverlay overwrites them
       if (ttOverlayName) ttOverlayName.textContent = 'You (Live)';
-      if (ttOverlayViewers) ttOverlayViewers.textContent = '🔴 LIVE';
+      if (ttOverlayViewers) ttOverlayViewers.textContent = `👁 ${viewerCount || 0}`;
     }
     return;
   }
@@ -1694,12 +1696,16 @@ socket.on('public-stream-signal', async ({ from, data }) => {
 // ── Stream update: new streamer list from server ──
 socket.on('public-stream-update', ({ streamers }) => {
   lastKnownStreamers = streamers || [];
-  // Update viewer count if currently watching
+  // Update viewer count if currently watching or streaming
   if (currentWatchingStreamerId) {
     const current = streamers.find(s => s.socketId === currentWatchingStreamerId);
     if (current && publicStreamViewerCount) {
       publicStreamViewerCount.textContent = `👁 ${current.viewerCount || 0}`;
     }
+  }
+  if (isStreaming) {
+    const self = streamers.find(s => s.socketId === socket.id);
+    if (self && ttOverlayViewers) ttOverlayViewers.textContent = `👁 ${self.viewerCount || 0}`;
   }
   // Render the streamers discovery grid
   renderStreamersGrid(streamers);
@@ -2630,7 +2636,9 @@ if (ttFeed) {
   function sendTtChat() {
     if (!ttInputEl) return;
     const text = ttInputEl.value.trim();
-    if (!text || !currentWatchingStreamerId) return;
+    if (!text) return;
+    // Allow sending when broadcasting (use own socket as stream room) or watching
+    if (!currentWatchingStreamerId && !isStreaming) return;
     const clientMsgId = `msg_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
     pendingPublicMessageIds.add(clientMsgId);
     addChatMessage(text, 'local');

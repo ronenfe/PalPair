@@ -2775,7 +2775,12 @@ body.tt-mode .chat-input-wrap {
   gap: 8px;
   background: linear-gradient(to bottom, rgba(0,0,0,.65) 0%, transparent 100%);
   pointer-events: auto;
+  overflow-x: auto;
+  overflow-y: visible;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
 }
+.tt-topbar::-webkit-scrollbar { display: none; }
 .tt-live-badge {
   background: #e00;
   color: #fff;
@@ -2787,7 +2792,8 @@ body.tt-mode .chat-input-wrap {
   flex-shrink: 0;
 }
 .tt-name {
-  flex: 1;
+  flex-shrink: 0;
+  max-width: 40vw;
   color: #fff;
   font-weight: 700;
   font-size: 1rem;
@@ -2851,6 +2857,7 @@ body.tt-mode .chat-input-wrap {
   align-items: center;
   gap: 6px;
   flex-shrink: 0;
+  padding-bottom: 2px;
 }
 .tt-icon-btn {
   background: rgba(0,0,0,.45);
@@ -2982,6 +2989,7 @@ body.tt-mode .chat-input-wrap {
   overflow-x: auto;
   scrollbar-width: none;
 }
+.tt-is-streaming .tt-tip-row { display: none; }
 .tt-tip-row::-webkit-scrollbar { display: none; }
 .tt-tip-row .tip-btn {
   background: rgba(255,255,255,.15);
