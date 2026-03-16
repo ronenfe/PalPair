@@ -2604,7 +2604,7 @@ if (ttFeed) {
   ttFeed.addEventListener('touchstart', e => {
     if (e.touches.length !== 1) return;
     // Don't start a slide-drag from scrollable child elements or nav buttons
-    if (e.target.closest('.tt-tip-row') || e.target.closest('.tt-chat-messages') || e.target.closest('.tt-nav-btn')) return;
+    if (e.target.closest('.tt-tip-row') || e.target.closest('.tt-chat-messages') || e.target.closest('.tt-nav-btn') || e.target.closest('.tt-topbar')) return;
     onTtStart(e.touches[0].clientY);
   }, { passive: true });
   ttFeed.addEventListener('touchmove', e => {
