@@ -1707,7 +1707,7 @@ function maybeEmitBotReplyToHumanPublicMessage(fromSocketId, text) {
   // Find the streamer the human is watching
   const streamerId = io.sockets.sockets.get(fromSocketId)?.data?.currentStreamRoom;
 
-  // Don't let bots intervene when multiple real users are chatting
+  // Count real humans in the room — only reply when the user is alone
   let humansCount = 0;
   if (streamerId) {
     const room = getStreamChatRoom(streamerId);
@@ -1724,17 +1724,25 @@ function maybeEmitBotReplyToHumanPublicMessage(fromSocketId, text) {
   }
   if (humansCount > 1) return;
 
-  const speakerId = getPublicRoomSpeakerBotSocketId();
-  if (!speakerId) return;
+  // When the user is watching a virtual bot broadcaster, that bot replies directly.
+  // Virtual bots have no real socket, so skip the socket-existence check.
+  const isVirtualBotStreamer = streamerId && bots.has(streamerId);
+  let speakerId;
+  if (isVirtualBotStreamer) {
+    speakerId = streamerId;
+  } else {
+    speakerId = getPublicRoomSpeakerBotSocketId();
+    if (!speakerId) return;
+    // For real-socket bots, confirm they're still active in the public room
+    const speakerSocket = io.sockets.sockets.get(speakerId);
+    if (!speakerSocket || !speakerSocket.data?.publicRoomJoined) return;
+  }
 
   const humanName = getSocketDisplayName(fromSocketId);
   const botProfile = botProfiles.get(speakerId) || userProfiles.get(speakerId)?.profile || {};
-  const speakerName = getSocketDisplayName(speakerId);
+  const speakerName = botProfile.name || getSocketDisplayName(speakerId);
 
   setTimeout(async () => {
-    const speakerSocket = io.sockets.sockets.get(speakerId);
-    if (!speakerSocket || !speakerSocket.data?.publicRoomJoined) return;
-
     try {
       const replyBody = await getPublicRoomBotReply(text, botProfile);
       const replyText = `${humanName}, ${replyBody}`;
@@ -1753,6 +1761,8 @@ function maybeEmitBotReplyToHumanPublicMessage(fromSocketId, text) {
       }
     } catch (error) {
       console.warn('Skipping public room bot reply:', error.message);
+      // For virtual bot streams just skip the error message — no need to clutter chat
+      if (isVirtualBotStreamer) return;
       const errorEvent = buildPublicRoomEvent({
         type: 'system',
         text: `${speakerName} couldn't reply right now (Groq temporarily unavailable).`
