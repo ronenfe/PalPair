@@ -47,6 +47,9 @@ class MainActivity : AppCompatActivity() {
         webView = WebView(this)
         setContentView(webView)
 
+        // Black background so no gray app chrome bleeds through during slide transitions
+        webView.setBackgroundColor(android.graphics.Color.BLACK)
+
         // WebView settings for WebRTC + camera/mic
         webView.settings.apply {
             javaScriptEnabled = true
@@ -61,18 +64,22 @@ class MainActivity : AppCompatActivity() {
             cacheMode = WebSettings.LOAD_NO_CACHE
         }
 
-        // Inject CSS to suppress native play-button overlay on all video elements
+        // On page load: suppress the native Android WebView video play-button overlay
+        // by ensuring every <video> has a poster attribute. We use a 1×1 transparent GIF
+        // which hides the native controls without affecting visible content (slide
+        // backgrounds and avatar placeholders show through beneath the video element).
         webView.webViewClient = object : WebViewClient() {
             override fun onPageFinished(view: WebView?, url: String?) {
                 val poster = "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7"
                 view?.evaluateJavascript(
                     """(function(){
                         var POSTER = '$poster';
-                        // Add poster to all existing video elements
+                        // Patch all existing video elements
                         document.querySelectorAll('video').forEach(function(v){
                             if (!v.getAttribute('poster')) v.setAttribute('poster', POSTER);
                         });
                         // Patch createElement so every future <video> also gets a poster
+                        // (suppresses the native gray play-button overlay on Android WebView)
                         var _orig = document.createElement.bind(document);
                         document.createElement = function(tag) {
                             var el = _orig(tag);

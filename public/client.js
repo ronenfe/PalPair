@@ -2069,9 +2069,19 @@ let ttChatObserver    = null;
 let ttActive          = false;
 let ttChatUserScrolled = false; // true when user has scrolled up in chat
 
+function ttSyncSlideHeights() {
+  // On Android WebView, 100dvh (CSS) can differ from the actual container
+  // height (JS), making translateY misaligned so the next slide never peeks in.
+  // Force every slide to exactly ttFeedH pixels so CSS and JS always agree.
+  if (!ttFeed) return;
+  ttFeedH = ttFeed.clientHeight || window.innerHeight;
+  const h = ttFeedH + 'px';
+  ttSlideEls.forEach(s => { if (s.style.height !== h) s.style.height = h; });
+}
+
 function ttUpdatePos(animated, delta = 0) {
   if (!ttSlideContainer) return;
-  ttFeedH = (ttFeed && ttFeed.clientHeight) || window.innerHeight;
+  ttSyncSlideHeights();
   const y = -ttIndex * ttFeedH + delta;
   const transition = animated ? 'transform 0.32s cubic-bezier(.4,0,.2,1)' : 'none';
   ttSlideContainer.style.transition = transition;
@@ -2132,12 +2142,9 @@ function ttGoTo(index, animated = true) {
   const prev = ttIndex;
   ttIndex = Math.max(0, Math.min(ttStreamers.length - 1, index));
 
-  // Pause bot video in previous slide if it wasn't changed
-  const prevSlide = ttSlideEls[prev];
-  if (prevSlide) {
-    const v = prevSlide.querySelector('video');
-    if (v && v.src) v.pause();
-  }
+  // Do NOT pause the previous slide's video here — pausing then immediately
+  // re-playing in ttLoadAdjacentVideos triggers Android's native gray overlay
+  // for that one frame. Let ttLoadAdjacentVideos own all play/pause decisions.
 
   ttUpdatePos(animated);
   ttUpdateDots();
@@ -2309,15 +2316,51 @@ function ttLoadAdjacentVideos(index) {
     const nearby = Math.abs(i - index) <= 1;
     if (nearby) {
       if (!v.src || v.src !== v.dataset.src) {
-        v.style.display = 'block';
+        v.style.display = 'none';
+        v.style.opacity = '0';
         v.src = v.dataset.src;
         v.load();
+        // Reveal only when the first real pixel frame is painted — not just on
+        // canplay (which fires before the first frame is rendered, causing a
+        // brief gray flash on Android and desktop Chrome).
+        const revealVideo = () => {
+          v.style.display = 'block';
+          v.style.opacity = '1';
+        };
+        const onCanPlay = () => {
+          v.removeEventListener('canplay', onCanPlay);
+          // Start playing (muted — suppresses Android native gray overlay).
+          // Keep display:none until first frame is actually painted.
+          v.play().catch(() => {});
+          if (typeof v.requestVideoFrameCallback === 'function') {
+            v.requestVideoFrameCallback(revealVideo);
+          } else {
+            // Fallback: timeupdate fires only when frames are being decoded/rendered
+            const onTime = () => { v.removeEventListener('timeupdate', onTime); revealVideo(); };
+            v.addEventListener('timeupdate', onTime);
+          }
+        };
+        v.addEventListener('canplay', onCanPlay);
+      } else {
+        // Already loaded — make sure it's playing and visible
+        if (v.paused) {
+          v.play().catch(() => {});
+        }
+        // Ensure it's visible (may have been hidden if src was just set)
+        if (v.style.display === 'none' || v.style.opacity === '0') {
+          if (typeof v.requestVideoFrameCallback === 'function') {
+            v.requestVideoFrameCallback(() => { v.style.display = 'block'; v.style.opacity = '1'; });
+          } else {
+            v.style.display = 'block';
+            v.style.opacity = '1';
+          }
+        }
       }
-      if (i === index && !isStreaming) v.play().catch(() => {});
-      else v.pause();
     } else {
       // Unload to free bandwidth/memory
       v.pause();
+      v.style.opacity = '0';
+      v.style.transition = '';
       v.removeAttribute('src');
       v.load();
       v.style.display = 'none';
@@ -2528,10 +2571,18 @@ if (ttFeed) {
     ttMuteMicEl.title = muted ? 'Unmute mic' : 'Mute mic';
   });
 
-  // Resize: update slide heights
+  // Resize: update slide heights (also fires on Android soft-keyboard show/hide)
   window.addEventListener('resize', () => {
+    ttSyncSlideHeights();
     ttUpdatePos(false);
   });
+  // visualViewport covers Android address-bar / keyboard resize events
+  if (window.visualViewport) {
+    window.visualViewport.addEventListener('resize', () => {
+      ttSyncSlideHeights();
+      ttUpdatePos(false);
+    });
+  }
 
   // Tip buttons inside TikTok feed — reuse existing tip-btn logic
   ttFeed.querySelectorAll('.tip-btn').forEach(btn => {
