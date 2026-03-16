@@ -365,10 +365,14 @@ function setChatCollapsed(collapsed) {
 }
 
 function setRandomMode(active) {
-  if (active) return; // random chat removed — always stay in TT mode
-  isRunning = false;
-  enterTtMode();
-  document.body.classList.remove('random-active');
+  if (!active) {
+    isRunning = false;
+    enterTtMode();
+    document.body.classList.remove('random-active');
+  } else {
+    exitTtMode();
+    document.body.classList.add('random-active');
+  }
 
   // Switch between public chat interface and private chat interface
   if (active) {
@@ -2658,7 +2662,7 @@ if (ttFeed) {
     ttMuteStreamEl.title = isStreamMuted ? 'Unmute stream' : 'Mute stream';
   }
   if (ttGoLiveEl)  ttGoLiveEl.addEventListener('click',  () => { if (goLiveBtn) goLiveBtn.click(); });
-  if (ttRandomEl)  ttRandomEl.addEventListener('click',  () => { if (goRandomBtn) goRandomBtn.click(); });
+  if (ttRandomEl)  ttRandomEl.addEventListener('click',  () => { exitTtMode(); if (goRandomBtn) goRandomBtn.click(); });
   if (ttMuteStreamEl) ttMuteStreamEl.addEventListener('click', () => {
     // Mute the viewer stream video (ttStreamVideo or publicStreamVideo in TT mode)
     const streamVid = document.getElementById('ttStreamVideo') || publicStreamVideo;

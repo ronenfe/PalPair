@@ -351,6 +351,80 @@ body.chat-active #privateChatInterface {
   overflow: hidden;
 }
 
+.private-chat-panel {
+  position: absolute;
+  left: 10px;
+  bottom: 62px;
+  width: min(86%, 420px);
+  height: clamp(160px, 28vh, 260px);
+  z-index: 7;
+  display: flex;
+  flex-direction: column;
+  background: #2B2930;
+  border-radius: 14px;
+  overflow: hidden;
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.5);
+  transition: opacity 0.2s ease, transform 0.2s ease;
+}
+
+.private-chat-panel .chat-messages {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 12px;
+  background: #1C1B1F;
+}
+
+.private-chat-input-wrap {
+  display: flex;
+  gap: 8px;
+  padding: 8px 10px;
+  background: #2B2930;
+  border-top: 1px solid #49454F;
+  flex-shrink: 0;
+}
+
+.private-chat-input-wrap input {
+  flex: 1;
+  min-width: 0;
+  padding: 8px 14px;
+  border: 1px solid #49454F;
+  border-radius: 20px;
+  font-size: 14px;
+  background: #1C1B1F;
+  color: #E6E1E5;
+  transition: border-color 0.2s;
+}
+
+.private-chat-input-wrap input:focus {
+  outline: none;
+  border-color: #D0BCFF;
+  box-shadow: 0 0 0 2px rgba(208, 188, 255, 0.2);
+}
+
+.private-chat-input-wrap input:disabled {
+  background: #36343B;
+  color: #938F99;
+  cursor: not-allowed;
+}
+
+.private-chat-input-wrap button {
+  flex: 0 0 auto;
+  padding: 8px 16px;
+  background: #D0BCFF;
+  color: #381E72;
+  border: none;
+  border-radius: 20px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.private-chat-input-wrap button:hover:not(:disabled) {
+  box-shadow: 0 2px 8px rgba(208, 188, 255, 0.4);
+}
+
 .chat-view {
   display: flex;
   flex-direction: column;
