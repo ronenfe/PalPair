@@ -2062,6 +2062,11 @@ let ttStreamers    = [];
 let ttIndex        = 0;
 let ttSlideEls     = [];
 let ttFeedH        = window.innerHeight;
+// Dark 2×2 PNG poster set on every bot <video> so the pre-frame state shows our
+// background color instead of Android WebView's native gray placeholder.
+const _pc = document.createElement('canvas'); _pc.width = _pc.height = 2;
+_pc.getContext('2d').fillStyle = '#0a0a14'; _pc.getContext('2d').fillRect(0,0,2,2);
+const SLIDE_DARK_POSTER = _pc.toDataURL('image/png');
 let ttDragStartY   = 0;
 let ttDragDeltaY   = 0;
 let ttIsDragging   = false;
@@ -2267,28 +2272,19 @@ function renderTikTokFeed(streamers) {
       vid.loop  = true;
       vid.preload = 'none';
       vid.setAttribute('playsinline', '');
-      // No transparent poster — slide background shows through instead
+      // poster = dark data URL so Android shows our background color (not gray)
+      // during buffering. Video stays display:block at all times — never hidden —
+      // so the compositor keeps it alive and adjacent slides are pre-rendered
+      // before the user swipes to them.
+      vid.poster = SLIDE_DARK_POSTER;
       slide.appendChild(vid);
-      // Avatar behind the video so there's no black flash while it loads
-      const ph = document.createElement('div');
-      ph.className = 'tt-slide-placeholder';
-      const initial = (streamer.name || '?')[0].toUpperCase();
-      ph.innerHTML = `<div class="tt-slide-avatar">${initial}</div><div class="tt-slide-pname">${streamer.name || ''}</div>`;
-      slide.insertBefore(ph, vid);
     } else {
-      // Real-user slide: always add avatar placeholder as base layer
-      const ph = document.createElement('div');
-      ph.className = 'tt-slide-placeholder';
-      const initial = (streamer.name || '?')[0].toUpperCase();
-      ph.innerHTML = `<div class="tt-slide-avatar">${initial}</div><div class="tt-slide-pname">${streamer.name || ''}</div>`;
-      slide.appendChild(ph);
+      // Real-user slide: show thumbnail while stream loads
       if (streamer.thumbnail) {
-        // Blurred background behind everything
         const bg = document.createElement('div');
         bg.className = 'tt-slide-blur-bg';
         bg.style.backgroundImage = `url('${streamer.thumbnail}')`;
         slide.appendChild(bg);
-        // Sharp thumbnail on top of blur
         const img = document.createElement('img');
         img.className = 'tt-slide-video';
         img.src = streamer.thumbnail;
@@ -2316,54 +2312,23 @@ function ttLoadAdjacentVideos(index) {
     const nearby = Math.abs(i - index) <= 1;
     if (nearby) {
       if (!v.src || v.src !== v.dataset.src) {
-        v.style.display = 'none';
-        v.style.opacity = '0';
+        // Lazy-load: only set src when this slide is current or adjacent.
+        // poster (dark data URL) shows during buffering — no gray flash.
         v.src = v.dataset.src;
         v.load();
-        // Reveal only when the first real pixel frame is painted — not just on
-        // canplay (which fires before the first frame is rendered, causing a
-        // brief gray flash on Android and desktop Chrome).
-        const revealVideo = () => {
-          v.style.display = 'block';
-          v.style.opacity = '1';
-        };
         const onCanPlay = () => {
           v.removeEventListener('canplay', onCanPlay);
-          // Start playing (muted — suppresses Android native gray overlay).
-          // Keep display:none until first frame is actually painted.
           v.play().catch(() => {});
-          if (typeof v.requestVideoFrameCallback === 'function') {
-            v.requestVideoFrameCallback(revealVideo);
-          } else {
-            // Fallback: timeupdate fires only when frames are being decoded/rendered
-            const onTime = () => { v.removeEventListener('timeupdate', onTime); revealVideo(); };
-            v.addEventListener('timeupdate', onTime);
-          }
         };
         v.addEventListener('canplay', onCanPlay);
-      } else {
-        // Already loaded — make sure it's playing and visible
-        if (v.paused) {
-          v.play().catch(() => {});
-        }
-        // Ensure it's visible (may have been hidden if src was just set)
-        if (v.style.display === 'none' || v.style.opacity === '0') {
-          if (typeof v.requestVideoFrameCallback === 'function') {
-            v.requestVideoFrameCallback(() => { v.style.display = 'block'; v.style.opacity = '1'; });
-          } else {
-            v.style.display = 'block';
-            v.style.opacity = '1';
-          }
-        }
+      } else if (v.paused) {
+        v.play().catch(() => {});
       }
     } else {
-      // Unload to free bandwidth/memory
+      // Unload to free bandwidth/memory; poster (dark) shows while unloaded
       v.pause();
-      v.style.opacity = '0';
-      v.style.transition = '';
       v.removeAttribute('src');
       v.load();
-      v.style.display = 'none';
     }
   });
 }
