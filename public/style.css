@@ -629,6 +629,13 @@ body.chat-active .control-btn {
 .beautify-btn-live {
   right: 88px;
 }
+.long-legs-btn-live {
+  right: 128px;
+}
+.long-legs-btn-live.active,
+#ttLongLegsBtn.active {
+  background: rgba(0, 140, 100, 0.75);
+}
 .beautify-btn-live.active,
 #ttBeautifyBtn.active {
   background: rgba(138, 43, 226, 0.75);

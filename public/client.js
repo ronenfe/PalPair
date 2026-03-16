@@ -219,6 +219,7 @@ let pendingWatchByIdActive = false;
 
 // Beautify filter state
 let isBeautifyOn = false;
+let isLongLegsOn = false;
 let beautifyRaf = null;
 let beautifyHiddenVid = null;
 let beautifyCanvas = null;
@@ -1219,7 +1220,7 @@ if (flipCameraBtnLive) {
 
 let thumbnailInterval = null;
 
-// ── Beautify filter ──
+// ── Beautify / Longer-legs canvas processing ──
 function startBeautifyProcessing() {
   if (!publicStreamLocalStream) return;
   const track = publicStreamLocalStream.getVideoTracks()[0];
@@ -1238,8 +1239,22 @@ function startBeautifyProcessing() {
   const ctx = beautifyCanvas.getContext('2d');
   function drawFrame() {
     if (!beautifyHiddenVid) return;
-    ctx.filter = 'blur(0.6px) brightness(1.08) contrast(0.88) saturate(1.12)';
-    ctx.drawImage(beautifyHiddenVid, 0, 0, W, H);
+    ctx.filter = isBeautifyOn
+      ? 'blur(0.6px) brightness(1.08) contrast(0.88) saturate(1.12)'
+      : 'none';
+    if (isLongLegsOn) {
+      // Split point in canvas output (where torso ends / legs begin)
+      const splitY = Math.round(H * 0.52);
+      // Source split: compress upper body slightly so legs can be stretched
+      // within the same canvas height. legStretch = 1.18 (~18% longer).
+      const sourceSplitY = Math.round(H - (H - splitY) / 1.18);
+      // Upper body: source [0..sourceSplitY] → canvas [0..splitY]
+      ctx.drawImage(beautifyHiddenVid, 0, 0, W, sourceSplitY, 0, 0, W, splitY);
+      // Legs: source [sourceSplitY..H] → canvas [splitY..H] (stretched)
+      ctx.drawImage(beautifyHiddenVid, 0, sourceSplitY, W, H - sourceSplitY, 0, splitY, W, H - splitY);
+    } else {
+      ctx.drawImage(beautifyHiddenVid, 0, 0, W, H);
+    }
     beautifyRaf = requestAnimationFrame(drawFrame);
   }
   drawFrame();
@@ -1249,10 +1264,9 @@ function startBeautifyProcessing() {
     const sender = viewerPC.getSenders().find(s => s.track && s.track.kind === 'video');
     if (sender && beautifiedTrack) sender.replaceTrack(beautifiedTrack).catch(() => {});
   }
-  // CSS filter on local preview elements
-  if (publicStreamVideo) publicStreamVideo.style.filter = 'brightness(1.08) contrast(0.88) saturate(1.12)';
+  if (publicStreamVideo) publicStreamVideo.style.filter = isBeautifyOn ? 'brightness(1.08) contrast(0.88) saturate(1.12)' : '';
   const ttSelfVid = document.getElementById('ttSelfVideo');
-  if (ttSelfVid) ttSelfVid.style.filter = 'brightness(1.08) contrast(0.88) saturate(1.12)';
+  if (ttSelfVid) ttSelfVid.style.filter = isBeautifyOn ? 'brightness(1.08) contrast(0.88) saturate(1.12)' : '';
 }
 
 function stopBeautifyProcessing() {
@@ -1279,10 +1293,33 @@ function toggleBeautify() {
   document.querySelectorAll('#beautifyBtnLive, #ttBeautifyBtn').forEach(btn => {
     btn.classList.toggle('active', isBeautifyOn);
   });
-  if (isBeautifyOn) {
-    if (isStreaming) startBeautifyProcessing();
-  } else {
-    stopBeautifyProcessing();
+  if (isStreaming) {
+    if (isBeautifyOn || isLongLegsOn) {
+      if (beautifyCanvasStream) {
+        // Pipeline already running — just update CSS filter on previews
+        if (publicStreamVideo) publicStreamVideo.style.filter = 'brightness(1.08) contrast(0.88) saturate(1.12)';
+        const ttSelfVid = document.getElementById('ttSelfVideo');
+        if (ttSelfVid) ttSelfVid.style.filter = 'brightness(1.08) contrast(0.88) saturate(1.12)';
+      } else {
+        startBeautifyProcessing();
+      }
+    } else {
+      stopBeautifyProcessing();
+    }
+  }
+}
+
+function toggleLongLegs() {
+  isLongLegsOn = !isLongLegsOn;
+  document.querySelectorAll('#longLegsBtnLive, #ttLongLegsBtn').forEach(btn => {
+    btn.classList.toggle('active', isLongLegsOn);
+  });
+  if (isStreaming) {
+    if (isBeautifyOn || isLongLegsOn) {
+      if (!beautifyCanvasStream) startBeautifyProcessing();
+    } else {
+      stopBeautifyProcessing();
+    }
   }
 }
 
@@ -1290,6 +1327,10 @@ const beautifyBtnLive = document.getElementById('beautifyBtnLive');
 if (beautifyBtnLive) beautifyBtnLive.onclick = toggleBeautify;
 const ttBeautifyBtnEl = document.getElementById('ttBeautifyBtn');
 if (ttBeautifyBtnEl) ttBeautifyBtnEl.onclick = toggleBeautify;
+const longLegsBtnLive = document.getElementById('longLegsBtnLive');
+if (longLegsBtnLive) longLegsBtnLive.onclick = toggleLongLegs;
+const ttLongLegsBtnEl = document.getElementById('ttLongLegsBtn');
+if (ttLongLegsBtnEl) ttLongLegsBtnEl.onclick = toggleLongLegs;
 
 async function startPublicStream() {
   try {
@@ -1310,7 +1351,9 @@ async function startPublicStream() {
     if (muteMicBtnLive) { muteMicBtnLive.style.display = 'flex'; muteMicBtnLive.textContent = '🎙️'; muteMicBtnLive.classList.remove('muted'); }
     { const el = document.getElementById('beautifyBtnLive'); if (el) el.style.display = 'flex'; }
     { const el = document.getElementById('ttBeautifyBtn'); if (el) el.style.display = 'inline-flex'; }
-    if (isBeautifyOn) startBeautifyProcessing();
+    { const el = document.getElementById('longLegsBtnLive'); if (el) el.style.display = 'flex'; }
+    { const el = document.getElementById('ttLongLegsBtn'); if (el) el.style.display = 'inline-flex'; }
+    if (isBeautifyOn || isLongLegsOn) startBeautifyProcessing();
     // In TikTok mode: show camera in the dedicated self-view element and pause slide videos
     if (ttActive) {
       const ttSelfVideo = document.getElementById('ttSelfVideo');
@@ -1362,6 +1405,8 @@ function stopPublicStream() {
   stopBeautifyProcessing();
   { const el = document.getElementById('beautifyBtnLive'); if (el) el.style.display = 'none'; }
   { const el = document.getElementById('ttBeautifyBtn'); if (el) el.style.display = 'none'; }
+  { const el = document.getElementById('longLegsBtnLive'); if (el) el.style.display = 'none'; }
+  { const el = document.getElementById('ttLongLegsBtn'); if (el) el.style.display = 'none'; }
   const shareBtn = document.getElementById('shareStreamBtn');
   if (shareBtn) shareBtn.style.display = 'none';
   const ttShareBtn = document.getElementById('ttShareBtn');
