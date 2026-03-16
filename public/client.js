@@ -370,6 +370,7 @@ function setRandomMode(active) {
     enterTtMode();
     document.body.classList.remove('random-active');
   } else {
+    isRunning = true;
     exitTtMode();
     document.body.classList.add('random-active');
   }
