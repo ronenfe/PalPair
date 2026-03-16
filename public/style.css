@@ -626,6 +626,13 @@ body.chat-active .control-btn {
 .mute-mic-btn-live.muted {
   background: rgba(220, 53, 69, 0.75);
 }
+.beautify-btn-live {
+  right: 88px;
+}
+.beautify-btn-live.active,
+#ttBeautifyBtn.active {
+  background: rgba(138, 43, 226, 0.75);
+}
 
 .go-random-btn {
   position: relative;

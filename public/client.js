@@ -217,6 +217,13 @@ let currentWatchingStreamerId = null;
 let isStreamMuted = localStorage.getItem('streamMuted') === 'true';
 let pendingWatchByIdActive = false;
 
+// Beautify filter state
+let isBeautifyOn = false;
+let beautifyRaf = null;
+let beautifyHiddenVid = null;
+let beautifyCanvas = null;
+let beautifyCanvasStream = null;
+
 // User profile and filters
 let userProfile = null;
 let userFilters = null;
@@ -1212,6 +1219,78 @@ if (flipCameraBtnLive) {
 
 let thumbnailInterval = null;
 
+// ── Beautify filter ──
+function startBeautifyProcessing() {
+  if (!publicStreamLocalStream) return;
+  const track = publicStreamLocalStream.getVideoTracks()[0];
+  if (!track) return;
+  const settings = track.getSettings();
+  const W = settings.width || 640;
+  const H = settings.height || 480;
+  beautifyHiddenVid = document.createElement('video');
+  beautifyHiddenVid.srcObject = publicStreamLocalStream;
+  beautifyHiddenVid.muted = true;
+  beautifyHiddenVid.setAttribute('playsinline', '');
+  beautifyHiddenVid.play().catch(() => {});
+  beautifyCanvas = document.createElement('canvas');
+  beautifyCanvas.width = W;
+  beautifyCanvas.height = H;
+  const ctx = beautifyCanvas.getContext('2d');
+  function drawFrame() {
+    if (!beautifyHiddenVid) return;
+    ctx.filter = 'blur(0.6px) brightness(1.08) contrast(0.88) saturate(1.12)';
+    ctx.drawImage(beautifyHiddenVid, 0, 0, W, H);
+    beautifyRaf = requestAnimationFrame(drawFrame);
+  }
+  drawFrame();
+  beautifyCanvasStream = beautifyCanvas.captureStream(30);
+  const beautifiedTrack = beautifyCanvasStream.getVideoTracks()[0];
+  for (const [, viewerPC] of publicStreamPCs) {
+    const sender = viewerPC.getSenders().find(s => s.track && s.track.kind === 'video');
+    if (sender && beautifiedTrack) sender.replaceTrack(beautifiedTrack).catch(() => {});
+  }
+  // CSS filter on local preview elements
+  if (publicStreamVideo) publicStreamVideo.style.filter = 'brightness(1.08) contrast(0.88) saturate(1.12)';
+  const ttSelfVid = document.getElementById('ttSelfVideo');
+  if (ttSelfVid) ttSelfVid.style.filter = 'brightness(1.08) contrast(0.88) saturate(1.12)';
+}
+
+function stopBeautifyProcessing() {
+  if (beautifyRaf) { cancelAnimationFrame(beautifyRaf); beautifyRaf = null; }
+  if (beautifyHiddenVid) { beautifyHiddenVid.pause(); beautifyHiddenVid.srcObject = null; beautifyHiddenVid = null; }
+  if (beautifyCanvasStream) { beautifyCanvasStream.getTracks().forEach(t => t.stop()); beautifyCanvasStream = null; }
+  beautifyCanvas = null;
+  if (publicStreamLocalStream) {
+    const rawTrack = publicStreamLocalStream.getVideoTracks()[0];
+    if (rawTrack) {
+      for (const [, viewerPC] of publicStreamPCs) {
+        const sender = viewerPC.getSenders().find(s => s.track && s.track.kind === 'video');
+        if (sender) sender.replaceTrack(rawTrack).catch(() => {});
+      }
+    }
+  }
+  if (publicStreamVideo) publicStreamVideo.style.filter = '';
+  const ttSelfVid = document.getElementById('ttSelfVideo');
+  if (ttSelfVid) ttSelfVid.style.filter = '';
+}
+
+function toggleBeautify() {
+  isBeautifyOn = !isBeautifyOn;
+  document.querySelectorAll('#beautifyBtnLive, #ttBeautifyBtn').forEach(btn => {
+    btn.classList.toggle('active', isBeautifyOn);
+  });
+  if (isBeautifyOn) {
+    if (isStreaming) startBeautifyProcessing();
+  } else {
+    stopBeautifyProcessing();
+  }
+}
+
+const beautifyBtnLive = document.getElementById('beautifyBtnLive');
+if (beautifyBtnLive) beautifyBtnLive.onclick = toggleBeautify;
+const ttBeautifyBtnEl = document.getElementById('ttBeautifyBtn');
+if (ttBeautifyBtnEl) ttBeautifyBtnEl.onclick = toggleBeautify;
+
 async function startPublicStream() {
   try {
     publicStreamLocalStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: useFrontCamera ? 'user' : 'environment' }, audio: true });
@@ -1229,6 +1308,9 @@ async function startPublicStream() {
     if (publicStreamName) publicStreamName.textContent = 'You (Live)';
     if (flipCameraBtnLive) flipCameraBtnLive.style.display = 'flex';
     if (muteMicBtnLive) { muteMicBtnLive.style.display = 'flex'; muteMicBtnLive.textContent = '🎙️'; muteMicBtnLive.classList.remove('muted'); }
+    { const el = document.getElementById('beautifyBtnLive'); if (el) el.style.display = 'flex'; }
+    { const el = document.getElementById('ttBeautifyBtn'); if (el) el.style.display = 'inline-flex'; }
+    if (isBeautifyOn) startBeautifyProcessing();
     // In TikTok mode: show camera in the dedicated self-view element and pause slide videos
     if (ttActive) {
       const ttSelfVideo = document.getElementById('ttSelfVideo');
@@ -1277,6 +1359,9 @@ function stopPublicStream() {
   if (ttGoLiveBtnEl) ttGoLiveBtnEl.textContent = translate('goLive');
   if (flipCameraBtnLive) flipCameraBtnLive.style.display = 'none';
   if (muteMicBtnLive) { muteMicBtnLive.style.display = 'none'; muteMicBtnLive.textContent = '🎙️'; muteMicBtnLive.classList.remove('muted'); }
+  stopBeautifyProcessing();
+  { const el = document.getElementById('beautifyBtnLive'); if (el) el.style.display = 'none'; }
+  { const el = document.getElementById('ttBeautifyBtn'); if (el) el.style.display = 'none'; }
   const shareBtn = document.getElementById('shareStreamBtn');
   if (shareBtn) shareBtn.style.display = 'none';
   const ttShareBtn = document.getElementById('ttShareBtn');
@@ -1381,6 +1466,13 @@ socket.on('public-stream-viewer-joined', async ({ viewerId }) => {
   publicStreamLocalStream.getTracks().forEach((t) => {
     viewerPC.addTrack(t, publicStreamLocalStream);
   });
+
+  // If beautify is active, swap in the beautified canvas video track
+  if (isBeautifyOn && beautifyCanvasStream) {
+    const beautifiedTrack = beautifyCanvasStream.getVideoTracks()[0];
+    const sender = viewerPC.getSenders().find(s => s.track && s.track.kind === 'video');
+    if (sender && beautifiedTrack) sender.replaceTrack(beautifiedTrack).catch(() => {});
+  }
 
   // Create offer
   const offer = await viewerPC.createOffer();
