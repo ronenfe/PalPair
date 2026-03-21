@@ -39,51 +39,53 @@ const translate = i18n ? i18n.t : (key, params = {}) => {
   return text;
 };
 
-// Shared AudioContext — must be created/resumed inside a user gesture
+// Shared AudioContext — warmed up on first user gesture
 let _audioCtx = null;
-function getAudioCtx() {
+async function getAudioCtx() {
   if (!_audioCtx) _audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-  if (_audioCtx.state === 'suspended') _audioCtx.resume();
+  if (_audioCtx.state === 'suspended') await _audioCtx.resume();
   return _audioCtx;
 }
-// Warm up AudioContext on first user interaction so it's ready for socket events
-document.addEventListener('click', () => getAudioCtx(), { once: true });
-document.addEventListener('touchstart', () => getAudioCtx(), { once: true });
+// Unlock on first interaction
+function _unlockAudio() { getAudioCtx(); }
+document.addEventListener('click', _unlockAudio, { once: true });
+document.addEventListener('keydown', _unlockAudio, { once: true });
+document.addEventListener('touchstart', _unlockAudio, { once: true });
 
 // Ascending two-tone "ding" played when a partner joins
-function playMatchSound() {
+async function playMatchSound() {
   try {
-    const ctx = getAudioCtx();
-    [[880, 0, 0.12], [1320, 0.13, 0.25]].forEach(([freq, start, end]) => {
+    const ctx = await getAudioCtx();
+    [[880, 0, 0.15], [1320, 0.16, 0.32]].forEach(([freq, start, end]) => {
       const osc = ctx.createOscillator();
       const gain = ctx.createGain();
       osc.connect(gain); gain.connect(ctx.destination);
       osc.type = 'sine';
       osc.frequency.value = freq;
-      gain.gain.setValueAtTime(0.3, ctx.currentTime + start);
+      gain.gain.setValueAtTime(0.35, ctx.currentTime + start);
       gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + end);
       osc.start(ctx.currentTime + start);
       osc.stop(ctx.currentTime + end);
     });
-  } catch (e) { /* ignore */ }
+  } catch (e) { console.log('playMatchSound error:', e); }
 }
 
 // Short blip sound for incoming messages
-function playMessageSound() {
+async function playMessageSound() {
   try {
-    const ctx = getAudioCtx();
+    const ctx = await getAudioCtx();
     const osc = ctx.createOscillator();
     const gain = ctx.createGain();
     osc.connect(gain);
     gain.connect(ctx.destination);
     osc.type = 'sine';
     osc.frequency.setValueAtTime(1000, ctx.currentTime);
-    osc.frequency.exponentialRampToValueAtTime(800, ctx.currentTime + 0.1);
-    gain.gain.setValueAtTime(0.25, ctx.currentTime);
-    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.15);
+    osc.frequency.exponentialRampToValueAtTime(800, ctx.currentTime + 0.12);
+    gain.gain.setValueAtTime(0.3, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.18);
     osc.start(ctx.currentTime);
-    osc.stop(ctx.currentTime + 0.15);
-  } catch (e) { /* ignore */ }
+    osc.stop(ctx.currentTime + 0.18);
+  } catch (e) { console.log('playMessageSound error:', e); }
 }
 
 socket.on('connect', () => console.log('Connected to server'));
