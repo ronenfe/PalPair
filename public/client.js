@@ -42,6 +42,24 @@ const translate = i18n ? i18n.t : (key, params = {}) => {
 // Sound notification for matches
 const matchSound = new Audio('data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2/LDciUFLIHO8tiJNwgZaLvt559NEAxQp+PwtmMcBjiR1/LMeSwFJHfH8N2QQAoUXrTp66hVFApGn+DyvmwhBDGH0fPTgjMGHm7A7+OZURE');
 
+// Short blip sound for incoming messages
+function playMessageSound() {
+  try {
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(1000, ctx.currentTime);
+    osc.frequency.exponentialRampToValueAtTime(800, ctx.currentTime + 0.1);
+    gain.gain.setValueAtTime(0.25, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.15);
+    osc.start(ctx.currentTime);
+    osc.stop(ctx.currentTime + 0.15);
+  } catch (e) { /* ignore */ }
+}
+
 socket.on('connect', () => console.log('Connected to server'));
 socket.on('disconnect', (reason) => console.log('Disconnected from server:', reason));
 
@@ -697,6 +715,7 @@ socket.on('peer-left', ({ id, reason }) => {
 // Chat events
 socket.on('chat-message', ({ from, text }) => {
   addChatMessage(text, 'remote');
+  playMessageSound();
 });
 
 socket.on('report-received', () => {
@@ -1154,6 +1173,7 @@ if (dmCloseBtn) {
 socket.on('private-message', (msg) => {
   if (!msg || !msg.from || !msg.text) return;
   addDmMessage(msg);
+  playMessageSound();
   // Auto-open the DM panel when a message arrives
   const partnerId = msg.from === socket.id ? msg.to : msg.from;
   const partnerName = msg.fromName || msg.toName || partnerId;
