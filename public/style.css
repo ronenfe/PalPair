@@ -582,6 +582,33 @@ body.chat-active .videos .video-wrap:nth-child(2) {
   font-size: 1.2em;
 }
 
+.partner-preview-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  text-align: center;
+}
+.partner-preview-avatar {
+  font-size: 3rem;
+  line-height: 1;
+}
+.partner-preview-name {
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: #E6E1E5;
+}
+.partner-preview-meta {
+  font-size: 0.85rem;
+  color: #938F99;
+}
+.partner-preview-connecting {
+  font-size: 0.75rem;
+  color: #938F99;
+  opacity: 0.7;
+  margin-top: 4px;
+}
+
 .ai-partner-badge {
   position: absolute;
   top: 10px;

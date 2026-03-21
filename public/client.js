@@ -644,6 +644,7 @@ socket.on('matched', async ({ otherId: id, initiator, isBot, botProfile, botVide
   // Ensure remote video is hidden until track arrives
   if (remoteVideo) remoteVideo.style.display = 'none';
   if (remotePlaceholder) {
+    remotePlaceholder.innerHTML = '';
     remotePlaceholder.style.display = 'block';
   }
   
@@ -684,6 +685,17 @@ socket.on('matched', async ({ otherId: id, initiator, isBot, botProfile, botVide
     if (remotePlaceholder) remotePlaceholder.style.display = 'none';
     remoteVideo.play().catch(e => console.log('Bot video play failed:', e));
   } else {
+    // Show partner profile card in placeholder while WebRTC negotiates
+    if (remotePlaceholder && partnerProfile) {
+      const genderEmoji = partnerProfile.gender === 'female' ? '👩' : partnerProfile.gender === 'male' ? '👨' : '🧑';
+      remotePlaceholder.innerHTML = `
+        <div class="partner-preview-card">
+          <div class="partner-preview-avatar">${genderEmoji}</div>
+          <div class="partner-preview-name">${String(partnerProfile.name || '').slice(0, 30)}</div>
+          <div class="partner-preview-meta">${partnerProfile.age ? partnerProfile.age + ' · ' : ''}${String(partnerProfile.country || '').slice(0, 30)}</div>
+          <div class="partner-preview-connecting">Connecting…</div>
+        </div>`;
+    }
     // Create peer connection for real users
     await createPeerConnection(id, initiator);
   }
@@ -831,6 +843,7 @@ function clearRemoteVideo() {
     try { remoteVideo.style.backgroundColor = '#000'; } catch (e) {}
     setAiPartnerBadge(false);
     if (remotePlaceholder) {
+      try { remotePlaceholder.innerHTML = ''; } catch (e) {}
       try { remotePlaceholder.style.display = 'block'; } catch (e) {}
     }
   } catch (e) {
