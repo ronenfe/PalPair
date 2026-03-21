@@ -1675,25 +1675,58 @@ socket.on('public-stream-ready', ({ streamerId, streamerName, streamerIndex, bot
     iceServers: [{ urls: 'stun:stun.l.google.com:19302' }]
   });
 
+  // Keep a local reference so the handlers below close over the right PC instance
+  const thisPC = publicStreamViewerPC;
+  const thisStreamerId = streamerId;
+
   publicStreamViewerPC.onicecandidate = (e) => {
     if (e.candidate) {
       socket.emit('public-stream-signal', { to: streamerId, data: { type: 'candidate', candidate: e.candidate } });
     }
   };
 
+  // When ICE fails or disconnects, request a fresh stream from the same streamer
+  publicStreamViewerPC.oniceconnectionstatechange = () => {
+    const state = thisPC.iceConnectionState;
+    if (state === 'failed' || state === 'disconnected') {
+      console.warn('[public-stream] ICE', state, '— reconnecting to', thisStreamerId);
+      if (thisPC === publicStreamViewerPC) {
+        // Small delay to let 'disconnected' potentially recover on its own
+        setTimeout(() => {
+          if (thisPC === publicStreamViewerPC && (thisPC.iceConnectionState === 'failed' || thisPC.iceConnectionState === 'disconnected')) {
+            socket.emit('watch-public-stream-by-id', { streamerId: thisStreamerId });
+          }
+        }, 3000);
+      }
+    }
+  };
+
   publicStreamViewerPC.ontrack = (e) => {
+    // Handle Unified Plan: e.streams[0] may be undefined — build stream manually
+    let stream;
+    if (e.streams && e.streams[0]) {
+      stream = e.streams[0];
+    } else {
+      if (!publicStreamVideo.srcObject || !(publicStreamVideo.srcObject instanceof MediaStream)) {
+        publicStreamVideo.srcObject = new MediaStream();
+      }
+      publicStreamVideo.srcObject.addTrack(e.track);
+      stream = publicStreamVideo.srcObject;
+    }
     if (publicStreamVideo) {
-      publicStreamVideo.srcObject = e.streams[0];
+      publicStreamVideo.srcObject = stream;
       if (!isStreaming) publicStreamVideo.muted = isStreamMuted;
+      publicStreamVideo.play().catch(() => {});
     }
     // In TikTok mode: show stream inside ttFeed so it participates in the swipe gesture
     if (ttActive) {
       const ttStreamVideo = document.getElementById('ttStreamVideo');
       if (ttStreamVideo) {
-        ttStreamVideo.srcObject = e.streams[0];
+        ttStreamVideo.srcObject = stream;
         ttStreamVideo.muted = isStreamMuted;
         ttStreamVideo.style.transform = ''; // clear any leftover drag offset
         ttStreamVideo.style.display = '';
+        ttStreamVideo.play().catch(() => {});
       }
     }
   };
