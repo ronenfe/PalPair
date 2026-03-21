@@ -39,13 +39,16 @@ const translate = i18n ? i18n.t : (key, params = {}) => {
   return text;
 };
 
-// Shared AudioContext — created lazily on first user gesture to satisfy browser autoplay policy
+// Shared AudioContext — must be created/resumed inside a user gesture
 let _audioCtx = null;
 function getAudioCtx() {
   if (!_audioCtx) _audioCtx = new (window.AudioContext || window.webkitAudioContext)();
   if (_audioCtx.state === 'suspended') _audioCtx.resume();
   return _audioCtx;
 }
+// Warm up AudioContext on first user interaction so it's ready for socket events
+document.addEventListener('click', () => getAudioCtx(), { once: true });
+document.addEventListener('touchstart', () => getAudioCtx(), { once: true });
 
 // Ascending two-tone "ding" played when a partner joins
 function playMatchSound() {
