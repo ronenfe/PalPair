@@ -39,13 +39,36 @@ const translate = i18n ? i18n.t : (key, params = {}) => {
   return text;
 };
 
-// Sound notification for matches
-const matchSound = new Audio('data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2/LDciUFLIHO8tiJNwgZaLvt559NEAxQp+PwtmMcBjiR1/LMeSwFJHfH8N2QQAoUXrTp66hVFApGn+DyvmwhBDGH0fPTgjMGHm7A7+OZURE');
+// Shared AudioContext — created lazily on first user gesture to satisfy browser autoplay policy
+let _audioCtx = null;
+function getAudioCtx() {
+  if (!_audioCtx) _audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  if (_audioCtx.state === 'suspended') _audioCtx.resume();
+  return _audioCtx;
+}
+
+// Ascending two-tone "ding" played when a partner joins
+function playMatchSound() {
+  try {
+    const ctx = getAudioCtx();
+    [[880, 0, 0.12], [1320, 0.13, 0.25]].forEach(([freq, start, end]) => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.connect(gain); gain.connect(ctx.destination);
+      osc.type = 'sine';
+      osc.frequency.value = freq;
+      gain.gain.setValueAtTime(0.3, ctx.currentTime + start);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + end);
+      osc.start(ctx.currentTime + start);
+      osc.stop(ctx.currentTime + end);
+    });
+  } catch (e) { /* ignore */ }
+}
 
 // Short blip sound for incoming messages
 function playMessageSound() {
   try {
-    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    const ctx = getAudioCtx();
     const osc = ctx.createOscillator();
     const gain = ctx.createGain();
     osc.connect(gain);
@@ -602,12 +625,7 @@ socket.on('matched', async ({ otherId: id, initiator, isBot, botProfile, botVide
   if (privateChatMessages) privateChatMessages.innerHTML = '';
   
   // Play sound notification
-  try {
-    matchSound.currentTime = 0;
-    matchSound.play().catch(e => console.log('Sound play failed:', e));
-  } catch (e) {
-    console.log('Sound error:', e);
-  }
+  playMatchSound();
   
   // Close old peer connection if exists
   if (pc) {
