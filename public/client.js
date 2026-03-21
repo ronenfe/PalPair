@@ -822,9 +822,11 @@ function clearRemoteVideo() {
     } catch (e) { /* ignore */ }
 
     // hide video element and show black placeholder to avoid frozen frame
+    try { remoteVideo.pause(); } catch (e) {}
+    try { remoteVideo.removeAttribute('src'); } catch (e) {}
     try { remoteVideo.srcObject = null; } catch (e) {}
     try { remoteVideo.muted = false; remoteVideo.loop = false; } catch (e) {}
-    try { remoteVideo.pause(); remoteVideo.removeAttribute('src'); remoteVideo.removeAttribute('srcObject'); } catch (e) {}
+    try { remoteVideo.load(); } catch (e) {} // reset media state machine so next srcObject assignment works
     try { remoteVideo.style.display = 'none'; } catch (e) {}
     try { remoteVideo.style.backgroundColor = '#000'; } catch (e) {}
     setAiPartnerBadge(false);
@@ -882,10 +884,19 @@ async function createPeerConnection(targetId, initiator) {
   };
 
   pc.ontrack = (e) => {
-    console.log('>>> ontrack event received');
+    console.log('>>> ontrack event received', e.track.kind);
+    if (e.streams && e.streams[0]) {
+      remoteVideo.srcObject = e.streams[0];
+    } else {
+      // Unified Plan: track not attached to a named stream — build one manually
+      if (!remoteVideo.srcObject || !(remoteVideo.srcObject instanceof MediaStream)) {
+        remoteVideo.srcObject = new MediaStream();
+      }
+      remoteVideo.srcObject.addTrack(e.track);
+    }
     remoteVideo.style.display = 'block';
     if (remotePlaceholder) remotePlaceholder.style.display = 'none';
-    remoteVideo.srcObject = e.streams[0];
+    remoteVideo.play().catch(() => {});
   };
 
   // Add local tracks FIRST
