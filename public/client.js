@@ -592,6 +592,7 @@ socket.on('public-room-init', ({ events = [] } = {}) => {
 
 socket.on('public-room-event', (event) => {
   addPublicRoomEvent(event);
+  if (event && event.socketId !== socket.id && event.type !== 'system' && event.type !== 'tip') playMessageSound();
 });
 
 // ── Per-streamer chat room events ──
@@ -602,7 +603,7 @@ socket.on('stream-chat-init', ({ streamerId, events = [] } = {}) => {
 
 socket.on('stream-chat-event', ({ streamerId, event } = {}) => {
   addPublicRoomEvent(event);
-  if (event && event.type === 'chat') playMessageSound();
+  if (event && event.socketId !== socket.id && event.type !== 'system' && event.type !== 'tip') playMessageSound();
 });
 
 socket.on('stream-room-users', ({ streamerId, users = [] } = {}) => {
