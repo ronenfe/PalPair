@@ -1026,6 +1026,10 @@ const userPurchasedCoins = new Map(); // userId → coins from purchases/tips (c
 const socketToUserId = new Map(); // socketId → userId
 const userIdToSocket = new Map(); // userId → socketId (latest connection)
 
+// ── Nudity-violation bans ──
+const bannedUserIds = new Set(); // persistent userId values banned for nudity
+const NUDITY_VIOLATION_THRESHOLD = 0.70; // must match client-side threshold
+
 // Persistence: load/save balances to disk
 const BALANCES_FILE = path.join(__dirname, 'data', 'balances.json');
 
@@ -2223,6 +2227,15 @@ function getRealUsersOnlineCount() {
   return connected.filter((s) => !s.data.isBot).length;
 }
 
+// Reject connections from banned users before they reach any handler
+io.use((socket, next) => {
+  const userId = socket.handshake?.auth?.userId;
+  if (userId && bannedUserIds.has(userId)) {
+    return next(new Error('banned'));
+  }
+  next();
+});
+
 io.on('connection', (socket) => {
   console.log('connected', socket.id);
   socket.data.isBot = false;
@@ -2971,6 +2984,35 @@ io.on('connection', (socket) => {
     });
 
     socket.emit('report-received');
+  });
+
+  socket.on('nudity-detected', ({ probability } = {}) => {
+    const prob = typeof probability === 'number' ? probability : 0;
+    if (prob < NUDITY_VIOLATION_THRESHOLD) return;
+
+    const userId = socket.data.userId || resolveUserId(socket.id);
+    bannedUserIds.add(userId);
+
+    const violationEntry = {
+      timestamp: new Date().toISOString(),
+      event: 'nudity-violation',
+      socketId: socket.id,
+      userId,
+      probability: prob,
+      userAgent: socket.handshake?.headers?.['user-agent'] || ''
+    };
+    const reportPath = path.join(__dirname, 'reports.log');
+    fs.appendFile(reportPath, `${JSON.stringify(violationEntry)}\n`, (err) => {
+      if (err) console.error('Failed to write nudity violation log:', err);
+      else console.log('[NUDITY VIOLATION]', violationEntry);
+    });
+
+    // Notify the offending client then forcibly disconnect them
+    socket.emit('nudity-kick', { reason: 'explicit content detected' });
+    setTimeout(() => {
+      endChatSessionForSocket(socket.id, 'nudity-kick');
+      socket.disconnect(true);
+    }, 500);
   });
 
   socket.on('stop-searching', () => {

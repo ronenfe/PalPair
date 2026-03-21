@@ -2768,6 +2768,92 @@ if (publicStreamVideo) {
   });
 }
 
+// ── Nudity detection ──────────────────────────────────────────────────────────
+// Scans the user's own local video feed every few seconds.
+// If explicit content is detected, notifies the server which will ban and kick.
+(function initNudityScanner() {
+  const SCAN_INTERVAL_MS = 3000;      // scan every 3 seconds
+  const PORN_THRESHOLD = 0.70;        // flag if "Porn" class confidence ≥ 70%
+  const CANVAS_SIZE = 224;            // NSFWJS MobileNet expects 224×224
+
+  let nsfwModel = null;
+  let scanTimer = null;
+  let violationReported = false;
+
+  // Load model lazily once the page is idle
+  async function loadModel() {
+    if (nsfwModel || typeof nsfwjs === 'undefined') return;
+    try {
+      nsfwModel = await nsfwjs.load();
+      console.log('[nudity-scan] model loaded');
+    } catch (e) {
+      console.warn('[nudity-scan] model load failed:', e);
+    }
+  }
+
+  if (window.requestIdleCallback) {
+    requestIdleCallback(loadModel, { timeout: 10000 });
+  } else {
+    setTimeout(loadModel, 5000);
+  }
+
+  const offscreenCanvas = document.createElement('canvas');
+  offscreenCanvas.width = CANVAS_SIZE;
+  offscreenCanvas.height = CANVAS_SIZE;
+  const ctx2d = offscreenCanvas.getContext('2d');
+
+  async function scanFrame() {
+    if (violationReported) return;
+    if (!nsfwModel) return;
+    if (!localVideo || !localVideo.srcObject || localVideo.readyState < 2) return;
+    if (localVideo.videoWidth === 0 || localVideo.videoHeight === 0) return;
+
+    try {
+      ctx2d.drawImage(localVideo, 0, 0, CANVAS_SIZE, CANVAS_SIZE);
+      const predictions = await nsfwModel.classify(offscreenCanvas);
+      const pornEntry = predictions.find(p => p.className === 'Porn');
+      if (pornEntry && pornEntry.probability >= PORN_THRESHOLD) {
+        violationReported = true;
+        console.warn('[nudity-scan] explicit content detected, probability:', pornEntry.probability);
+        socket.emit('nudity-detected', { probability: pornEntry.probability });
+      }
+    } catch (e) {
+      console.warn('[nudity-scan] classify error:', e);
+    }
+  }
+
+  function startScanner() {
+    if (scanTimer) return;
+    scanTimer = setInterval(scanFrame, SCAN_INTERVAL_MS);
+  }
+
+  function stopScanner() {
+    if (scanTimer) { clearInterval(scanTimer); scanTimer = null; }
+  }
+
+  // Start scanning when local camera stream begins, stop when it ends
+  const _origSetRandomMode = typeof setRandomMode !== 'undefined' ? setRandomMode : null;
+  socket.on('connect', () => { violationReported = false; });
+
+  // Poll isRunning state to start/stop the scanner
+  setInterval(() => {
+    if (typeof isRunning !== 'undefined' && isRunning && localVideo && localVideo.srcObject) {
+      startScanner();
+    } else {
+      stopScanner();
+    }
+  }, 1000);
+
+  // Handle server-initiated kick for nudity violation
+  socket.on('nudity-kick', ({ reason } = {}) => {
+    stopScanner();
+    if (typeof stopRandomMode === 'function') {
+      stopRandomMode({ notifyPartner: false, notifySearching: false, statusText: 'Removed: explicit content detected' });
+    }
+    alert('Your session was ended because explicit content was detected on your camera.\nRepeated violations will result in a permanent ban.');
+  });
+})();
+
 // Sync coin balance into TikTok overlay
 const _origCoinBalance = socket.listeners ? null : null;
 socket.on('coin-balance', () => {
