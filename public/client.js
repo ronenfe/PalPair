@@ -602,6 +602,7 @@ socket.on('stream-chat-init', ({ streamerId, events = [] } = {}) => {
 
 socket.on('stream-chat-event', ({ streamerId, event } = {}) => {
   addPublicRoomEvent(event);
+  if (event && event.type === 'chat') playMessageSound();
 });
 
 socket.on('stream-room-users', ({ streamerId, users = [] } = {}) => {
@@ -1545,6 +1546,7 @@ function captureThumbnail() {
 // ── Streamer: handle new viewer joining ──
 socket.on('public-stream-viewer-joined', async ({ viewerId }) => {
   if (!isStreaming || !publicStreamLocalStream) return;
+  playMatchSound();
   // Create a peer connection for this viewer
   const viewerPC = new RTCPeerConnection({
     iceServers: [{ urls: 'stun:stun.l.google.com:19302' }]
