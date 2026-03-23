@@ -300,7 +300,20 @@ function loadSavedFormValues() {
 loadSavedFormValues();
 
 // Profile form handler
+const profileError = document.getElementById('profileError');
+function showProfileError(msg) {
+  if (profileError) {
+    profileError.textContent = msg;
+    profileError.style.display = 'block';
+    profileError.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  }
+}
+function clearProfileError() {
+  if (profileError) profileError.style.display = 'none';
+}
+
 saveProfileBtn.addEventListener('click', () => {
+  clearProfileError();
   const name = document.getElementById('userName').value.trim();
   const age = parseInt(document.getElementById('userAge').value);
   const gender = document.getElementById('userGender').value;
@@ -312,17 +325,17 @@ saveProfileBtn.addEventListener('click', () => {
 
   // Validation
   if (!name || !age || !gender || !country) {
-    alert(translate('alertFillProfile'));
+    showProfileError(translate('alertFillProfile'));
     return;
   }
 
   if (age < 18 || age > 100) {
-    alert(translate('alertAgeRange'));
+    showProfileError(translate('alertAgeRange'));
     return;
   }
 
   if (minAge > maxAge) {
-    alert(translate('alertMinMax'));
+    showProfileError(translate('alertMinMax'));
     return;
   }
 
