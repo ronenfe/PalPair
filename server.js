@@ -1454,12 +1454,15 @@ function joinStreamRoom(socket, streamerId) {
         const pending = pendingLeaveTimers.get(pendingKey);
         clearTimeout(pending.timer);
         pendingLeaveTimers.delete(pendingKey);
-        if (pending.displayName !== displayName) {
-          // Name changed — show old left + new joined
+        if (pending.socketId === socket.id) {
+          // Same socket navigating back intentionally — always announce
+          pushStreamChatEvent(streamerId, buildPublicRoomEvent({ type: 'system', text: `${displayName} joined` }));
+        } else if (pending.displayName !== displayName) {
+          // Different socket (page reload), name changed — show old left + new joined
           pushStreamChatEvent(streamerId, buildPublicRoomEvent({ type: 'system', text: `${pending.displayName} left` }));
           pushStreamChatEvent(streamerId, buildPublicRoomEvent({ type: 'system', text: `${displayName} joined` }));
         }
-        // else: same name, silent reconnect — show nothing
+        // else: page reload, same name — silent
       } else {
         // Fresh join — announce it
         pushStreamChatEvent(streamerId, buildPublicRoomEvent({
@@ -1492,7 +1495,7 @@ function leaveAllStreamRooms(socket) {
           text: `${displayName} left`
         }));
       }, 8000);
-      pendingLeaveTimers.set(pendingKey, { timer, displayName });
+      pendingLeaveTimers.set(pendingKey, { timer, displayName, socketId: socket.id });
     }
     emitStreamRoomUsers(prevStreamerId);
   }
