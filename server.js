@@ -1014,7 +1014,6 @@ const completedLoginSessions = []; // recent ended login sessions
 const publicRoomEvents = []; // recent public room system/user messages (legacy, kept for init)
 let publicRoomSpeakerBotId = null; // exactly one bot that replies in public room chat
 const streamChatEvents = new Map(); // streamerId → [{id, type, text, ...}] per-streamer chat history
-const pendingLeaveTimers = new Map(); // `${userId}:${streamerId}` → { timer, displayName }
 
 // ── Public Stream ──
 const publicStreamers = []; // ordered list of socket IDs currently streaming
@@ -1431,43 +1430,22 @@ function emitStreamRoomUsers(streamerId) {
 }
 
 function joinStreamRoom(socket, streamerId) {
-  const isRejoin = socket.data.currentStreamRoom === streamerId;
-  // Leave any previous stream room (silent if rejoining the same room)
-  if (!isRejoin) {
-    leaveAllStreamRooms(socket);
-  }
+  // Leave any previous stream room
+  leaveAllStreamRooms(socket);
   const room = getStreamChatRoom(streamerId);
   socket.join(room);
   socket.data.currentStreamRoom = streamerId;
-  // Only send chat history on a fresh join, not on ICE reconnects — avoids clearing the chat
-  if (!isRejoin) {
-    const history = (streamChatEvents.get(streamerId) || []).filter(e => e.type !== 'system');
-    socket.emit('stream-chat-init', { streamerId, events: history.slice(-100) });
-  }
-  if (!isRejoin) {
-    const displayName = socket.data.publicRoomName || getSocketDisplayName(socket.id);
-    if (displayName && displayName !== 'Guest') {
-      const userId = socket.data.userId || socket.id;
-      const pendingKey = `${userId}:${streamerId}`;
-      if (pendingLeaveTimers.has(pendingKey)) {
-        // Same user reconnected before the leave event fired
-        const pending = pendingLeaveTimers.get(pendingKey);
-        clearTimeout(pending.timer);
-        pendingLeaveTimers.delete(pendingKey);
-        if (pending.displayName !== displayName) {
-          // Name changed — show old left + new joined
-          pushStreamChatEvent(streamerId, buildPublicRoomEvent({ type: 'system', text: `${pending.displayName} left` }));
-          pushStreamChatEvent(streamerId, buildPublicRoomEvent({ type: 'system', text: `${displayName} joined` }));
-        }
-        // else: same name, silent reconnect — show nothing
-      } else {
-        // Fresh join — announce it
-        pushStreamChatEvent(streamerId, buildPublicRoomEvent({
-          type: 'system',
-          text: `${displayName} joined`
-        }));
-      }
-    }
+  // Send chat history for this room
+  const history = streamChatEvents.get(streamerId) || [];
+  socket.emit('stream-chat-init', { streamerId, events: history.slice(-100) });
+  // Notify room of new viewer — use cached publicRoomName so we always have
+  // the real name even if userProfiles isn't set yet (race on reconnect).
+  const displayName = socket.data.publicRoomName || getSocketDisplayName(socket.id);
+  if (displayName && displayName !== 'Guest') {
+    pushStreamChatEvent(streamerId, buildPublicRoomEvent({
+      type: 'system',
+      text: `${displayName} joined`
+    }));
   }
   emitStreamRoomUsers(streamerId);
 }
@@ -1482,17 +1460,10 @@ function leaveAllStreamRooms(socket) {
     // by the time this is called from the disconnect handler.
     const displayName = socket.data.publicRoomName || getSocketDisplayName(socket.id);
     if (displayName && displayName !== 'Guest') {
-      const userId = socket.data.userId || socket.id;
-      const pendingKey = `${userId}:${prevStreamerId}`;
-      // Debounce: delay the leave event to absorb page reloads
-      const timer = setTimeout(() => {
-        pendingLeaveTimers.delete(pendingKey);
-        pushStreamChatEvent(prevStreamerId, buildPublicRoomEvent({
-          type: 'system',
-          text: `${displayName} left`
-        }));
-      }, 8000);
-      pendingLeaveTimers.set(pendingKey, { timer, displayName });
+      pushStreamChatEvent(prevStreamerId, buildPublicRoomEvent({
+        type: 'system',
+        text: `${displayName} left`
+      }));
     }
     emitStreamRoomUsers(prevStreamerId);
   }
@@ -2701,14 +2672,6 @@ io.on('connection', (socket) => {
     if (!to) return;
     const dest = io.sockets.sockets.get(to);
     if (dest) dest.emit('public-stream-signal', { from: socket.id, data });
-  });
-
-  // Viewer asks streamer to restart ICE (transient disconnected state)
-  socket.on('public-stream-ice-restart', ({ streamerId } = {}) => {
-    if (!streamerId) return;
-    const effectiveId = (streamerId === SUKI_BOT_ID && sukiLiveSocketId) ? sukiLiveSocketId : streamerId;
-    const streamerSocket = io.sockets.sockets.get(effectiveId);
-    if (streamerSocket) streamerSocket.emit('public-stream-ice-restart-request', { viewerId: socket.id });
   });
 
   socket.on('stop-watching-public-stream', () => {
