@@ -1615,6 +1615,20 @@ socket.on('public-stream-viewer-joined', async ({ viewerId }) => {
   socket.emit('public-stream-signal', { to: viewerId, data: { type: 'offer', sdp: viewerPC.localDescription } });
 });
 
+// ── Streamer: viewer requests ICE restart (transient disconnect recovery) ──
+socket.on('public-stream-ice-restart-request', async ({ viewerId }) => {
+  if (!isStreaming || !publicStreamLocalStream) return;
+  const viewerPC = publicStreamPCs.get(viewerId);
+  if (!viewerPC || viewerPC.signalingState === 'closed') return;
+  try {
+    const offer = await viewerPC.createOffer({ iceRestart: true });
+    await viewerPC.setLocalDescription(offer);
+    socket.emit('public-stream-signal', { to: viewerId, data: { type: 'offer', sdp: viewerPC.localDescription } });
+  } catch (e) {
+    console.warn('[public-stream] ICE restart offer failed:', e.message);
+  }
+});
+
 // ── Streamer: viewer left ──
 socket.on('public-stream-viewer-left', ({ viewerId }) => {
   const viewerPC = publicStreamPCs.get(viewerId);
@@ -1698,18 +1712,30 @@ socket.on('public-stream-ready', ({ streamerId, streamerName, streamerIndex, bot
     }
   };
 
-  // When ICE fails or disconnects, request a fresh stream from the same streamer
+  // When ICE fails or disconnects, try to recover gracefully
   publicStreamViewerPC.oniceconnectionstatechange = () => {
     const state = thisPC.iceConnectionState;
-    if (state === 'failed' || state === 'disconnected') {
-      console.warn('[public-stream] ICE', state, '— reconnecting to', thisStreamerId);
+    if (state === 'disconnected') {
+      // Transient — ask streamer to restart ICE instead of full teardown
+      console.warn('[public-stream] ICE disconnected — requesting ICE restart from', thisStreamerId);
       if (thisPC === publicStreamViewerPC) {
-        // Small delay to let 'disconnected' potentially recover on its own
         setTimeout(() => {
-          if (thisPC === publicStreamViewerPC && (thisPC.iceConnectionState === 'failed' || thisPC.iceConnectionState === 'disconnected')) {
+          if (thisPC !== publicStreamViewerPC) return;
+          if (thisPC.iceConnectionState === 'connected' || thisPC.iceConnectionState === 'completed') return; // already recovered
+          if (thisPC.iceConnectionState === 'failed') return; // handled below
+          // Still disconnected — ask streamer to send a new offer with iceRestart
+          socket.emit('public-stream-ice-restart', { streamerId: thisStreamerId });
+        }, 4000);
+      }
+    } else if (state === 'failed') {
+      // Unrecoverable — full reconnect
+      console.warn('[public-stream] ICE failed — full reconnect to', thisStreamerId);
+      if (thisPC === publicStreamViewerPC) {
+        setTimeout(() => {
+          if (thisPC === publicStreamViewerPC && thisPC.iceConnectionState === 'failed') {
             socket.emit('watch-public-stream-by-id', { streamerId: thisStreamerId });
           }
-        }, 3000);
+        }, 2000);
       }
     }
   };
@@ -2428,6 +2454,10 @@ function ttGoTo(index, animated = true) {
   // Watch the new streamer (never while broadcasting — would compete for bandwidth)
   if (!isStreaming && (ttIndex !== prev || !currentWatchingStreamerId)) {
     streamHiddenByUser = false;
+    // Set currentWatchingStreamerId eagerly so renderTikTokFeed (triggered by
+    // the public-stream-update broadcast that follows watch-public-stream-by-id)
+    // doesn't reset ttIndex back to the old streamer's position mid-navigation.
+    currentWatchingStreamerId = streamer.socketId;
     // Delay hiding the stream overlay until the slide animation finishes (320ms)
     // so there's no black flash mid-swipe. We fade it out, then clear srcObject.
     const ttStreamVideo = document.getElementById('ttStreamVideo');
@@ -2737,7 +2767,7 @@ if (ttFeed) {
   ttFeed.addEventListener('touchend', onTtEnd, { passive: true });
 
   // Mouse (desktop)
-  ttFeed.addEventListener('mousedown', e => { if (!e.target.closest('.tt-overlay')) onTtStart(e.clientY); });
+  ttFeed.addEventListener('mousedown', e => { if (!e.target.closest('.tt-overlay') && !e.target.closest('.tt-nav-btn')) onTtStart(e.clientY); });
   window.addEventListener('mousemove', e => { if (ttIsDragging) onTtMove(e.clientY); });
   window.addEventListener('mouseup',   () => { if (ttIsDragging) onTtEnd(); });
 

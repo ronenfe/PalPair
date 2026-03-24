@@ -496,10 +496,6 @@
               <ul id="ttViewerList" class="tt-viewer-list"></ul>
             </div>
 
-            <!-- Navigation arrows (desktop) -->
-            <button id="ttPrevBtn" class="tt-nav-btn tt-prev" title="Previous streamer">▲</button>
-            <button id="ttNextBtn" class="tt-nav-btn tt-next" title="Next streamer">▼</button>
-
             <!-- Slide indicator dots -->
             <div id="ttDots" class="tt-dots"></div>
 
@@ -519,8 +515,13 @@
               </div>
             </div>
           </div>
+          <!-- /tt-overlay -->
+
+          <!-- Navigation arrows — outside overlay so pointer-events work reliably -->
+          <button id="ttPrevBtn" class="tt-nav-btn tt-prev" title="Previous streamer">▲</button>
+          <button id="ttNextBtn" class="tt-nav-btn tt-next" title="Next streamer">▼</button>
+
         </div>
-        <!-- /TikTok Feed -->
 
         <!-- DM Panel (inside TT feed layer so it appears above overlay) -->
         <aside class="dm-panel" id="dmPanel">
