@@ -1430,22 +1430,26 @@ function emitStreamRoomUsers(streamerId) {
 }
 
 function joinStreamRoom(socket, streamerId) {
-  // Leave any previous stream room
-  leaveAllStreamRooms(socket);
+  const isRejoin = socket.data.currentStreamRoom === streamerId;
+  // Leave any previous stream room (silent if rejoining the same room)
+  if (!isRejoin) {
+    leaveAllStreamRooms(socket);
+  }
   const room = getStreamChatRoom(streamerId);
   socket.join(room);
   socket.data.currentStreamRoom = streamerId;
   // Send chat history for this room
   const history = streamChatEvents.get(streamerId) || [];
   socket.emit('stream-chat-init', { streamerId, events: history.slice(-100) });
-  // Notify room of new viewer — use cached publicRoomName so we always have
-  // the real name even if userProfiles isn't set yet (race on reconnect).
-  const displayName = socket.data.publicRoomName || getSocketDisplayName(socket.id);
-  if (displayName && displayName !== 'Guest') {
-    pushStreamChatEvent(streamerId, buildPublicRoomEvent({
-      type: 'system',
-      text: `${displayName} joined`
-    }));
+  // Only announce join/leave when it's a new room entry, not an ICE reconnect
+  if (!isRejoin) {
+    const displayName = socket.data.publicRoomName || getSocketDisplayName(socket.id);
+    if (displayName && displayName !== 'Guest') {
+      pushStreamChatEvent(streamerId, buildPublicRoomEvent({
+        type: 'system',
+        text: `${displayName} joined`
+      }));
+    }
   }
   emitStreamRoomUsers(streamerId);
 }
@@ -2672,6 +2676,14 @@ io.on('connection', (socket) => {
     if (!to) return;
     const dest = io.sockets.sockets.get(to);
     if (dest) dest.emit('public-stream-signal', { from: socket.id, data });
+  });
+
+  // Viewer asks streamer to restart ICE (transient disconnected state)
+  socket.on('public-stream-ice-restart', ({ streamerId } = {}) => {
+    if (!streamerId) return;
+    const effectiveId = (streamerId === SUKI_BOT_ID && sukiLiveSocketId) ? sukiLiveSocketId : streamerId;
+    const streamerSocket = io.sockets.sockets.get(effectiveId);
+    if (streamerSocket) streamerSocket.emit('public-stream-ice-restart-request', { viewerId: socket.id });
   });
 
   socket.on('stop-watching-public-stream', () => {
