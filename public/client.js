@@ -2454,6 +2454,10 @@ function ttGoTo(index, animated = true) {
   // Watch the new streamer (never while broadcasting — would compete for bandwidth)
   if (!isStreaming && (ttIndex !== prev || !currentWatchingStreamerId)) {
     streamHiddenByUser = false;
+    // Set currentWatchingStreamerId eagerly so renderTikTokFeed (triggered by
+    // the public-stream-update broadcast that follows watch-public-stream-by-id)
+    // doesn't reset ttIndex back to the old streamer's position mid-navigation.
+    currentWatchingStreamerId = streamer.socketId;
     // Delay hiding the stream overlay until the slide animation finishes (320ms)
     // so there's no black flash mid-swipe. We fade it out, then clear srcObject.
     const ttStreamVideo = document.getElementById('ttStreamVideo');
