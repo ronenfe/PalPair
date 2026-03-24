@@ -1439,9 +1439,11 @@ function joinStreamRoom(socket, streamerId) {
   const room = getStreamChatRoom(streamerId);
   socket.join(room);
   socket.data.currentStreamRoom = streamerId;
-  // Send chat history for this room (exclude system join/leave events — they only make sense live)
-  const history = (streamChatEvents.get(streamerId) || []).filter(e => e.type !== 'system');
-  socket.emit('stream-chat-init', { streamerId, events: history.slice(-100) });
+  // Only send chat history on a fresh join, not on ICE reconnects — avoids clearing the chat
+  if (!isRejoin) {
+    const history = (streamChatEvents.get(streamerId) || []).filter(e => e.type !== 'system');
+    socket.emit('stream-chat-init', { streamerId, events: history.slice(-100) });
+  }
   if (!isRejoin) {
     const displayName = socket.data.publicRoomName || getSocketDisplayName(socket.id);
     if (displayName && displayName !== 'Guest') {
