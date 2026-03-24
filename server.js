@@ -1014,6 +1014,7 @@ const completedLoginSessions = []; // recent ended login sessions
 const publicRoomEvents = []; // recent public room system/user messages (legacy, kept for init)
 let publicRoomSpeakerBotId = null; // exactly one bot that replies in public room chat
 const streamChatEvents = new Map(); // streamerId → [{id, type, text, ...}] per-streamer chat history
+const pendingLeaveTimers = new Map(); // `${userId}:${streamerId}` → { timer, displayName }
 
 // ── Public Stream ──
 const publicStreamers = []; // ordered list of socket IDs currently streaming
@@ -1441,14 +1442,29 @@ function joinStreamRoom(socket, streamerId) {
   // Send chat history for this room (exclude system join/leave events — they only make sense live)
   const history = (streamChatEvents.get(streamerId) || []).filter(e => e.type !== 'system');
   socket.emit('stream-chat-init', { streamerId, events: history.slice(-100) });
-  // Only announce join/leave when it's a new room entry, not an ICE reconnect
   if (!isRejoin) {
     const displayName = socket.data.publicRoomName || getSocketDisplayName(socket.id);
     if (displayName && displayName !== 'Guest') {
-      pushStreamChatEvent(streamerId, buildPublicRoomEvent({
-        type: 'system',
-        text: `${displayName} joined`
-      }));
+      const userId = socket.data.userId || socket.id;
+      const pendingKey = `${userId}:${streamerId}`;
+      if (pendingLeaveTimers.has(pendingKey)) {
+        // Same user reconnected before the leave event fired
+        const pending = pendingLeaveTimers.get(pendingKey);
+        clearTimeout(pending.timer);
+        pendingLeaveTimers.delete(pendingKey);
+        if (pending.displayName !== displayName) {
+          // Name changed — show old left + new joined
+          pushStreamChatEvent(streamerId, buildPublicRoomEvent({ type: 'system', text: `${pending.displayName} left` }));
+          pushStreamChatEvent(streamerId, buildPublicRoomEvent({ type: 'system', text: `${displayName} joined` }));
+        }
+        // else: same name, silent reconnect — show nothing
+      } else {
+        // Fresh join — announce it
+        pushStreamChatEvent(streamerId, buildPublicRoomEvent({
+          type: 'system',
+          text: `${displayName} joined`
+        }));
+      }
     }
   }
   emitStreamRoomUsers(streamerId);
@@ -1464,10 +1480,17 @@ function leaveAllStreamRooms(socket) {
     // by the time this is called from the disconnect handler.
     const displayName = socket.data.publicRoomName || getSocketDisplayName(socket.id);
     if (displayName && displayName !== 'Guest') {
-      pushStreamChatEvent(prevStreamerId, buildPublicRoomEvent({
-        type: 'system',
-        text: `${displayName} left`
-      }));
+      const userId = socket.data.userId || socket.id;
+      const pendingKey = `${userId}:${prevStreamerId}`;
+      // Debounce: delay the leave event to absorb page reloads
+      const timer = setTimeout(() => {
+        pendingLeaveTimers.delete(pendingKey);
+        pushStreamChatEvent(prevStreamerId, buildPublicRoomEvent({
+          type: 'system',
+          text: `${displayName} left`
+        }));
+      }, 8000);
+      pendingLeaveTimers.set(pendingKey, { timer, displayName });
     }
     emitStreamRoomUsers(prevStreamerId);
   }
