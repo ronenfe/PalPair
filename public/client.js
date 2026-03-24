@@ -2763,7 +2763,7 @@ if (ttFeed) {
   ttFeed.addEventListener('touchend', onTtEnd, { passive: true });
 
   // Mouse (desktop)
-  ttFeed.addEventListener('mousedown', e => { if (!e.target.closest('.tt-overlay')) onTtStart(e.clientY); });
+  ttFeed.addEventListener('mousedown', e => { if (!e.target.closest('.tt-overlay') && !e.target.closest('.tt-nav-btn')) onTtStart(e.clientY); });
   window.addEventListener('mousemove', e => { if (ttIsDragging) onTtMove(e.clientY); });
   window.addEventListener('mouseup',   () => { if (ttIsDragging) onTtEnd(); });
 
