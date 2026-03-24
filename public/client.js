@@ -2771,15 +2771,15 @@ if (ttFeed) {
   window.addEventListener('mousemove', e => { if (ttIsDragging) onTtMove(e.clientY); });
   window.addEventListener('mouseup',   () => { if (ttIsDragging) onTtEnd(); });
 
-  // Nav buttons — click + direct touchend for reliable mobile behaviour
+  // Nav buttons — mousedown for reliable desktop, touchend for mobile
   function ttPrevAction(e) { e.stopPropagation(); ttGoTo(ttIndex - 1); }
   function ttNextAction(e) { e.stopPropagation(); ttGoTo(ttIndex + 1); }
   if (ttPrevBtnEl) {
-    ttPrevBtnEl.addEventListener('click', ttPrevAction);
+    ttPrevBtnEl.addEventListener('mousedown', e => { if (e.button === 0) { e.stopPropagation(); ttPrevAction(e); } });
     ttPrevBtnEl.addEventListener('touchend', e => { e.preventDefault(); ttPrevAction(e); }, { passive: false });
   }
   if (ttNextBtnEl) {
-    ttNextBtnEl.addEventListener('click', ttNextAction);
+    ttNextBtnEl.addEventListener('mousedown', e => { if (e.button === 0) { e.stopPropagation(); ttNextAction(e); } });
     ttNextBtnEl.addEventListener('touchend', e => { e.preventDefault(); ttNextAction(e); }, { passive: false });
   }
 
