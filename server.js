@@ -1441,7 +1441,7 @@ function joinStreamRoom(socket, streamerId) {
   socket.data.currentStreamRoom = streamerId;
   // Only send chat history on a fresh join, not on ICE reconnects — avoids clearing the chat
   if (!isRejoin) {
-    const history = (streamChatEvents.get(streamerId) || []).filter(e => e.type !== 'system');
+    const history = (streamChatEvents.get(streamerId) || []);
     socket.emit('stream-chat-init', { streamerId, events: history.slice(-100) });
   }
   if (!isRejoin) {
@@ -1455,7 +1455,8 @@ function joinStreamRoom(socket, streamerId) {
         clearTimeout(pending.timer);
         pendingLeaveTimers.delete(pendingKey);
         if (pending.socketId === socket.id) {
-          // Same socket navigating back intentionally — always announce
+          // Same socket navigating back intentionally — record both left and joined
+          pushStreamChatEvent(streamerId, buildPublicRoomEvent({ type: 'system', text: `${pending.displayName} left` }));
           pushStreamChatEvent(streamerId, buildPublicRoomEvent({ type: 'system', text: `${displayName} joined` }));
         } else if (pending.displayName !== displayName) {
           // Different socket (page reload), name changed — show old left + new joined
