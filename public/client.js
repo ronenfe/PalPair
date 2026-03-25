@@ -2503,14 +2503,20 @@ function ttGoTo(index, animated = true) {
     // so there's no black flash mid-swipe. We fade it out, then clear srcObject.
     const ttStreamVideo = document.getElementById('ttStreamVideo');
     if (ttStreamVideo && ttStreamVideo.srcObject) {
+      // Fade the old stream out but keep it visible (placeholder shows underneath)
+      // The new stream's ontrack handler will cancel this and take over
       ttStreamVideo.style.opacity = '0';
       if (ttClearStreamTimer) clearTimeout(ttClearStreamTimer);
       ttClearStreamTimer = setTimeout(() => {
         ttClearStreamTimer = null;
+        ttStreamVideo.srcObject = null;
         ttStreamVideo.style.display = 'none';
         ttStreamVideo.style.opacity = '';
-        ttStreamVideo.srcObject = null;
-      }, 350);
+      }, 1500);
+    } else if (ttStreamVideo) {
+      // No previous stream — ensure it's hidden so placeholder is visible
+      ttStreamVideo.style.display = 'none';
+      ttStreamVideo.srcObject = null;
     }
     // Clear old stream video
     if (publicStreamArea) publicStreamArea.classList.remove('tt-stream-live');
@@ -2620,7 +2626,12 @@ function renderTikTokFeed(streamers) {
       vid.poster = SLIDE_DARK_POSTER;
       slide.appendChild(vid);
     } else {
-      // Real-user slide: show thumbnail while stream loads
+      // Real-user slide: name+avatar placeholder always visible while stream loads
+      const placeholder = document.createElement('div');
+      placeholder.className = 'tt-slide-placeholder';
+      const initials = (streamer.name || '?').slice(0, 2).toUpperCase();
+      placeholder.innerHTML = `<div class="tt-slide-avatar">${initials}</div><div class="tt-slide-pname">${streamer.name || ''}</div>`;
+      slide.appendChild(placeholder);
       if (streamer.thumbnail) {
         const bg = document.createElement('div');
         bg.className = 'tt-slide-blur-bg';
