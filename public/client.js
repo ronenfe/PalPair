@@ -1764,9 +1764,12 @@ socket.on('public-stream-ready', ({ streamerId, streamerName, streamerIndex, bot
     if (ttActive) {
       const ttStreamVideo = document.getElementById('ttStreamVideo');
       if (ttStreamVideo) {
+        // Cancel any pending hide-timer so it doesn't overwrite us
+        if (ttClearStreamTimer) { clearTimeout(ttClearStreamTimer); ttClearStreamTimer = null; }
         ttStreamVideo.srcObject = stream;
         ttStreamVideo.muted = isStreamMuted;
         ttStreamVideo.style.transform = ''; // clear any leftover drag offset
+        ttStreamVideo.style.opacity = '';
         ttStreamVideo.style.display = '';
         ttStreamVideo.play().catch(() => {});
       }
@@ -2363,6 +2366,7 @@ const SLIDE_DARK_POSTER = _pc.toDataURL('image/png');
 let ttDragStartY   = 0;
 let ttDragDeltaY   = 0;
 let ttIsDragging   = false;
+let ttClearStreamTimer = null; // cancellable timeout to hide ttStreamVideo on slide change
 let ttChatObserver    = null;
 let ttActive          = false;
 let ttChatUserScrolled = false; // true when user has scrolled up in chat
@@ -2466,7 +2470,9 @@ function ttGoTo(index, animated = true) {
     const ttStreamVideo = document.getElementById('ttStreamVideo');
     if (ttStreamVideo && ttStreamVideo.srcObject) {
       ttStreamVideo.style.opacity = '0';
-      setTimeout(() => {
+      if (ttClearStreamTimer) clearTimeout(ttClearStreamTimer);
+      ttClearStreamTimer = setTimeout(() => {
+        ttClearStreamTimer = null;
         ttStreamVideo.style.display = 'none';
         ttStreamVideo.style.opacity = '';
         ttStreamVideo.srcObject = null;
