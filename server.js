@@ -358,11 +358,6 @@ function initVirtualBots() {
     console.log(`>>> Virtual bot ${botId} created - Name: ${profile.name}, Age: ${profile.age}, Country: ${profile.countryName}`);
   }
 
-  // Set first bot as public room speaker
-  if (virtualBotIds.length > 0) {
-    publicRoomSpeakerBotId = virtualBotIds[0];
-  }
-
   console.log(`${NUM_BOTS} virtual bots initialized (no Puppeteer)`);
 
   // All bots start broadcasting immediately
@@ -1011,8 +1006,6 @@ const socketToChatSession = new Map(); // socketId -> chatId
 const notifiedJoins = new Set(); // prevent duplicate join webhooks per socket
 const activeLoginSessions = new Map(); // socketId -> { socketId, name, loginAt, lastSeenAt }
 const completedLoginSessions = []; // recent ended login sessions
-const publicRoomEvents = []; // recent public room system/user messages (legacy, kept for init)
-let publicRoomSpeakerBotId = null; // exactly one bot that replies in public room chat
 const streamChatEvents = new Map(); // streamerId → [{id, type, text, ...}] per-streamer chat history
 const pendingLeaveTimers = new Map(); // `${userId}:${streamerId}` → { timer, displayName }
 
@@ -1342,7 +1335,7 @@ function sendJoinWebhook(payload) {
   request.end();
 }
 
-function buildPublicRoomEvent({ type, text, socketId = null, name = null, clientMsgId = null }) {
+function buildChatEvent({ type, text, socketId = null, name = null, clientMsgId = null }) {
   return {
     id: `room_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
     type,
@@ -1352,17 +1345,6 @@ function buildPublicRoomEvent({ type, text, socketId = null, name = null, client
     clientMsgId: clientMsgId || null,
     timestamp: new Date().toISOString()
   };
-}
-
-function pushPublicRoomEvent(event) {
-  if (!event || !event.text) return null;
-  publicRoomEvents.push(event);
-  if (publicRoomEvents.length > 300) {
-    publicRoomEvents.shift();
-  }
-  // Broadcast to all connected sockets (legacy global)
-  io.emit('public-room-event', event);
-  return event;
 }
 
 // ── Per-streamer chat ──
@@ -1445,7 +1427,7 @@ function joinStreamRoom(socket, streamerId) {
     socket.emit('stream-chat-init', { streamerId, events: history.slice(-100) });
   }
   if (!isRejoin) {
-    const displayName = socket.data.publicRoomName || getSocketDisplayName(socket.id);
+    const displayName = getSocketDisplayName(socket.id);
     if (displayName && displayName !== 'Guest') {
       const userId = socket.data.userId || socket.id;
       const pendingKey = `${userId}:${streamerId}`;
@@ -1456,17 +1438,17 @@ function joinStreamRoom(socket, streamerId) {
         pendingLeaveTimers.delete(pendingKey);
         if (pending.socketId === socket.id) {
           // Same socket navigating back intentionally — record both left and joined
-          pushStreamChatEvent(streamerId, buildPublicRoomEvent({ type: 'system', text: `${pending.displayName} left` }));
-          pushStreamChatEvent(streamerId, buildPublicRoomEvent({ type: 'system', text: `${displayName} joined` }));
+          pushStreamChatEvent(streamerId, buildChatEvent({ type: 'system', text: `${pending.displayName} left` }));
+          pushStreamChatEvent(streamerId, buildChatEvent({ type: 'system', text: `${displayName} joined` }));
         } else if (pending.displayName !== displayName) {
           // Different socket (page reload), name changed — show old left + new joined
-          pushStreamChatEvent(streamerId, buildPublicRoomEvent({ type: 'system', text: `${pending.displayName} left` }));
-          pushStreamChatEvent(streamerId, buildPublicRoomEvent({ type: 'system', text: `${displayName} joined` }));
+          pushStreamChatEvent(streamerId, buildChatEvent({ type: 'system', text: `${pending.displayName} left` }));
+          pushStreamChatEvent(streamerId, buildChatEvent({ type: 'system', text: `${displayName} joined` }));
         }
         // else: page reload, same name — silent
       } else {
         // Fresh join — announce it
-        pushStreamChatEvent(streamerId, buildPublicRoomEvent({
+        pushStreamChatEvent(streamerId, buildChatEvent({
           type: 'system',
           text: `${displayName} joined`
         }));
@@ -1482,16 +1464,14 @@ function leaveAllStreamRooms(socket) {
     const room = getStreamChatRoom(prevStreamerId);
     socket.leave(room);
     socket.data.currentStreamRoom = null;
-    // Use socket.data.publicRoomName — userProfiles may already be deleted
-    // by the time this is called from the disconnect handler.
-    const displayName = socket.data.publicRoomName || getSocketDisplayName(socket.id);
+    const displayName = getSocketDisplayName(socket.id);
     if (displayName && displayName !== 'Guest') {
       const userId = socket.data.userId || socket.id;
       const pendingKey = `${userId}:${prevStreamerId}`;
       // Debounce: delay the leave event to absorb page reloads
       const timer = setTimeout(() => {
         pendingLeaveTimers.delete(pendingKey);
-        pushStreamChatEvent(prevStreamerId, buildPublicRoomEvent({
+        pushStreamChatEvent(prevStreamerId, buildChatEvent({
           type: 'system',
           text: `${displayName} left`
         }));
@@ -1501,6 +1481,7 @@ function leaveAllStreamRooms(socket) {
     emitStreamRoomUsers(prevStreamerId);
   }
 }
+
 
 function getSocketDisplayName(socketId) {
   const profileName = userProfiles.get(socketId)?.profile?.name;
@@ -1721,242 +1702,45 @@ function emitPublicOnlineUsers() {
   });
 }
 
-function getPublicRoomBotSocketIds() {
-  // Virtual bots are always in the public room
-  return virtualBotIds.slice();
-}
+function maybeEmitBotReplyToHumanStreamMessage(fromSocketId, streamerId, text) {
+  if (!streamerId) return;
 
-function getPublicRoomSpeakerBotSocketId() {
-  const botSocketIds = getPublicRoomBotSocketIds();
-  if (botSocketIds.length < 1) {
-    publicRoomSpeakerBotId = null;
-    return null;
-  }
-
-  if (publicRoomSpeakerBotId && botSocketIds.includes(publicRoomSpeakerBotId)) {
-    return publicRoomSpeakerBotId;
-  }
-
-  publicRoomSpeakerBotId = botSocketIds[0];
-  return publicRoomSpeakerBotId;
-}
-
-function maybeEmitBotReplyToHumanPublicMessage(fromSocketId, text) {
-  // Find the streamer the human is watching
-  const streamerId = io.sockets.sockets.get(fromSocketId)?.data?.currentStreamRoom;
-
-  // Count real humans in the room — only reply when the user is alone
+  // Count real humans in the stream room — only reply when the user is alone
+  const room = getStreamChatRoom(streamerId);
+  const socketsInRoom = io.sockets.adapter.rooms.get(room);
   let humansCount = 0;
-  if (streamerId) {
-    const room = getStreamChatRoom(streamerId);
-    const socketsInRoom = io.sockets.adapter.rooms.get(room);
-    if (socketsInRoom) {
-      for (const sid of socketsInRoom) {
-        const s = io.sockets.sockets.get(sid);
-        if (s && !s.data?.isBot) humansCount++;
-      }
+  if (socketsInRoom) {
+    for (const sid of socketsInRoom) {
+      const s = io.sockets.sockets.get(sid);
+      if (s && !s.data?.isBot) humansCount++;
     }
-  } else {
-    humansCount = Array.from(io.sockets.sockets.values())
-      .filter(s => s.data?.publicRoomJoined && !s.data?.isBot).length;
   }
   if (humansCount > 1) return;
 
   // When the user is watching a virtual bot broadcaster, that bot replies directly.
-  // Virtual bots have no real socket, so skip the socket-existence check.
-  const isVirtualBotStreamer = streamerId && bots.has(streamerId);
-  let speakerId;
-  if (isVirtualBotStreamer) {
-    speakerId = streamerId;
-  } else {
-    speakerId = getPublicRoomSpeakerBotSocketId();
-    if (!speakerId) return;
-    // For real-socket bots, confirm they're still active in the public room
-    const speakerSocket = io.sockets.sockets.get(speakerId);
-    if (!speakerSocket || !speakerSocket.data?.publicRoomJoined) return;
-  }
+  const isVirtualBotStreamer = bots.has(streamerId);
+  if (!isVirtualBotStreamer) return;
 
   const humanName = getSocketDisplayName(fromSocketId);
-  const botProfile = botProfiles.get(speakerId) || userProfiles.get(speakerId)?.profile || {};
-  const speakerName = botProfile.name || getSocketDisplayName(speakerId);
+  const botProfile = botProfiles.get(streamerId) || userProfiles.get(streamerId)?.profile || {};
+  const speakerName = botProfile.name || getSocketDisplayName(streamerId);
 
   setTimeout(async () => {
     try {
       const replyBody = await getPublicRoomBotReply(text, botProfile);
       const replyText = `${humanName}, ${replyBody}`;
-
-      const replyEvent = buildPublicRoomEvent({
+      pushStreamChatEvent(streamerId, buildChatEvent({
         type: 'message',
         text: replyText,
-        socketId: speakerId,
+        socketId: streamerId,
         name: speakerName
-      });
-
-      if (streamerId) {
-        pushStreamChatEvent(streamerId, replyEvent);
-      } else {
-        pushPublicRoomEvent(replyEvent);
-      }
+      }));
     } catch (error) {
-      console.warn('Skipping public room bot reply:', error.message);
-      // For virtual bot streams just skip the error message — no need to clutter chat
-      if (isVirtualBotStreamer) return;
-      const errorEvent = buildPublicRoomEvent({
-        type: 'system',
-        text: `${speakerName} couldn't reply right now (Groq temporarily unavailable).`
-      });
-      if (streamerId) {
-        pushStreamChatEvent(streamerId, errorEvent);
-      } else {
-        pushPublicRoomEvent(errorEvent);
-      }
+      console.warn('Skipping bot reply:', error.message);
     }
   }, 900);
 }
 
-// ═══════════════════════════════════════════════
-//  Bot-to-Bot Conversation (when no humans chat)
-// ═══════════════════════════════════════════════
-let lastHumanMessageAt = Date.now();
-let botConvoTimer = null;
-let botConvoLastMessage = '';  // track last bot message for context
-const BOT_CONVO_IDLE_MS = 60_000;   // resume after 60s of no human messages
-const BOT_CONVO_INTERVAL_MS = 12_000; // bots exchange every 12s
-let botConvoGeneration = 0; // incremented when human speaks, cancels in-flight bot replies
-let botConvoInProgress = false; // lock to prevent overlapping async turns
-
-function countHumansInPublicRoom() {
-  return Array.from(io.sockets.sockets.values())
-    .filter(s => s.data?.publicRoomJoined && !s.data?.isBot).length;
-}
-
-function pickTwoBots() {
-  const botIds = getPublicRoomBotSocketIds();
-  if (botIds.length < 2) return null;
-  const shuffled = botIds.sort(() => Math.random() - 0.5);
-  return [shuffled[0], shuffled[1]];
-}
-
-const botConvoStarters = [
-  'Hey! How\'s your day going?',
-  'What kind of music are you into?',
-  'Have you watched any good movies lately?',
-  'What do you do for fun?',
-  'Where are you from? I love learning about new places!',
-  'Do you have any pets?',
-  'What\'s the best food you\'ve ever had?',
-  'If you could travel anywhere, where would you go?',
-  'What\'s your favorite thing about weekends?',
-  'Do you have any hobbies?'
-];
-
-function shouldBotsChat() {
-  // No chatting if no humans are in the public room (no audience)
-  if (countHumansInPublicRoom() === 0) return false;
-  // No chatting if a human spoke recently (within 60s)
-  if (Date.now() - lastHumanMessageAt < BOT_CONVO_IDLE_MS) return false;
-  return true;
-}
-
-async function doBotConvoTurn() {
-  if (botConvoInProgress) return; // skip if previous turn still in-flight
-  if (!shouldBotsChat()) {
-    botConvoLastMessage = '';
-    return;
-  }
-
-  const pair = pickTwoBots();
-  if (!pair) return;
-
-  botConvoInProgress = true;
-  const [speakerA, speakerB] = pair;
-  const socketA = io.sockets.sockets.get(speakerA);
-  const socketB = io.sockets.sockets.get(speakerB);
-  if (!socketA || !socketB) { botConvoInProgress = false; return; }
-
-  const profileA = botProfiles.get(speakerA) || userProfiles.get(speakerA)?.profile || {};
-  const profileB = botProfiles.get(speakerB) || userProfiles.get(speakerB)?.profile || {};
-  const nameA = getSocketDisplayName(speakerA);
-  const nameB = getSocketDisplayName(speakerB);
-
-  const gen = botConvoGeneration;
-  console.log(`[BOT-CONVO] Turn start gen=${gen}, humans=${countHumansInPublicRoom()}`);
-
-  try {
-    if (!botConvoLastMessage) {
-      // Start a fresh conversation — Bot A initiates
-      if (!shouldBotsChat()) { botConvoInProgress = false; return; }
-      const starter = botConvoStarters[Math.floor(Math.random() * botConvoStarters.length)];
-      const starterEvent = buildPublicRoomEvent({
-        type: 'message', text: starter, socketId: speakerA, name: nameA
-      });
-      // Broadcast to speakerA's stream room (since they're a bot streamer)
-      if (publicStreamers.includes(speakerA)) {
-        pushStreamChatEvent(speakerA, starterEvent);
-      } else {
-        pushPublicRoomEvent(starterEvent);
-      }
-      botConvoLastMessage = starter;
-
-      // Bot B replies after a delay — but abort if human joined or spoke
-      setTimeout(async () => {
-        if (botConvoGeneration !== gen || !shouldBotsChat()) { botConvoInProgress = false; return; }
-        try {
-          const reply = await getPublicRoomBotReply(`${nameA} said: "${starter}"`, profileB);
-          if (botConvoGeneration !== gen || !shouldBotsChat()) { botConvoInProgress = false; return; }
-          const replyEvent = buildPublicRoomEvent({
-            type: 'message', text: reply, socketId: speakerB, name: nameB
-          });
-          if (publicStreamers.includes(speakerB)) {
-            pushStreamChatEvent(speakerB, replyEvent);
-          } else {
-            pushPublicRoomEvent(replyEvent);
-          }
-          botConvoLastMessage = reply;
-        } catch (e) {
-          console.warn('Bot-to-bot reply error:', e.message);
-        }
-        botConvoInProgress = false;
-      }, 3000 + Math.random() * 2000);
-      return; // don't release lock here — setTimeout will release it
-    } else {
-      // Continue — Bot A responds to last message
-      if (!shouldBotsChat()) { botConvoInProgress = false; return; }
-      const reply = await getPublicRoomBotReply(botConvoLastMessage, profileA);
-      if (botConvoGeneration !== gen || !shouldBotsChat()) { botConvoInProgress = false; return; }
-      const replyEvent = buildPublicRoomEvent({
-        type: 'message', text: reply, socketId: speakerA, name: nameA
-      });
-      if (publicStreamers.includes(speakerA)) {
-        pushStreamChatEvent(speakerA, replyEvent);
-      } else {
-        pushPublicRoomEvent(replyEvent);
-      }
-      botConvoLastMessage = reply;
-    }
-  } catch (e) {
-    console.warn('Bot-to-bot convo error:', e.message);
-    botConvoLastMessage = '';
-  }
-  botConvoInProgress = false;
-}
-
-function startBotConvoLoop() {
-  if (botConvoTimer) return;
-  botConvoTimer = setInterval(doBotConvoTurn, BOT_CONVO_INTERVAL_MS);
-  console.log('Bot-to-bot conversation loop started');
-}
-
-function stopBotConvoLoop() {
-  if (botConvoTimer) {
-    clearInterval(botConvoTimer);
-    botConvoTimer = null;
-    botConvoLastMessage = '';
-  }
-}
-
-// Start the bot conversation loop after server boots
-setTimeout(startBotConvoLoop, 15_000);
 
 function startChatSession(socketIdA, socketIdB) {
   const existing = socketToChatSession.get(socketIdA) || socketToChatSession.get(socketIdB);
@@ -2272,8 +2056,6 @@ io.use((socket, next) => {
 io.on('connection', (socket) => {
   console.log('connected', socket.id);
   socket.data.isBot = false;
-  socket.data.publicRoomJoined = false;
-  socket.data.publicRoomName = null;
 
   // Map persistent userId to this socket
   const userId = socket.handshake?.auth?.userId;
@@ -2317,23 +2099,12 @@ io.on('connection', (socket) => {
     }
 
     if (!socket.data.isBot) {
-      const displayName = getSocketDisplayName(socket.id);
-      socket.data.publicRoomName = displayName;
-
-      socket.emit('public-room-init', {
-        events: publicRoomEvents.slice(-150)
-      });
-
       // Send coin balance to user
       socket.emit('coin-balance', { balance: getUserBalance(socket.id) });
 
       // Send current public streamers to new joiner
       if (publicStreamers.length > 0) {
         socket.emit('public-stream-update', { streamers: getPublicStreamersList() });
-      }
-
-      if (!socket.data.publicRoomJoined) {
-        socket.data.publicRoomJoined = true;
       }
 
       // Ensure all bots are streaming
@@ -2392,7 +2163,7 @@ io.on('connection', (socket) => {
 
     // Broadcast tip to the streamer's chat room
     const tipStreamerId = socket.data?.currentStreamRoom;
-    const tipEvent = buildPublicRoomEvent({
+    const tipEvent = buildChatEvent({
       type: 'tip',
       text: `🪙 ${senderName} tipped ${recipientName} ${tipAmount} coins!`,
       amount: tipAmount,
@@ -2401,8 +2172,6 @@ io.on('connection', (socket) => {
     });
     if (tipStreamerId) {
       pushStreamChatEvent(tipStreamerId, tipEvent);
-    } else {
-      pushPublicRoomEvent(tipEvent);
     }
 
     console.log(`>>> TIP: ${senderName} → ${recipientName}: ${tipAmount} coins`);
@@ -2410,38 +2179,21 @@ io.on('connection', (socket) => {
 
   socket.on('public-chat-message', ({ text, clientMsgId } = {}) => {
     if (socket.data.isBot) return;
-    if (!socket.data.publicRoomJoined) return;
-
-    lastHumanMessageAt = Date.now();
-    botConvoLastMessage = '';
-    botConvoGeneration++;
-    console.log(`[HUMAN MSG] gen=${botConvoGeneration}, from=${getSocketDisplayName(socket.id)}`);
 
     const safeText = String(text || '').trim().slice(0, 500);
     if (!safeText) return;
 
-    // Send to the per-streamer chat room the viewer is watching
     const currentStreamerId = socket.data?.currentStreamRoom;
-    if (currentStreamerId) {
-      pushStreamChatEvent(currentStreamerId, buildPublicRoomEvent({
-        type: 'message',
-        text: safeText,
-        socketId: socket.id,
-        name: getSocketDisplayName(socket.id),
-        clientMsgId: typeof clientMsgId === 'string' ? clientMsgId.slice(0, 80) : null
-      }));
-      maybeEmitBotReplyToHumanPublicMessage(socket.id, safeText);
-    } else {
-      // Fallback: global public room (user not watching any stream)
-      pushPublicRoomEvent(buildPublicRoomEvent({
-        type: 'message',
-        text: safeText,
-        socketId: socket.id,
-        name: getSocketDisplayName(socket.id),
-        clientMsgId: typeof clientMsgId === 'string' ? clientMsgId.slice(0, 80) : null
-      }));
-      maybeEmitBotReplyToHumanPublicMessage(socket.id, safeText);
-    }
+    if (!currentStreamerId) return;
+
+    pushStreamChatEvent(currentStreamerId, buildChatEvent({
+      type: 'message',
+      text: safeText,
+      socketId: socket.id,
+      name: getSocketDisplayName(socket.id),
+      clientMsgId: typeof clientMsgId === 'string' ? clientMsgId.slice(0, 80) : null
+    }));
+    maybeEmitBotReplyToHumanStreamMessage(socket.id, currentStreamerId, safeText);
   });
 
   // ── Private Direct Messages ──
@@ -2588,7 +2340,7 @@ io.on('connection', (socket) => {
   });
 
   socket.on('watch-public-stream', ({ streamerIndex } = {}) => {
-    if (!socket.data.publicRoomJoined) return; // must have set profile first
+    if (!userProfiles.has(socket.id)) return; // must have set profile first
     // Viewer wants to watch a specific streamer by index
     const idx = typeof streamerIndex === 'number' ? streamerIndex : 0;
     if (idx < 0 || idx >= publicStreamers.length) {
@@ -2629,7 +2381,7 @@ io.on('connection', (socket) => {
 
   // ── Watch specific streamer by socket ID (QR / share link) ──
   socket.on('watch-public-stream-by-id', ({ streamerId } = {}) => {
-    if (!socket.data.publicRoomJoined) return; // must have set profile first
+    if (!userProfiles.has(socket.id)) return; // must have set profile first
     if (!streamerId) { socket.emit('public-stream-ended'); return; }
     // Resolve SUKI_BOT_ID alias in case the grid sends the bot ID while she's live
     const resolvedId = (streamerId === SUKI_BOT_ID && sukiLiveSocketId) ? sukiLiveSocketId : streamerId;
@@ -3098,8 +2850,6 @@ io.on('connection', (socket) => {
 
   socket.on('disconnect', () => {
     console.log('disconnect', socket.id);
-    const publicRoomName = socket.data.publicRoomName || getSocketDisplayName(socket.id);
-    const wasInPublicRoom = socket.data.publicRoomJoined;
     closeLoginSession(socket.id);
     endChatSessionForSocket(socket.id, 'disconnect');
     const partner = pairs.get(socket.id);
@@ -3116,9 +2866,6 @@ io.on('connection', (socket) => {
     }
     
     // Clean up all traces of this user
-    if (socket.id === publicRoomSpeakerBotId) {
-      publicRoomSpeakerBotId = null;
-    }
     bots.delete(socket.id);
     botProfiles.delete(socket.id);
     userProfiles.delete(socket.id);
@@ -3169,13 +2916,6 @@ io.on('connection', (socket) => {
     viewerStreamIndex.delete(socket.id);
     io.emit('public-stream-update', { streamers: getPublicStreamersList() });
 
-    if (wasInPublicRoom && publicRoomName && publicRoomName !== 'Guest') {
-      pushPublicRoomEvent(buildPublicRoomEvent({
-        type: 'system',
-        text: `${publicRoomName} left the public room`
-      }));
-    }
-    
     // Also remove this user from anyone's lastPartner
     for (const [key, value] of lastPartner.entries()) {
       if (value === socket.id) {

@@ -25,8 +25,6 @@ const translate = i18n ? i18n.t : (key, params = {}) => {
     statusWaiting: 'Waiting for a partner...',
     statusConnected: 'Connected',
     statusConnectedBot: 'Connected to {name}, {age}, from {country}',
-    statusPublicRoom: 'Public room',
-    statusReturnedPublic: 'Back in public room',
     reportPrompt: 'Report safety concern (child safety, harassment, explicit content, etc.). Please include useful details:',
     reportSubmitted: 'Safety report submitted. Thank you for helping keep FlashLive safe.',
     start: 'Start',
@@ -376,7 +374,7 @@ saveProfileBtn.addEventListener('click', () => {
   enterTtMode();
   chatInput.disabled = false;
   sendBtn.disabled = false;
-  status(translate('statusPublicRoom'));
+  status('');
 
   // ── If user arrived via ?watch= link, start watching that stream now ──
   if (pendingWatchId) {
@@ -475,7 +473,7 @@ function setRandomMode(active) {
     // Disable private chat input
     if (privateChatInput) { privateChatInput.disabled = true; privateChatInput.value = ''; }
     if (privateSendBtn) privateSendBtn.disabled = true;
-    // Re-check for active public streamers when returning to public room
+    // Re-check for active public streamers when stopping random mode
     if (streamersGrid) streamersGrid.style.display = '';
     socket.emit('request-public-streamers');
   }
@@ -513,7 +511,7 @@ function setAiPartnerBadge(visible) {
   aiPartnerBadge.style.display = visible ? 'inline-flex' : 'none';
 }
 
-function stopRandomMode({ notifyPartner = false, notifySearching = true, statusText = translate('statusReturnedPublic') } = {}) {
+function stopRandomMode({ notifyPartner = false, notifySearching = true, statusText = '' } = {}) {
   if (!isRunning) return;
 
   if (notifyPartner && otherId) {
@@ -524,7 +522,7 @@ function stopRandomMode({ notifyPartner = false, notifySearching = true, statusT
   }
 
   setRandomMode(false);
-  status(statusText === 'statusReturnedPublic' ? 'Back in public room' : statusText);
+  status(statusText);
 }
 
 if (chatToggleBtn) {
@@ -564,7 +562,7 @@ if (goRandomBtn) {
 
 if (stopRandomBtn) {
   stopRandomBtn.onclick = () => {
-    stopRandomMode({ notifyPartner: true, notifySearching: true, statusText: translate('statusReturnedPublic') });
+    stopRandomMode({ notifyPartner: true, notifySearching: true });
   };
 }
 
@@ -590,22 +588,12 @@ if (nextBtn) nextBtn.onclick = () => {
 socket.on('waiting', () => {
   localNextInProgress = false;
   if (!isRunning) {
-    status(translate('statusPublicRoom'));
+    status('');
     return;
   }
   setAiPartnerBadge(false);
   console.log('>>> waiting event received');
   status(translate('statusWaiting'));
-});
-
-socket.on('public-room-init', ({ events = [] } = {}) => {
-  clearChat();
-  events.forEach((event) => addPublicRoomEvent(event));
-});
-
-socket.on('public-room-event', (event) => {
-  addPublicRoomEvent(event);
-  if (event && event.socketId !== socket.id && event.type !== 'system' && event.type !== 'tip') playMessageSound();
 });
 
 // ── Per-streamer chat room events ──
@@ -635,7 +623,7 @@ socket.on('online-users', ({ users = [] } = {}) => {
 socket.on('matched', async ({ otherId: id, initiator, isBot, botProfile, botVideoUrl, partnerProfile }) => {
   localNextInProgress = false;
   if (!isRunning) {
-    status(translate('statusPublicRoom'));
+    status('');
     return;
   }
   console.log('>>> Matched event received, otherId:', id, 'initiator:', initiator, 'isBot:', isBot);
@@ -742,11 +730,11 @@ socket.on('peer-disconnected', ({ id }) => {
     return;
   }
   if (!isRunning) {
-    status(translate('statusPublicRoom'));
+    status('');
     return;
   }
   console.log('*** peer-disconnected event received from', id, '***');
-  stopRandomMode({ notifyPartner: false, notifySearching: false, statusText: translate('statusReturnedPublic') });
+  stopRandomMode({ notifyPartner: false, notifySearching: false });
 });
 
 // some server flows emit `peer-left` to ensure clients handle forced leaves
@@ -755,11 +743,11 @@ socket.on('peer-left', ({ id, reason }) => {
     return;
   }
   if (!isRunning) {
-    status(translate('statusPublicRoom'));
+    status('');
     return;
   }
   console.log('*** peer-left event received *** id:', id, 'reason:', reason);
-  stopRandomMode({ notifyPartner: false, notifySearching: false, statusText: translate('statusReturnedPublic') });
+  stopRandomMode({ notifyPartner: false, notifySearching: false });
 });
 
 // Chat events
@@ -945,8 +933,7 @@ async function createPeerConnection(targetId, initiator) {
 function status(s) {
   console.log('>>> STATUS:', s);
   if (!statusEl) return;
-  // Hide the whole status element when in public room
-  if (s === translate('statusPublicRoom') || s === 'Back in public room') {
+  if (!s) {
     statusEl.style.display = 'none';
   } else {
     statusEl.style.display = '';
@@ -2992,7 +2979,6 @@ function mirrorChatToFullscreen() {
 }
 
 // Mirror new messages in real-time when fullscreen
-const _origPushPublicRoom = window._origPushPublicRoom; // not needed, use MutationObserver
 let fsChatObserver = null;
 
 function startFullscreenChatMirror() {
