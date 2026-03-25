@@ -2943,8 +2943,7 @@ server.listen(PORT, '0.0.0.0', () => {
   
   // Initialize virtual bots (no Puppeteer needed)
   initVirtualBots();
-  // Suki's partner slot disabled
-  // initSukiSlot();
+  initSukiSlot();
 
   // Clean up when server stops
   process.on('SIGINT', () => {
