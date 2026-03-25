@@ -1475,6 +1475,12 @@ async function startPublicStream() {
       publicStreamViewerPC = null;
     }
     currentWatchingStreamerId = null;
+    // Clear the in-feed stream video — its WebRTC track is now dead (would show black)
+    const ttStreamVideoGoLive = document.getElementById('ttStreamVideo');
+    if (ttStreamVideoGoLive) {
+      ttStreamVideoGoLive.style.display = 'none';
+      ttStreamVideoGoLive.srcObject = null;
+    }
     socket.emit('start-public-stream');
     // Start periodic thumbnail capture
     startThumbnailCapture();
