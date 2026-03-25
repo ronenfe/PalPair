@@ -1802,10 +1802,20 @@ socket.on('public-stream-ready', ({ streamerId, streamerName, streamerIndex, bot
         if (ttClearStreamTimer) { clearTimeout(ttClearStreamTimer); ttClearStreamTimer = null; }
         ttStreamVideo.srcObject = stream;
         ttStreamVideo.muted = isStreamMuted;
-        ttStreamVideo.style.transform = ''; // clear any leftover drag offset
-        ttStreamVideo.style.opacity = '';
+        ttStreamVideo.style.transform = '';
         ttStreamVideo.style.display = '';
+        // Keep hidden (opacity 0) until the first decoded frame is ready.
+        // This prevents the black-before-first-frame flash on all platforms.
+        ttStreamVideo.style.opacity = '0';
         ttStreamVideo.play().catch(() => {});
+        let _ttRevealDone = false;
+        const _ttReveal = () => {
+          if (_ttRevealDone) return; _ttRevealDone = true;
+          ttStreamVideo.style.opacity = '';
+        };
+        ttStreamVideo.addEventListener('canplay',    _ttReveal, { once: true });
+        ttStreamVideo.addEventListener('timeupdate', _ttReveal, { once: true });
+        setTimeout(_ttReveal, 2000); // final fallback if events never fire
       }
     }
   };
@@ -2502,21 +2512,23 @@ function ttGoTo(index, animated = true) {
     // Delay hiding the stream overlay until the slide animation finishes (320ms)
     // so there's no black flash mid-swipe. We fade it out, then clear srcObject.
     const ttStreamVideo = document.getElementById('ttStreamVideo');
-    if (ttStreamVideo && ttStreamVideo.srcObject) {
-      // Fade the old stream out but keep it visible (placeholder shows underneath)
-      // The new stream's ontrack handler will cancel this and take over
-      ttStreamVideo.style.opacity = '0';
-      if (ttClearStreamTimer) clearTimeout(ttClearStreamTimer);
-      ttClearStreamTimer = setTimeout(() => {
-        ttClearStreamTimer = null;
+    if (ttClearStreamTimer) { clearTimeout(ttClearStreamTimer); ttClearStreamTimer = null; }
+    if (ttStreamVideo) {
+      if (streamer.botVideoUrl) {
+        // Bot slide: clear stream overlay immediately so the bot <video> shows
         ttStreamVideo.srcObject = null;
         ttStreamVideo.style.display = 'none';
         ttStreamVideo.style.opacity = '';
-      }, 1500);
-    } else if (ttStreamVideo) {
-      // No previous stream — ensure it's hidden so placeholder is visible
-      ttStreamVideo.style.display = 'none';
-      ttStreamVideo.srcObject = null;
+      } else {
+        // Real-user stream: keep old stream visible so there's no black gap.
+        // Safety timer hides it after 3 s in case new stream never arrives.
+        ttClearStreamTimer = setTimeout(() => {
+          ttClearStreamTimer = null;
+          ttStreamVideo.srcObject = null;
+          ttStreamVideo.style.display = 'none';
+          ttStreamVideo.style.opacity = '';
+        }, 3000);
+      }
     }
     // Clear old stream video
     if (publicStreamArea) publicStreamArea.classList.remove('tt-stream-live');
