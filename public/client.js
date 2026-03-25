@@ -263,7 +263,9 @@ const ICE_SERVERS = {
     {
       urls: [
         'turn:129.159.135.182:3478?transport=udp',
-        'turn:129.159.135.182:3478?transport=tcp'
+        'turn:129.159.135.182:3478?transport=tcp',
+        // Port 443 TCP — bypasses GFW and strict firewalls (redirected to 3478)
+        'turn:129.159.135.182:443?transport=tcp'
       ],
       username: 'flashlive',
       credential: 'TurnRelay2026!'
