@@ -738,6 +738,18 @@ socket.on('signal', async ({ from, data }) => {
       console.log('>>> adding ice candidate');
       await pc.addIceCandidate(new RTCIceCandidate(data.candidate)); 
     } catch (e) { console.warn(e); }
+  } else if (data.type === 'ice-restart-request') {
+    // Other side's ICE failed — send a new offer with iceRestart to recover
+    if (pc && pc.signalingState === 'stable') {
+      try {
+        console.log('>>> ICE restart requested — creating new offer');
+        const offer = await pc.createOffer({ iceRestart: true });
+        await pc.setLocalDescription(offer);
+        socket.emit('signal', { to: from, data: { type: 'offer', sdp: pc.localDescription } });
+      } catch (e) {
+        console.warn('ICE restart offer failed:', e.message);
+      }
+    }
   }
 });
 
@@ -910,6 +922,26 @@ async function createPeerConnection(targetId, initiator) {
       socket.emit('signal', { to: targetId, data: { type: 'candidate', candidate: e.candidate } });
     }
   };
+
+  pc.oniceconnectionstatechange = () => {
+    const state = pc.iceConnectionState;
+    console.log('>>> ICE state:', state);
+    if (state === 'disconnected') {
+      // Give it a few seconds to recover on its own before trying ICE restart
+      setTimeout(() => {
+        if (!pc || pc !== window._currentPc) return;
+        if (pc.iceConnectionState === 'connected' || pc.iceConnectionState === 'completed') return;
+        if (pc.iceConnectionState === 'failed') return; // handled below
+        // Still disconnected — emit restart request to the other side
+        socket.emit('signal', { to: targetId, data: { type: 'ice-restart-request' } });
+      }, 4000);
+    } else if (state === 'failed') {
+      console.warn('>>> ICE failed — requesting full reconnect');
+      socket.emit('signal', { to: targetId, data: { type: 'ice-restart-request' } });
+    }
+  };
+  // Store ref for stale-check above
+  window._currentPc = pc;
 
   pc.ontrack = (e) => {
     console.log('>>> ontrack event received', e.track.kind);
