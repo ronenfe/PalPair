@@ -2584,7 +2584,11 @@ function renderTikTokFeed(streamers) {
   ttFeedH = (ttFeed && ttFeed.clientHeight) || window.innerHeight;
 
   // Keep current streamer in view if it's still in list
-  if (currentWatchingStreamerId) {
+  if (isStreaming) {
+    // While broadcasting, always lock to our own slot (prevents flash-back on go-live)
+    const selfIdx = ttStreamers.findIndex(s => s.socketId === socket.id);
+    if (selfIdx !== -1) ttIndex = selfIdx;
+  } else if (currentWatchingStreamerId) {
     const newIdx = ttStreamers.findIndex(s => s.socketId === currentWatchingStreamerId);
     if (newIdx !== -1) ttIndex = newIdx;
   }
