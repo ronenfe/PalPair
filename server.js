@@ -2107,8 +2107,8 @@ io.on('connection', (socket) => {
         socket.emit('public-stream-update', { streamers: getPublicStreamersList() });
       }
 
-      // Ensure all bots are streaming
-      if (publicStreamers.length < virtualBotIds.length) {
+      // Ensure all bots are streaming (only when no real user is broadcasting)
+      if (!hasRealStreamers() && publicStreamers.length < virtualBotIds.length) {
         setTimeout(() => triggerAllBotStreams(), 1500);
       }
     }
