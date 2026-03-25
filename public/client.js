@@ -888,7 +888,12 @@ if (flipCameraBtn) {
 
 async function createPeerConnection(targetId, initiator) {
   pc = new RTCPeerConnection({
-    iceServers: [{ urls: 'stun:stun.l.google.com:19302' }]
+    iceServers: [
+      { urls: 'stun:stun.cloudflare.com:3478' },
+      { urls: 'stun:stun.l.google.com:19302' },
+      { urls: 'stun:stun1.l.google.com:19302' },
+      { urls: 'stun:stun.stunprotocol.org:3478' }
+    ]
   });
 
   pc.onicecandidate = (e) => {
@@ -1574,7 +1579,12 @@ socket.on('public-stream-viewer-joined', async ({ viewerId }) => {
   playMatchSound();
   // Create a peer connection for this viewer
   const viewerPC = new RTCPeerConnection({
-    iceServers: [{ urls: 'stun:stun.l.google.com:19302' }]
+    iceServers: [
+      { urls: 'stun:stun.cloudflare.com:3478' },
+      { urls: 'stun:stun.l.google.com:19302' },
+      { urls: 'stun:stun1.l.google.com:19302' },
+      { urls: 'stun:stun.stunprotocol.org:3478' }
+    ]
   });
   publicStreamPCs.set(viewerId, viewerPC);
 
@@ -1686,7 +1696,12 @@ socket.on('public-stream-ready', ({ streamerId, streamerName, streamerIndex, bot
 
   // Create viewer peer connection (receive only) for real streamers
   publicStreamViewerPC = new RTCPeerConnection({
-    iceServers: [{ urls: 'stun:stun.l.google.com:19302' }]
+    iceServers: [
+      { urls: 'stun:stun.cloudflare.com:3478' },
+      { urls: 'stun:stun.l.google.com:19302' },
+      { urls: 'stun:stun1.l.google.com:19302' },
+      { urls: 'stun:stun.stunprotocol.org:3478' }
+    ]
   });
 
   // Keep a local reference so the handlers below close over the right PC instance
