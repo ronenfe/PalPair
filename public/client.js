@@ -256,6 +256,22 @@ const pendingPublicMessageIds = new Set();
 let isStreaming = false;
 let publicStreamLocalStream = null;
 const publicStreamPCs = new Map(); // viewerId → RTCPeerConnection (streamer-side)
+
+const ICE_SERVERS = {
+  iceServers: [
+    { urls: 'stun:129.159.135.182:3478' },
+    {
+      urls: [
+        'turn:129.159.135.182:3478?transport=udp',
+        'turn:129.159.135.182:3478?transport=tcp'
+      ],
+      username: 'flashlive',
+      credential: 'TurnRelay2026!'
+    },
+    { urls: 'stun:stun.cloudflare.com:3478' },
+    { urls: 'stun:stun.l.google.com:19302' }
+  ]
+};
 let publicStreamViewerPC = null;    // single PC for viewer-side
 let currentWatchingStreamerId = null;
 let isStreamMuted = localStorage.getItem('streamMuted') === 'true';
@@ -887,14 +903,7 @@ if (flipCameraBtn) {
 }
 
 async function createPeerConnection(targetId, initiator) {
-  pc = new RTCPeerConnection({
-    iceServers: [
-      { urls: 'stun:stun.cloudflare.com:3478' },
-      { urls: 'stun:stun.l.google.com:19302' },
-      { urls: 'stun:stun1.l.google.com:19302' },
-      { urls: 'stun:stun.stunprotocol.org:3478' }
-    ]
-  });
+  pc = new RTCPeerConnection(ICE_SERVERS);
 
   pc.onicecandidate = (e) => {
     if (e.candidate) {
@@ -1578,14 +1587,7 @@ socket.on('public-stream-viewer-joined', async ({ viewerId }) => {
   if (!isStreaming || !publicStreamLocalStream) return;
   playMatchSound();
   // Create a peer connection for this viewer
-  const viewerPC = new RTCPeerConnection({
-    iceServers: [
-      { urls: 'stun:stun.cloudflare.com:3478' },
-      { urls: 'stun:stun.l.google.com:19302' },
-      { urls: 'stun:stun1.l.google.com:19302' },
-      { urls: 'stun:stun.stunprotocol.org:3478' }
-    ]
-  });
+  const viewerPC = new RTCPeerConnection(ICE_SERVERS);
   publicStreamPCs.set(viewerId, viewerPC);
 
   viewerPC.onicecandidate = (e) => {
@@ -1695,14 +1697,7 @@ socket.on('public-stream-ready', ({ streamerId, streamerName, streamerIndex, bot
   }
 
   // Create viewer peer connection (receive only) for real streamers
-  publicStreamViewerPC = new RTCPeerConnection({
-    iceServers: [
-      { urls: 'stun:stun.cloudflare.com:3478' },
-      { urls: 'stun:stun.l.google.com:19302' },
-      { urls: 'stun:stun1.l.google.com:19302' },
-      { urls: 'stun:stun.stunprotocol.org:3478' }
-    ]
-  });
+  publicStreamViewerPC = new RTCPeerConnection(ICE_SERVERS);
 
   // Keep a local reference so the handlers below close over the right PC instance
   const thisPC = publicStreamViewerPC;
