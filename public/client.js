@@ -86,7 +86,12 @@ async function playMessageSound() {
   } catch (e) { console.log('playMessageSound error:', e); }
 }
 
-socket.on('connect', () => console.log('Connected to server'));
+socket.on('connect', () => {
+  console.log('Connected to server');
+  if (profileReady && userProfile) {
+    socket.emit('set-profile', { profile: userProfile, filters: userFilters });
+  }
+});
 socket.on('disconnect', (reason) => console.log('Disconnected from server:', reason));
 
 // Update user counter (real users + bots)
