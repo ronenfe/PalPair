@@ -91,6 +91,9 @@ socket.on('connect', () => {
   if (profileReady && userProfile) {
     socket.emit('set-profile', { profile: userProfile, filters: userFilters });
   }
+  if (isStreaming) {
+    socket.emit('start-public-stream');
+  }
 });
 socket.on('disconnect', (reason) => console.log('Disconnected from server:', reason));
 
@@ -2600,7 +2603,7 @@ function renderTikTokFeed(streamers) {
       }
     });
     ttStreamers = newStreamers;
-    ttUpdateOverlay(ttStreamers[ttIndex]);
+    if (!isStreaming) ttUpdateOverlay(ttStreamers[ttIndex]);
     return;
   }
 
@@ -2668,7 +2671,7 @@ function renderTikTokFeed(streamers) {
 
   ttUpdatePos(false);
   ttUpdateDots();
-  ttUpdateOverlay(ttStreamers[ttIndex]);
+  if (!isStreaming) ttUpdateOverlay(ttStreamers[ttIndex]);
   startTtChatMirror();
   ttLoadAdjacentVideos(ttIndex);
 }
