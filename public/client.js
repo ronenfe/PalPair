@@ -468,6 +468,13 @@ function setRandomMode(active) {
       currentWatchingStreamerId = null;
       if (publicStreamViewerPC) { publicStreamViewerPC.close(); publicStreamViewerPC = null; }
     }
+    // Always stop publicStreamVideo audio (bot src or live srcObject) when entering random mode
+    if (publicStreamVideo) {
+      try { publicStreamVideo.pause(); } catch (e) {}
+      try { publicStreamVideo.srcObject = null; } catch (e) {}
+      try { publicStreamVideo.removeAttribute('src'); } catch (e) {}
+      try { publicStreamVideo.load(); } catch (e) {}
+    }
     if (publicStreamArea) publicStreamArea.style.display = 'none';
     if (streamersGrid) streamersGrid.style.display = 'none';
     streamHiddenByUser = false; // reset so stream auto-shows when returning
