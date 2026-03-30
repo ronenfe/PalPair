@@ -1709,6 +1709,11 @@ socket.on('public-stream-ready', ({ streamerId, streamerName, streamerIndex, bot
     socket.emit('stop-watching-public-stream');
     return;
   }
+  // Don't start/resume a public stream while in random private chat mode
+  if (isRunning) {
+    socket.emit('stop-watching-public-stream');
+    return;
+  }
   // Don't become a viewer while broadcasting — ignore inbound stream-ready
   if (isStreaming) {
     socket.emit('stop-watching-public-stream');
