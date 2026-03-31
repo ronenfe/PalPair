@@ -284,6 +284,7 @@ const ICE_SERVERS = {
 };
 let publicStreamViewerPC = null;    // single PC for viewer-side
 let currentWatchingStreamerId = null;
+let preRandomStreamerId = null;     // streamer watched before entering random mode
 let isStreamMuted = localStorage.getItem('streamMuted') === 'true';
 let pendingWatchByIdActive = false;
 
@@ -464,6 +465,7 @@ function setRandomMode(active) {
     if (isStreaming) stopPublicStream();
     // Stop watching if viewing
     if (currentWatchingStreamerId) {
+      preRandomStreamerId = currentWatchingStreamerId; // remember so we can restore on exit
       socket.emit('stop-watching-public-stream');
       currentWatchingStreamerId = null;
       if (publicStreamViewerPC) { publicStreamViewerPC.close(); publicStreamViewerPC = null; }
@@ -508,7 +510,13 @@ function setRandomMode(active) {
     if (privateSendBtn) privateSendBtn.disabled = true;
     // Re-check for active public streamers when stopping random mode
     if (streamersGrid) streamersGrid.style.display = '';
-    socket.emit('request-public-streamers');
+    // If we were watching a specific stream before, try to restore it
+    if (preRandomStreamerId) {
+      pendingWatchByIdActive = true;
+      socket.emit('request-public-streamers');
+    } else {
+      socket.emit('request-public-streamers');
+    }
   }
 
   if (goRandomBtn) {
@@ -1929,8 +1937,21 @@ socket.on('public-stream-update', ({ streamers }) => {
   renderTikTokFeed(streamers);
   // If not currently watching and not streaming, and there are streamers, auto-watch first
   // Skip auto-watch if we have a pending watch-by-id request in flight
-  if (profileReady && !isRunning && !isStreaming && !currentWatchingStreamerId && !streamHiddenByUser && !pendingWatchByIdActive && streamers.length > 0) {
-    socket.emit('watch-public-stream', { streamerIndex: 0 });
+  if (profileReady && !isRunning && !isStreaming && !currentWatchingStreamerId && !streamHiddenByUser && streamers.length > 0) {
+    if (preRandomStreamerId) {
+      // Try to restore the stream we were watching before random mode
+      const stillLive = streamers.find(s => s.socketId === preRandomStreamerId);
+      preRandomStreamerId = null;
+      pendingWatchByIdActive = false;
+      if (stillLive) {
+        pendingWatchByIdActive = true;
+        socket.emit('watch-public-stream-by-id', { streamerId: stillLive.socketId });
+      } else {
+        socket.emit('watch-public-stream', { streamerIndex: 0 });
+      }
+    } else if (!pendingWatchByIdActive) {
+      socket.emit('watch-public-stream', { streamerIndex: 0 });
+    }
   }
   // If no streamers left, reset the hidden flag so next stream auto-shows
   if (streamers.length === 0) streamHiddenByUser = false;
