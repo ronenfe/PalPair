@@ -284,6 +284,7 @@ const ICE_SERVERS = {
 };
 let publicStreamViewerPC = null;    // single PC for viewer-side
 let currentWatchingStreamerId = null;
+let currentWatchingRoomId = null;   // canonical room ID (partner-marlet / partner-suki / socket ID)
 let preRandomStreamerId = null;     // streamer watched before entering random mode
 let isStreamMuted = localStorage.getItem('streamMuted') === 'true';
 let pendingWatchByIdActive = false;
@@ -468,6 +469,7 @@ function setRandomMode(active) {
       preRandomStreamerId = currentWatchingStreamerId; // remember so we can restore on exit
       socket.emit('stop-watching-public-stream');
       currentWatchingStreamerId = null;
+      currentWatchingRoomId = null;
       if (publicStreamViewerPC) { publicStreamViewerPC.close(); publicStreamViewerPC = null; }
     }
     // Always stop publicStreamVideo audio (bot src or live srcObject) when entering random mode
@@ -644,6 +646,8 @@ socket.on('stream-chat-init', ({ streamerId, events = [] } = {}) => {
 });
 
 socket.on('stream-chat-event', ({ streamerId, event } = {}) => {
+  // Ignore events from rooms we're no longer watching
+  if (currentWatchingRoomId && streamerId && streamerId !== currentWatchingRoomId) return;
   addPublicRoomEvent(event);
   if (event && event.socketId !== socket.id && event.type !== 'system' && event.type !== 'tip') playMessageSound();
 });
@@ -1734,7 +1738,24 @@ socket.on('public-stream-ready', ({ streamerId, streamerName, streamerIndex, bot
     publicStreamViewerPC = null;
   }
   currentWatchingStreamerId = streamerId;
+  currentWatchingRoomId = (typeof streamerIndex === 'number' && ttStreamers[streamerIndex])
+    ? ttStreamers[streamerIndex].socketId
+    : streamerId;
   pendingWatchByIdActive = false;
+  // Snap TT feed to the correct slide if it's on the wrong one
+  if (ttActive && typeof streamerIndex === 'number' && ttIndex !== streamerIndex && ttStreamers[streamerIndex]) {
+    const prev = ttIndex;
+    ttIndex = streamerIndex;
+    ttUpdatePos(false);
+    ttUpdateDots();
+    ttUpdateOverlay(ttStreamers[ttIndex]);
+    ttLoadAdjacentVideos(ttIndex);
+    // Clear stale live-stream overlay if switching to a bot slide
+    if (ttStreamers[ttIndex]?.botVideoUrl) {
+      const ttSV = document.getElementById('ttStreamVideo');
+      if (ttSV) { ttSV.style.display = 'none'; ttSV.srcObject = null; }
+    }
+  }
   if (publicStreamArea) publicStreamArea.style.display = 'flex';
   const _ttShareBtnV = document.getElementById('ttShareBtn');
   if (_ttShareBtnV) _ttShareBtnV.style.display = 'inline-flex';
@@ -1858,6 +1879,7 @@ socket.on('watch-public-stream-redirect', ({ streamerIndex }) => {
 // ── Viewer: stream ended ──
 socket.on('public-stream-ended', () => {
   currentWatchingStreamerId = null;
+  currentWatchingRoomId = null;
   pendingWatchByIdActive = false;
   if (!isStreaming) { const _ttShareBtnV = document.getElementById('ttShareBtn'); if (_ttShareBtnV) _ttShareBtnV.style.display = 'none'; }
   if (publicStreamViewerPC) {
