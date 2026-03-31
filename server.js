@@ -369,10 +369,118 @@ function initVirtualBots() {
   }
 }
 
+// ── Partner Room: Marlet (default/first slot) ──
+// Marlet always appears as the FIRST stream slot (index 0).
+// When offline the slot plays marlet.mp4 (bot).
+// When she logs in with name "Marlet Bringquiz" and goes live the real socket takes the slot.
+const MARLET_BOT_ID = 'partner-marlet';
+let marletLiveSocketId = null;
+
+function isMarletSocket(socket) {
+  const p = userProfiles.get(socket.id)?.profile || {};
+  return String(p.name || '').toLowerCase().trim() === 'marlet bringquiz';
+}
+
+function initMarletSlot() {
+  bots.add(MARLET_BOT_ID);
+  botProfiles.set(MARLET_BOT_ID, {
+    name: 'Marlet',
+    fullName: 'Marlet Bringquiz',
+    age: 25,
+    gender: 'female',
+    country: 'US',
+    countryName: 'United States',
+    botVideoUrl: '/videos/marlet.mp4',
+    isMarletSlot: true,
+    style: 'Warm, bubbly and loves to chat. Always upbeat and curious about people.'
+  });
+  userProfiles.set(MARLET_BOT_ID, {
+    profile: { name: 'Marlet', age: 25, gender: 'female', country: 'US' },
+    filters: { minAge: 18, maxAge: 100, gender: 'any', country: 'any' }
+  });
+  // Insert at position 0 so Marlet is always the first (default) stream
+  if (!publicStreamers.includes(MARLET_BOT_ID)) {
+    publicStreamers.unshift(MARLET_BOT_ID);
+  }
+  console.log('>>> Marlet partner slot initialised (showing marlet.mp4)');
+}
+
+function marletGoLive(socketId) {
+  if (marletLiveSocketId === socketId) return;
+  marletLiveSocketId = socketId;
+  const marletSocket = io.sockets.sockets.get(socketId);
+
+  if (marletSocket) {
+    leaveAllStreamRooms(marletSocket);
+    viewerStreamIndex.delete(socketId);
+  }
+
+  if (marletSocket) {
+    marletSocket.join(getStreamChatRoom(MARLET_BOT_ID));
+    marletSocket.emit('public-stream-ready', {
+      streamerId: socketId,
+      streamerName: 'Marlet',
+      streamerIndex: 0,
+      botVideoUrl: null,
+      viewerCount: 0,
+      isSelf: true
+    });
+  }
+
+  const roomSockets = io.sockets.adapter.rooms.get(getStreamChatRoom(MARLET_BOT_ID));
+  if (roomSockets) {
+    const viewerCount = roomSockets.size;
+    for (const viewerId of roomSockets) {
+      if (viewerId === socketId) continue;
+      const viewerSocket = io.sockets.sockets.get(viewerId);
+      if (!viewerSocket) continue;
+      viewerSocket.emit('public-stream-ready', {
+        streamerId: socketId,
+        streamerName: 'Marlet',
+        streamerIndex: 0,
+        botVideoUrl: null,
+        viewerCount
+      });
+      if (marletSocket) marletSocket.emit('public-stream-viewer-joined', { viewerId });
+    }
+  }
+
+  io.emit('public-stream-update', { streamers: getPublicStreamersList() });
+  console.log(`>>> Marlet is now LIVE (${socketId})`);
+}
+
+function marletGoOffline() {
+  if (!marletLiveSocketId) return;
+  const prevLiveId = marletLiveSocketId;
+  marletLiveSocketId = null;
+
+  const roomSockets = io.sockets.adapter.rooms.get(getStreamChatRoom(MARLET_BOT_ID));
+  if (roomSockets) {
+    const viewerCount = roomSockets.size;
+    for (const viewerId of roomSockets) {
+      const viewerSocket = io.sockets.sockets.get(viewerId);
+      if (!viewerSocket) continue;
+      viewerSocket.emit('public-stream-ready', {
+        streamerId: MARLET_BOT_ID,
+        streamerName: 'Marlet',
+        streamerIndex: 0,
+        botVideoUrl: '/videos/marlet.mp4',
+        viewerCount
+      });
+    }
+  }
+
+  streamChatEvents.delete(prevLiveId);
+  streamerThumbnails.delete(prevLiveId);
+
+  io.emit('public-stream-update', { streamers: getPublicStreamersList() });
+  console.log('>>> Marlet went offline — restoring marlet.mp4 slot');
+}
+
 // ── Partner Room: Suki ──
-// Suki always appears as the first stream slot.  When she is offline the slot
+// Suki always appears at index 1.  When she is offline the slot
 // plays suki.mp4 (bot).  When she logs in and goes live the bot slot is hidden
-// and her real socket takes the first position instead.
+// and her real socket takes that position instead.
 const SUKI_BOT_ID = 'partner-suki';
 const SUKI_CREDENTIALS = { name: 'suki', age: 28, gender: 'female', country: 'CN' };
 let sukiLiveSocketId = null; // set while Suki is broadcasting live
@@ -403,9 +511,10 @@ function initSukiSlot() {
     profile: { name: 'Suki', age: 28, gender: 'female', country: 'CN' },
     filters: { minAge: 18, maxAge: 100, gender: 'any', country: 'any' }
   });
-  // Insert at position 0 so Suki is always the first stream
+  // Insert at position 1 (after Marlet) so Suki is always the second stream
   if (!publicStreamers.includes(SUKI_BOT_ID)) {
-    publicStreamers.unshift(SUKI_BOT_ID);
+    const marletIdx = publicStreamers.indexOf(MARLET_BOT_ID);
+    publicStreamers.splice(marletIdx + 1, 0, SUKI_BOT_ID);
   }
   console.log('>>> Suki partner slot initialised (showing suki.mp4)');
 }
@@ -1119,15 +1228,15 @@ function getViewerCount(streamerId) {
 function getPublicStreamersList() {
   return publicStreamers.map((id) => {
     const bp = botProfiles.get(id);
+    const isLiveMarlet = id === MARLET_BOT_ID && marletLiveSocketId;
     const isLiveSuki = id === SUKI_BOT_ID && sukiLiveSocketId;
+    const effectiveId = isLiveMarlet ? marletLiveSocketId : isLiveSuki ? sukiLiveSocketId : id;
     return {
       socketId: id,
       name: getSocketDisplayName(id),
-      viewerCount: getViewerCount(isLiveSuki ? sukiLiveSocketId : id),
-      botVideoUrl: isLiveSuki ? null : (bp ? bp.botVideoUrl : null),
-      thumbnail: isLiveSuki
-        ? (streamerThumbnails.get(sukiLiveSocketId) || null)
-        : (streamerThumbnails.get(id) || null)
+      viewerCount: getViewerCount(effectiveId),
+      botVideoUrl: (isLiveMarlet || isLiveSuki) ? null : (bp ? bp.botVideoUrl : null),
+      thumbnail: streamerThumbnails.get(effectiveId) || null
     };
   });
 }
@@ -1149,14 +1258,15 @@ function triggerAllBotStreams() {
 }
 
 function hasRealStreamers() {
-  // Suki's offline bot slot doesn't count as a "real" streamer
-  return publicStreamers.some(id => !botProfiles.has(id) && id !== SUKI_BOT_ID);
+  // Partner offline bot slots don't count as "real" streamers
+  return publicStreamers.some(id => !botProfiles.has(id) && id !== SUKI_BOT_ID && id !== MARLET_BOT_ID);
 }
 
 function removeBotStreams() {
   const before = publicStreamers.length;
   for (let i = publicStreamers.length - 1; i >= 0; i--) {
-    // Never remove Suki's offline slot — it stays unless she goes live herself
+    // Never remove partner offline slots
+    if (publicStreamers[i] === MARLET_BOT_ID) continue;
     if (publicStreamers[i] === SUKI_BOT_ID) continue;
     if (botProfiles.has(publicStreamers[i])) publicStreamers.splice(i, 1);
   }
@@ -1178,7 +1288,7 @@ function consolidateBotsToStreamer(realStreamerId) {
   // Collect bot indexes before we splice anything
   const botIndexes = new Set();
   for (let i = 0; i < publicStreamers.length; i++) {
-    if (publicStreamers[i] !== SUKI_BOT_ID && botProfiles.has(publicStreamers[i])) {
+    if (publicStreamers[i] !== SUKI_BOT_ID && publicStreamers[i] !== MARLET_BOT_ID && botProfiles.has(publicStreamers[i])) {
       botIndexes.add(i);
     }
   }
@@ -2246,6 +2356,13 @@ io.on('connection', (socket) => {
   socket.on('start-public-stream', () => {
     if (publicStreamers.includes(socket.id)) return; // already streaming
 
+    // If this is Marlet going live, use the dedicated partner-room logic
+    if (isMarletSocket(socket)) {
+      marletGoLive(socket.id);
+      emitPublicOnlineUsers();
+      return;
+    }
+
     // If this is Suki going live, use the dedicated partner-room logic
     if (isSukiSocket(socket)) {
       sukiGoLive(socket.id);
@@ -2289,14 +2406,22 @@ io.on('connection', (socket) => {
   // ── Streamer sends a thumbnail capture of their webcam ──
   socket.on('stream-thumbnail', ({ data } = {}) => {
     if (!data || typeof data !== 'string') return;
-    // Allow Suki's live socket even though she's not in publicStreamers
-    if (!publicStreamers.includes(socket.id) && socket.id !== sukiLiveSocketId) return;
+    // Allow partner live sockets even though they're not in publicStreamers
+    if (!publicStreamers.includes(socket.id) && socket.id !== sukiLiveSocketId && socket.id !== marletLiveSocketId) return;
     // Limit size (~100KB max base64)
     if (data.length > 150000) return;
     streamerThumbnails.set(socket.id, data);
   });
 
   socket.on('stop-public-stream', () => {
+    // If Marlet stops broadcasting, restore her offline slot
+    if (socket.id === marletLiveSocketId) {
+      marletGoOffline();
+      streamChatEvents.delete(socket.id);
+      streamerThumbnails.delete(socket.id);
+      emitPublicOnlineUsers();
+      return;
+    }
     // If Suki stops broadcasting, restore her offline slot
     if (socket.id === sukiLiveSocketId) {
       sukiGoOffline();
@@ -2499,7 +2624,11 @@ io.on('connection', (socket) => {
       return;
     }
 
-    // Suki is a partner broadcaster — she does not enter random chat
+    // Partner broadcasters do not enter random chat
+    if (isMarletSocket(socket)) {
+      console.log('>>> Marlet socket blocked from random chat find');
+      return;
+    }
     if (isSukiSocket(socket)) {
       console.log('>>> Suki socket blocked from random chat find');
       return;
@@ -2878,6 +3007,12 @@ io.on('connection', (socket) => {
     // Clean up public stream state
     leaveAllStreamRooms(socket);
 
+    // If Marlet disconnects while live, restore her offline bot slot
+    if (socket.id === marletLiveSocketId) {
+      marletGoOffline();
+      streamChatEvents.delete(socket.id);
+      streamerThumbnails.delete(socket.id);
+    }
     // If Suki disconnects while live, restore her offline bot slot
     if (socket.id === sukiLiveSocketId) {
       sukiGoOffline();
@@ -2943,6 +3078,7 @@ server.listen(PORT, '0.0.0.0', () => {
   
   // Initialize virtual bots (no Puppeteer needed)
   initVirtualBots();
+  initMarletSlot();
   initSukiSlot();
 
   // Clean up when server stops
