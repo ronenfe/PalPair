@@ -1929,7 +1929,7 @@ socket.on('public-stream-update', ({ streamers }) => {
   renderTikTokFeed(streamers);
   // If not currently watching and not streaming, and there are streamers, auto-watch first
   // Skip auto-watch if we have a pending watch-by-id request in flight
-  if (profileReady && !isStreaming && !currentWatchingStreamerId && !streamHiddenByUser && !pendingWatchByIdActive && streamers.length > 0) {
+  if (profileReady && !isRunning && !isStreaming && !currentWatchingStreamerId && !streamHiddenByUser && !pendingWatchByIdActive && streamers.length > 0) {
     socket.emit('watch-public-stream', { streamerIndex: 0 });
   }
   // If no streamers left, reset the hidden flag so next stream auto-shows
