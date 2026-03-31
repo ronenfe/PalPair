@@ -378,7 +378,8 @@ let marletLiveSocketId = null;
 
 function isMarletSocket(socket) {
   const p = userProfiles.get(socket.id)?.profile || {};
-  return String(p.name || '').toLowerCase().trim() === 'marlet bringquiz';
+  const name = String(p.name || '').toLowerCase().trim();
+  return name === 'marlet' || name === 'marlet bringquiz';
 }
 
 function initMarletSlot() {
@@ -778,7 +779,8 @@ app.get('/api/debug', (req, res) => {
 app.get('/api/admin-online-users', (req, res) => {
   res.json({
     onlineUsers: buildOnlineUsersSnapshot(),
-    loginSessions: buildLoginSessionsSnapshot()
+    loginSessions: buildLoginSessionsSnapshot(),
+    streamSessions: buildStreamSessionsSnapshot()
   });
 });
 
@@ -1115,6 +1117,8 @@ const socketToChatSession = new Map(); // socketId -> chatId
 const notifiedJoins = new Set(); // prevent duplicate join webhooks per socket
 const activeLoginSessions = new Map(); // socketId -> { socketId, name, loginAt, lastSeenAt }
 const completedLoginSessions = []; // recent ended login sessions
+const activeStreamTimes = new Map(); // socketId → startedAt ms
+const completedStreamSessions = []; // {name, socketId, startedAt, endedAt, durationSeconds}
 const streamChatEvents = new Map(); // streamerId → [{id, type, text, ...}] per-streamer chat history
 const pendingLeaveTimers = new Map(); // `${userId}:${streamerId}` → { timer, displayName }
 
@@ -1761,10 +1765,45 @@ function buildOnlineUsersSnapshot() {
   return online;
 }
 
+function recordStreamStart(socketId) {
+  activeStreamTimes.set(socketId, Date.now());
+}
+
+function recordStreamEnd(socketId) {
+  const startMs = activeStreamTimes.get(socketId);
+  if (!startMs) return;
+  activeStreamTimes.delete(socketId);
+  const endMs = Date.now();
+  const durationSeconds = Math.max(0, Math.floor((endMs - startMs) / 1000));
+  if (durationSeconds < 2) return;
+  completedStreamSessions.unshift({
+    socketId,
+    name: getSocketDisplayName(socketId),
+    startedAt: new Date(startMs).toISOString(),
+    endedAt: new Date(endMs).toISOString(),
+    durationSeconds
+  });
+  if (completedStreamSessions.length > 200) completedStreamSessions.pop();
+}
+
+function buildStreamSessionsSnapshot() {
+  const now = Date.now();
+  const active = Array.from(activeStreamTimes.entries()).map(([socketId, startMs]) => ({
+    socketId,
+    name: getSocketDisplayName(socketId),
+    startedAt: new Date(startMs).toISOString(),
+    endedAt: null,
+    durationSeconds: Math.max(0, Math.floor((now - startMs) / 1000)),
+    isLive: true
+  }));
+  return [...active, ...completedStreamSessions.slice(0, 100)];
+}
+
 function emitAdminOnlineUsers() {
   adminNamespace.emit('admin-online-users', {
     onlineUsers: buildOnlineUsersSnapshot(),
-    loginSessions: buildLoginSessionsSnapshot()
+    loginSessions: buildLoginSessionsSnapshot(),
+    streamSessions: buildStreamSessionsSnapshot()
   });
 }
 
@@ -1948,7 +1987,8 @@ adminNamespace.on('connection', (socket) => {
     activeChats: Array.from(activeChatSessions.values()).map(buildChatSummary),
     completedChats: completedChatSessions.slice(0, 200).map(buildChatSummary),
     onlineUsers: buildOnlineUsersSnapshot(),
-    loginSessions: buildLoginSessionsSnapshot()
+    loginSessions: buildLoginSessionsSnapshot(),
+    streamSessions: buildStreamSessionsSnapshot()
   });
 
   socket.on('admin-get-chat', ({ chatId } = {}) => {
@@ -2382,8 +2422,9 @@ io.on('connection', (socket) => {
     viewerStreamIndex.delete(socket.id);   // clear viewer index
 
     publicStreamers.push(socket.id);
+    recordStreamStart(socket.id);
     const streamerName = getSocketDisplayName(socket.id);
-    console.log(`>>> ${socket.id} started public stream (${streamerName})`);
+    console.log(`>>> ${socket.id} started public stream (${streamerName})`);  
     // Pull all virtual bots out of publicStreamers and move their viewers to this streamer
     consolidateBotsToStreamer(socket.id);
     // Put the streamer in their own chat room so they receive chat messages
@@ -2433,8 +2474,9 @@ io.on('connection', (socket) => {
 
     const idx = publicStreamers.indexOf(socket.id);
     if (idx === -1) return;
+    recordStreamEnd(socket.id);
     publicStreamers.splice(idx, 1);
-    console.log(`>>> ${socket.id} stopped public stream`);
+    console.log(`>>> ${socket.id} stopped public stream`);  
     // Notify viewers who were watching this streamer
     io.emit('public-stream-update', { streamers: getPublicStreamersList() });
     emitPublicOnlineUsers();
@@ -3022,6 +3064,7 @@ io.on('connection', (socket) => {
 
     const streamerIdx = publicStreamers.indexOf(socket.id);
     if (streamerIdx !== -1) {
+      recordStreamEnd(socket.id);
       publicStreamers.splice(streamerIdx, 1);
       // Notify viewers who were watching this streamer and leave their stream rooms
       for (const [viewerId, viewerIdx] of viewerStreamIndex.entries()) {

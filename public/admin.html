@@ -60,6 +60,39 @@
         overflow: auto;
         border-bottom: 1px solid #1f2937;
       }
+      .stream-sessions {
+        max-height: 24vh;
+        overflow: auto;
+        border-bottom: 1px solid #1f2937;
+      }
+      .activity-chart {
+        padding: 10px 12px;
+        border-bottom: 1px solid #1f2937;
+      }
+      .chart-bars {
+        display: flex;
+        align-items: flex-end;
+        gap: 2px;
+        height: 48px;
+        margin-top: 6px;
+      }
+      .chart-bar {
+        flex: 1;
+        background: #2563eb;
+        border-radius: 2px 2px 0 0;
+        min-height: 2px;
+        position: relative;
+        cursor: default;
+      }
+      .chart-bar:hover { background: #3b82f6; }
+      .chart-bar.current { background: #16a34a; }
+      .chart-labels {
+        display: flex;
+        justify-content: space-between;
+        font-size: 0.65rem;
+        opacity: 0.6;
+        margin-top: 2px;
+      }
       .sessions-table {
         width: 100%;
         border-collapse: collapse;
@@ -145,10 +178,17 @@
     </div>
     <div class="wrap">
       <div class="list">
+        <div class="panel-title">Activity (last 24h)</div>
+        <div id="activityChart" class="activity-chart">
+          <div class="chart-bars" id="chartBars"></div>
+          <div class="chart-labels" id="chartLabels"></div>
+        </div>
         <div class="panel-title">Online Users</div>
         <div id="onlineUsers" class="online-users"></div>
         <div class="panel-title">Login Sessions</div>
         <div id="loginSessions" class="login-sessions"></div>
+        <div class="panel-title">Stream Sessions</div>
+        <div id="streamSessions" class="stream-sessions"></div>
         <div class="panel-title">Chats</div>
         <div id="chatList"></div>
       </div>
@@ -167,11 +207,18 @@
     <script>
       const params = new URLSearchParams(window.location.search);
       const adminKey = params.get('key') || '';
-      const socket = io('/admin', { auth: { key: adminKey } });
+      const socket = io('/admin', {
+        auth: { key: adminKey },
+        transports: ['polling', 'websocket'],
+        timeout: 10000
+      });
 
       const chatListEl = document.getElementById('chatList');
       const onlineUsersEl = document.getElementById('onlineUsers');
       const loginSessionsEl = document.getElementById('loginSessions');
+      const streamSessionsEl = document.getElementById('streamSessions');
+      const chartBarsEl = document.getElementById('chartBars');
+      const chartLabelsEl = document.getElementById('chartLabels');
       const chatMetaEl = document.getElementById('chatMeta');
       const chatMessagesEl = document.getElementById('chatMessages');
       const connStatusEl = document.getElementById('connStatus');
@@ -180,6 +227,7 @@
       const chatSummaries = new Map();
       let onlineUsers = [];
       let loginSessions = [];
+      let streamSessions = [];
       let previousOnlineUserIds = new Set();
       let onlineUsersInitialized = false;
       let selectedChatId = null;
@@ -239,7 +287,67 @@
         return `${seconds}s`;
       }
 
-      function renderList() {
+      function renderActivityChart() {
+        const nowMs = Date.now();
+        const counts = new Array(24).fill(0);
+        const currentHour = new Date().getHours();
+        for (const s of loginSessions) {
+          const loginMs = Date.parse(s.loginAt);
+          if (!Number.isFinite(loginMs)) continue;
+          const ageMs = nowMs - loginMs;
+          if (ageMs > 86400000) continue; // older than 24h
+          const hourIndex = Math.floor(ageMs / 3600000); // 0 = current hour, 23 = 23h ago
+          if (hourIndex >= 0 && hourIndex < 24) counts[23 - hourIndex]++;
+        }
+        const maxCount = Math.max(...counts, 1);
+        chartBarsEl.innerHTML = counts.map((c, i) => {
+          const pct = Math.max(4, Math.round((c / maxCount) * 100));
+          const isCurrent = i === 23;
+          return `<div class="chart-bar${isCurrent ? ' current' : ''}" style="height:${pct}%" title="${c} login${c !== 1 ? 's' : ''} (${(23 - (23 - i)) === 0 ? 'now' : (23 - i) + 'h ago'})"></div>`;
+        }).join('');
+        const labels = [];
+        for (let i = 0; i < 24; i += 6) {
+          const h = (currentHour - (23 - i) + 24) % 24;
+          labels.push(`${String(h).padStart(2,'0')}:00`);
+        }
+        chartLabelsEl.innerHTML = labels.map(l => `<span>${l}</span>`).join('');
+      }
+
+      function renderStreamSessions() {
+        if (!streamSessions.length) {
+          streamSessionsEl.innerHTML = '<div class="empty">No stream sessions yet.</div>';
+          return;
+        }
+        const nowMs = Date.now();
+        const rows = streamSessions.slice(0, 100).map((s) => {
+          const dur = s.isLive
+            ? Math.max(0, Math.floor((nowMs - Date.parse(s.startedAt)) / 1000))
+            : (s.durationSeconds || 0);
+          const status = s.isLive ? '<span style="color:#16a34a">● LIVE</span>' : 'ended';
+          return `
+            <tr>
+              <td>${(s.name || 'Unknown').replace(/</g,'&lt;').replace(/>/g,'&gt;')}</td>
+              <td>${fmtTime(s.startedAt)}</td>
+              <td>${fmtDuration(dur)}</td>
+              <td>${status}</td>
+            </tr>
+          `;
+        }).join('');
+        streamSessionsEl.innerHTML = `
+          <table class="sessions-table">
+            <thead><tr><th>Name</th><th>Started</th><th>Duration</th><th>Status</th></tr></thead>
+            <tbody>${rows}</tbody>
+          </table>
+        `;
+      }
+
+      function processStreamSessions(sessions) {
+        streamSessions = sessions || [];
+        renderStreamSessions();
+        renderActivityChart();
+      }
+
+
         const chats = Array.from(chatSummaries.values()).sort((a, b) => {
           const aTime = new Date(a.startedAt || 0).getTime();
           const bTime = new Date(b.startedAt || 0).getTime();
@@ -420,17 +528,19 @@
         connStatusEl.textContent = `Auth/Error: ${err.message}`;
       });
 
-      socket.on('admin-init', ({ activeChats = [], completedChats = [], onlineUsers: users = [], loginSessions: sessions = [] }) => {
+      socket.on('admin-init', ({ activeChats = [], completedChats = [], onlineUsers: users = [], loginSessions: sessions = [], streamSessions: streams = [] }) => {
         chatSummaries.clear();
         [...activeChats, ...completedChats].forEach((chat) => chatSummaries.set(chat.id, chat));
         processOnlineUsers(users);
         processLoginSessions(sessions);
+        processStreamSessions(streams);
         renderList();
       });
 
-      socket.on('admin-online-users', ({ onlineUsers: users = [], loginSessions: sessions = [] }) => {
+      socket.on('admin-online-users', ({ onlineUsers: users = [], loginSessions: sessions = [], streamSessions: streams = [] }) => {
         processOnlineUsers(users);
         processLoginSessions(sessions);
+        processStreamSessions(streams);
       });
 
       async function refreshOnlineUsersFallback() {
@@ -440,6 +550,7 @@
           const payload = await response.json();
           processOnlineUsers(payload.onlineUsers || []);
           processLoginSessions(payload.loginSessions || []);
+          processStreamSessions(payload.streamSessions || []);
         } catch (e) {
           // ignore fallback polling errors
         }
@@ -448,6 +559,9 @@
       setInterval(() => {
         if (loginSessions.length) {
           renderLoginSessions();
+        }
+        if (streamSessions.length) {
+          renderStreamSessions();
         }
       }, 1000);
 
