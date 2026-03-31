@@ -723,6 +723,7 @@ socket.on('matched', async ({ otherId: id, initiator, isBot, botProfile, botVide
     remoteVideo.srcObject = null;
     remoteVideo.src = botVideoUrl;
     remoteVideo.loop = false;
+    remoteVideo.muted = true;
     remoteVideo.style.display = 'block';
     if (remotePlaceholder) remotePlaceholder.style.display = 'none';
     remoteVideo.play().catch(e => console.log('Bot video play failed:', e));
@@ -1750,19 +1751,20 @@ socket.on('public-stream-ready', ({ streamerId, streamerName, streamerIndex, bot
     }
   }
   if (publicStreamViewerCount) publicStreamViewerCount.textContent = `👁 ${viewerCount || 0}`;
-  if (publicStreamVideo && !isStreaming) publicStreamVideo.muted = false;
 
-  // If bot stream, play MP4 directly (no WebRTC)
+  // If bot stream, play MP4 directly (no WebRTC) — always muted
   if (botVideoUrl) {
     if (publicStreamVideo) {
       publicStreamVideo.srcObject = null;
       publicStreamVideo.src = botVideoUrl;
       publicStreamVideo.loop = false;
-      publicStreamVideo.muted = isStreamMuted;
+      publicStreamVideo.muted = true;
       publicStreamVideo.play().catch(e => console.log('Bot stream play failed:', e));
     }
     return;
   }
+
+  if (publicStreamVideo && !isStreaming) publicStreamVideo.muted = false;
 
   // Create viewer peer connection (receive only) for real streamers
   publicStreamViewerPC = new RTCPeerConnection(ICE_SERVERS);
