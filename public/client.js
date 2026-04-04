@@ -89,13 +89,24 @@ async function playMessageSound() {
 socket.on('connect', () => {
   console.log('Connected to server');
   if (profileReady && userProfile) {
-    socket.emit('set-profile', { profile: userProfile, filters: userFilters });
+    socket.emit('set-profile', { profile: userProfile, filters: userFilters, deviceId });
   }
   if (isStreaming) {
     socket.emit('start-public-stream');
   }
 });
 socket.on('disconnect', (reason) => console.log('Disconnected from server:', reason));
+
+// ── Tab visibility: suppress ICE failures in background, recover on focus ──
+document.addEventListener('visibilitychange', () => {
+  if (!document.hidden && isRunning && pc) {
+    const state = pc.iceConnectionState;
+    if (state === 'disconnected' || state === 'failed') {
+      console.log('>>> Tab visible again, ICE state:', state, '— requesting restart');
+      if (otherId) socket.emit('signal', { to: otherId, data: { type: 'ice-restart-request' } });
+    }
+  }
+});
 
 // Update user counter (real users + bots)
 socket.on('user-count', ({ total = 0, humans = 0, bots = 0 }) => {
@@ -302,6 +313,16 @@ let userProfile = null;
 let userFilters = null;
 let profileReady = false; // true only after user submits the login form
 
+// Stable device ID — persists across sessions so self-match detection works correctly
+const deviceId = (() => {
+  let id = localStorage.getItem('deviceId');
+  if (!id) {
+    id = Math.random().toString(36).slice(2) + Math.random().toString(36).slice(2);
+    localStorage.setItem('deviceId', id);
+  }
+  return id;
+})();
+
 // Load saved form values from localStorage
 function loadSavedFormValues() {
   const saved = localStorage.getItem('videochatProfile');
@@ -387,7 +408,7 @@ saveProfileBtn.addEventListener('click', () => {
   };
 
   // Send profile to server
-  socket.emit('set-profile', { profile: userProfile, filters: userFilters });
+  socket.emit('set-profile', { profile: userProfile, filters: userFilters, deviceId });
   profileReady = true;
 
   // Show chat interface and hide profile view
@@ -727,7 +748,7 @@ socket.on('matched', async ({ otherId: id, initiator, isBot, botProfile, botVide
     remoteVideo.srcObject = null;
     remoteVideo.src = botVideoUrl;
     remoteVideo.loop = false;
-    remoteVideo.muted = true;
+    remoteVideo.muted = false;
     remoteVideo.style.display = 'block';
     if (remotePlaceholder) remotePlaceholder.style.display = 'none';
     remoteVideo.play().catch(e => console.log('Bot video play failed:', e));
@@ -791,6 +812,12 @@ socket.on('peer-disconnected', ({ id }) => {
     status('');
     return;
   }
+  // If the tab is hidden the browser throttled ICE/network — don't exit random mode;
+  // the visibilitychange handler will request ICE restart when user returns.
+  if (document.hidden) {
+    console.log('*** peer-disconnected received while tab hidden — ignoring ***');
+    return;
+  }
   console.log('*** peer-disconnected event received from', id, '***');
   stopRandomMode({ notifyPartner: false, notifySearching: false });
 });
@@ -802,6 +829,10 @@ socket.on('peer-left', ({ id, reason }) => {
   }
   if (!isRunning) {
     status('');
+    return;
+  }
+  if (document.hidden) {
+    console.log('*** peer-left received while tab hidden — ignoring ***');
     return;
   }
   console.log('*** peer-left event received *** id:', id, 'reason:', reason);
@@ -957,15 +988,22 @@ async function createPeerConnection(targetId, initiator) {
     const state = pc.iceConnectionState;
     console.log('>>> ICE state:', state);
     if (state === 'disconnected') {
-      // Give it a few seconds to recover on its own before trying ICE restart
+      // When tab is hidden the browser throttles ICE — wait longer and skip if still hidden
+      const delay = document.hidden ? 12000 : 4000;
       setTimeout(() => {
         if (!pc || pc !== window._currentPc) return;
         if (pc.iceConnectionState === 'connected' || pc.iceConnectionState === 'completed') return;
         if (pc.iceConnectionState === 'failed') return; // handled below
+        if (document.hidden) return; // tab still hidden — let visibilitychange handle recovery
         // Still disconnected — emit restart request to the other side
         socket.emit('signal', { to: targetId, data: { type: 'ice-restart-request' } });
-      }, 4000);
+      }, delay);
     } else if (state === 'failed') {
+      if (document.hidden) {
+        // Don't escalate while tab is hidden — recovery happens on visibilitychange
+        console.warn('>>> ICE failed while tab hidden — deferring restart');
+        return;
+      }
       console.warn('>>> ICE failed — requesting full reconnect');
       socket.emit('signal', { to: targetId, data: { type: 'ice-restart-request' } });
     }
@@ -1773,13 +1811,17 @@ socket.on('public-stream-ready', ({ streamerId, streamerName, streamerIndex, bot
   }
   if (publicStreamViewerCount) publicStreamViewerCount.textContent = `👁 ${viewerCount || 0}`;
 
-  // If bot stream, play MP4 directly (no WebRTC) — always muted
+  // If bot stream, play MP4 directly (no WebRTC)
   if (botVideoUrl) {
+    // Hide the live WebRTC overlay so the bot MP4 shows through
+    const ttSV = document.getElementById('ttStreamVideo');
+    if (ttSV) { ttSV.style.display = 'none'; ttSV.srcObject = null; }
+    if (publicStreamViewerPC) { publicStreamViewerPC.close(); publicStreamViewerPC = null; }
     if (publicStreamVideo) {
       publicStreamVideo.srcObject = null;
       publicStreamVideo.src = botVideoUrl;
       publicStreamVideo.loop = false;
-      publicStreamVideo.muted = true;
+      publicStreamVideo.muted = false;
       publicStreamVideo.play().catch(e => console.log('Bot stream play failed:', e));
     }
     return;
@@ -2595,9 +2637,10 @@ function ttGoTo(index, animated = true) {
         }, 3000);
       }
     }
-    // Clear old stream video
+    // Clear old stream video — pause first to stop audio immediately
     if (publicStreamArea) publicStreamArea.classList.remove('tt-stream-live');
     if (publicStreamVideo) {
+      publicStreamVideo.pause();
       publicStreamVideo.srcObject = null;
       publicStreamVideo.removeAttribute('src');
       publicStreamVideo.load();
@@ -2692,8 +2735,8 @@ function renderTikTokFeed(streamers) {
       const vid = document.createElement('video');
       vid.className = 'tt-slide-video';
       vid.dataset.src = streamer.botVideoUrl; // lazy — src set only when nearby
-      vid.muted = true;
-      vid.loop  = true;
+      vid.muted = true; // audio handled by publicStreamVideo only
+      vid.loop  = false;
       vid.preload = 'none';
       vid.setAttribute('playsinline', '');
       // poster = dark data URL so Android shows our background color (not gray)

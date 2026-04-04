@@ -347,7 +347,7 @@
         renderActivityChart();
       }
 
-
+      function renderList() {
         const chats = Array.from(chatSummaries.values()).sort((a, b) => {
           const aTime = new Date(a.startedAt || 0).getTime();
           const bTime = new Date(b.startedAt || 0).getTime();

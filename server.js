@@ -1249,6 +1249,94 @@ function getPublicStreamersList() {
   });
 }
 
+// ── Try to match a newly-freed bot with any user already waiting in searching ──
+function tryMatchWaitingUsers(botId) {
+  if (pairs.has(botId) || !searching.has(botId)) return;
+  const bp = botProfiles.get(botId);
+
+  for (const [sid] of [...searching.entries()]) {
+    if (sid === botId) continue;
+    if (bots.has(sid)) continue; // skip other bots
+    if (pairs.has(sid)) continue;
+    // Allow lastPartner rematch only if it's the only free bot
+    const isLastPartner = lastPartner.get(sid) === botId || lastPartner.get(botId) === sid;
+    if (isLastPartner) continue; // prefer a different bot; fall through to second pass below
+
+    // Check filters
+    const userData = userProfiles.get(sid);
+    if (!userData) continue;
+    const { profile: p, filters: f } = userData;
+    if (f.gender !== 'any' && bp?.gender && p?.gender !== f.gender) continue;
+    if (f.country !== 'any' && bp?.country && p?.country !== f.country) continue;
+    const botAge = bp?.age || 25;
+    if (botAge < f.minAge || botAge > f.maxAge) continue;
+
+    // Match!
+    pairs.set(sid, botId);
+    pairs.set(botId, sid);
+    lastPartner.delete(sid);
+    lastPartner.delete(botId);
+    searching.delete(sid);
+    searching.delete(botId);
+    console.log(`>>> [proactive] matched waiting user ${sid} with freed bot ${botId}`);
+
+    const profile = botProfiles.get(botId);
+    const botVideoUrl = profile?.botVideoUrl || null;
+    const userSocket = io.sockets.sockets.get(sid);
+    if (userSocket) {
+      userSocket.emit('matched', {
+        otherId: botId,
+        initiator: true,
+        isBot: true,
+        botProfile: profile ? { name: profile.name, age: profile.age, country: profile.countryName } : null,
+        botVideoUrl
+      });
+    }
+    emitAdminOnlineUsers();
+    emitPublicOnlineUsers();
+    return;
+  }
+
+  // Second pass: allow lastPartner if it's the only option
+  for (const [sid] of [...searching.entries()]) {
+    if (sid === botId) continue;
+    if (bots.has(sid)) continue;
+    if (pairs.has(sid)) continue;
+
+    const userData = userProfiles.get(sid);
+    if (!userData) continue;
+    const { profile: p, filters: f } = userData;
+    if (f.gender !== 'any' && bp?.gender && p?.gender !== f.gender) continue;
+    if (f.country !== 'any' && bp?.country && p?.country !== f.country) continue;
+    const botAge = bp?.age || 25;
+    if (botAge < f.minAge || botAge > f.maxAge) continue;
+
+    pairs.set(sid, botId);
+    pairs.set(botId, sid);
+    lastPartner.delete(sid);
+    lastPartner.delete(botId);
+    searching.delete(sid);
+    searching.delete(botId);
+    console.log(`>>> [proactive fallback] matched waiting user ${sid} with last-partner bot ${botId}`);
+
+    const profile = botProfiles.get(botId);
+    const botVideoUrl = profile?.botVideoUrl || null;
+    const userSocket = io.sockets.sockets.get(sid);
+    if (userSocket) {
+      userSocket.emit('matched', {
+        otherId: botId,
+        initiator: true,
+        isBot: true,
+        botProfile: profile ? { name: profile.name, age: profile.age, country: profile.countryName } : null,
+        botVideoUrl
+      });
+    }
+    emitAdminOnlineUsers();
+    emitPublicOnlineUsers();
+    return;
+  }
+}
+
 // ── Ensure all virtual bots are streaming ──
 function triggerAllBotStreams() {
   let added = 0;
@@ -1322,9 +1410,9 @@ function consolidateBotsToStreamer(realStreamerId) {
     if (streamerSocket) streamerSocket.emit('public-stream-viewer-joined', { viewerId });
   }
 
-  // Remove virtual bot slots from publicStreamers (SUKI_BOT_ID stays)
+  // Remove virtual bot slots from publicStreamers (partner slots always stay)
   for (let i = publicStreamers.length - 1; i >= 0; i--) {
-    if (publicStreamers[i] !== SUKI_BOT_ID && botProfiles.has(publicStreamers[i])) {
+    if (publicStreamers[i] !== SUKI_BOT_ID && publicStreamers[i] !== MARLET_BOT_ID && botProfiles.has(publicStreamers[i])) {
       publicStreamers.splice(i, 1);
     }
   }
@@ -2141,10 +2229,24 @@ function cleanupStaleEntries() {
   
   let cleaned = 0;
   // Clean up pairs for disconnected users
+  // Track which virtual bots need to be re-added to searching after cleanup
+  const botsToRestore = new Set();
   for (const [key, value] of pairs.entries()) {
-    if (!connectedSockets.has(key) || !connectedSockets.has(value)) {
+    const keyConnected = connectedSockets.has(key) || virtualBotIds.includes(key);
+    const valueConnected = connectedSockets.has(value) || virtualBotIds.includes(value);
+    if (!keyConnected || !valueConnected) {
       pairs.delete(key);
       cleaned++;
+      // If this pair involved a virtual bot, mark it for restore
+      if (virtualBotIds.includes(key)) botsToRestore.add(key);
+      if (virtualBotIds.includes(value)) botsToRestore.add(value);
+    }
+  }
+  // Re-add any freed bots back to searching
+  for (const botId of botsToRestore) {
+    if (!pairs.has(botId)) {
+      searching.add(botId);
+      console.log(`[CLEANUP] Restored bot ${botId} to searching pool`);
     }
   }
   
@@ -2224,8 +2326,8 @@ io.on('connection', (socket) => {
   emitPublicOnlineUsers();
   
   // Handle profile setting
-  socket.on('set-profile', ({ profile, filters }) => {
-    userProfiles.set(socket.id, { profile, filters });
+  socket.on('set-profile', ({ profile, filters, deviceId }) => {
+    userProfiles.set(socket.id, { profile, filters, deviceId: deviceId || null });
     console.log(`Profile set for ${socket.id}:`, profile, 'Filters:', filters);
     if (!socket.data.isBot) {
       upsertLoginSession(socket.id, profile?.name);
@@ -2670,13 +2772,13 @@ io.on('connection', (socket) => {
       return;
     }
 
-    // Partner broadcasters do not enter random chat
-    if (isMarletSocket(socket)) {
-      console.log('>>> Marlet socket blocked from random chat find');
+    // Partner broadcasters do not enter random chat while they are live
+    if (marletLiveSocketId === socket.id) {
+      console.log('>>> Marlet socket blocked from random chat find (is live)');
       return;
     }
-    if (isSukiSocket(socket)) {
-      console.log('>>> Suki socket blocked from random chat find');
+    if (sukiLiveSocketId === socket.id) {
+      console.log('>>> Suki socket blocked from random chat find (is live)');
       return;
     }
     
@@ -2751,22 +2853,11 @@ io.on('connection', (socket) => {
       if (!socket1 || !socket2) return false;
       if (socket1.data.isBot || socket2.data.isBot) return false;
 
-      const profile1 = userProfiles.get(socketId1)?.profile;
-      const profile2 = userProfiles.get(socketId2)?.profile;
-      if (!profile1 || !profile2) return false;
-
-      const sameName = normalizeText(profile1.name) && normalizeText(profile1.name) === normalizeText(profile2.name);
-      const sameAge = Number(profile1.age) === Number(profile2.age);
-      const sameGender = normalizeText(profile1.gender) === normalizeText(profile2.gender);
-      const sameCountry = normalizeText(profile1.country) === normalizeText(profile2.country);
-      const sameProfile = sameName && sameAge && sameGender && sameCountry;
-
-      const ip1 = getClientIp(socket1);
-      const ip2 = getClientIp(socket2);
-      const sameIp = !!ip1 && ip1 === ip2;
-
-      if (sameProfile && sameIp) {
-        console.log(`>>> skip likely self-match between ${socketId1} and ${socketId2}`);
+      // Use client-supplied deviceId (stored in localStorage) — reliable across NAT/proxy
+      const deviceId1 = userProfiles.get(socketId1)?.deviceId;
+      const deviceId2 = userProfiles.get(socketId2)?.deviceId;
+      if (deviceId1 && deviceId2 && deviceId1 === deviceId2) {
+        console.log(`>>> skip self-match (same deviceId) between ${socketId1} and ${socketId2}`);
         return true;
       }
 
@@ -2800,6 +2891,15 @@ io.on('connection', (socket) => {
         if (lastPartner.get(socket.id) === botId || lastPartner.get(botId) === socket.id) continue;
         if (!checkFiltersMatch(socket.id, botId)) continue;
         availableBots.push(botId);
+      }
+      // If no bots passed the lastPartner filter, fall back to any free bot (avoid deadlock)
+      if (availableBots.length === 0) {
+        for (const botId of virtualBotIds) {
+          if (pairs.has(botId)) continue;
+          if (!searching.has(botId)) continue;
+          if (!checkFiltersMatch(socket.id, botId)) continue;
+          availableBots.push(botId);
+        }
       }
     }
     
@@ -3005,12 +3105,6 @@ io.on('connection', (socket) => {
       lastPartner.set(partner, socket.id);
       console.log(`>>> set lastPartner: ${socket.id} -> ${partner}`);
       
-      // If partner is a virtual bot, add it back to searching pool (not Suki's slot)
-      if (virtualBotIds.includes(partner)) {
-        searching.add(partner);
-        console.log(`>>> re-added bot ${partner} to searching pool`);
-      }
-      
       // notify partner
       io.to(partner).emit('peer-disconnected', { id: socket.id });
       io.to(partner).emit('peer-left', { id: socket.id, reason: 'peer-requested-next' });
@@ -3020,6 +3114,16 @@ io.on('connection', (socket) => {
       endChatSessionForSocket(socket.id, 'next');
       emitAdminOnlineUsers();
       emitPublicOnlineUsers();
+
+      // Re-add bot and try to match a waiting user AFTER pairs are cleared,
+      // so tryMatchWaitingUsers sees the bot as free. Also user5 is not yet
+      // in searching (they haven't emitted 'find' yet), so they won't get
+      // re-matched before the waiting user does.
+      if (virtualBotIds.includes(partner)) {
+        searching.add(partner);
+        console.log(`>>> re-added bot ${partner} to searching pool`);
+        tryMatchWaitingUsers(partner);
+      }
     }
   });
 
@@ -3037,6 +3141,7 @@ io.on('connection', (socket) => {
       if (virtualBotIds.includes(partner)) {
         searching.add(partner);
         console.log(`>>> re-added bot ${partner} to searching pool after disconnect`);
+        tryMatchWaitingUsers(partner);
       }
     }
     
