@@ -86,7 +86,7 @@ const GROQ_AI_URL = (process.env.GROQ_BASE_URL || process.env.GROQ_API_URL || 'h
 const GROQ_API_KEY = (process.env.GROQ_API_KEY || '').trim();
 const GROQ_MODEL = (process.env.GROQ_MODEL || 'llama-3.1-8b-instant').trim();
 const GROQ_TIMEOUT = parseInt(process.env.GROQ_TIMEOUT || '12000');
-const NUM_BOTS = parseInt(process.env.NUM_BOTS || '0');
+const NUM_BOTS = parseInt(process.env.NUM_BOTS || '5');
 const CLEANUP_INTERVAL = parseInt(process.env.CLEANUP_INTERVAL || '60000'); // 1 minute
 const ADMIN_KEY = process.env.ADMIN_KEY || '';
 const JOIN_WEBHOOK_URL = (process.env.JOIN_WEBHOOK_URL || process.env.NTFY_URL || '').trim();
@@ -447,6 +447,8 @@ function marletGoLive(socketId) {
   }
 
   io.emit('public-stream-update', { streamers: getPublicStreamersList() });
+  recordStreamStart(socketId);
+  emitAdminOnlineUsers();
   console.log(`>>> Marlet is now LIVE (${socketId})`);
 }
 
@@ -474,7 +476,9 @@ function marletGoOffline() {
   streamChatEvents.delete(prevLiveId);
   streamerThumbnails.delete(prevLiveId);
 
+  recordStreamEnd(prevLiveId);
   io.emit('public-stream-update', { streamers: getPublicStreamersList() });
+  emitAdminOnlineUsers();
   console.log('>>> Marlet went offline — restoring marlet.mp4 slot');
 }
 
