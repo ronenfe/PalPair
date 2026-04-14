@@ -139,6 +139,18 @@ body.chat-active .container {
   margin-bottom: 12px;
 }
 
+.hire-streamers {
+  text-align: center;
+  font-size: 0.9em;
+  opacity: 0.85;
+  margin-bottom: 8px;
+}
+
+.hire-streamers a {
+  color: #fff;
+  text-decoration: underline;
+}
+
 .safety-note {
   text-align: center;
   font-size: 0.95em;
