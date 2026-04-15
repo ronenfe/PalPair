@@ -419,6 +419,20 @@ saveProfileBtn.addEventListener('click', () => {
   }
   chatInterface.style.display = 'flex';
   document.body.classList.add('chat-active');
+
+  // Show hire streamers popup once per session
+  if (!sessionStorage.getItem('hirePopupShown')) {
+    sessionStorage.setItem('hirePopupShown', '1');
+    const hirePopup = document.getElementById('hirePopup');
+    if (hirePopup) {
+      hirePopup.style.display = 'flex';
+      const closePopup = () => { hirePopup.style.display = 'none'; };
+      document.getElementById('closeHirePopup').addEventListener('click', closePopup);
+      document.getElementById('closeHirePopup2').addEventListener('click', closePopup);
+      hirePopup.addEventListener('click', e => { if (e.target === hirePopup) closePopup(); });
+    }
+  }
+
   setRandomMode(false);
   enterTtMode();
   chatInput.disabled = false;
@@ -837,6 +851,17 @@ socket.on('peer-left', ({ id, reason }) => {
   }
   console.log('*** peer-left event received *** id:', id, 'reason:', reason);
   stopRandomMode({ notifyPartner: false, notifySearching: false });
+});
+
+// A real user went live — bot random chats are cleared and users are sent to the live stream
+socket.on('go-watch-live', ({ streamerIndex }) => {
+  console.log('>>> go-watch-live event received, streamerIndex:', streamerIndex);
+  if (isRunning) {
+    stopRandomMode({ notifyPartner: false, notifySearching: false });
+  }
+  if (ttActive && typeof streamerIndex === 'number') {
+    setTimeout(() => ttGoTo(streamerIndex, true), 300);
+  }
 });
 
 // Chat events
@@ -1821,13 +1846,13 @@ socket.on('public-stream-ready', ({ streamerId, streamerName, streamerIndex, bot
       publicStreamVideo.srcObject = null;
       publicStreamVideo.src = botVideoUrl;
       publicStreamVideo.loop = false;
-      publicStreamVideo.muted = false;
+      publicStreamVideo.muted = isStreamMuted;
       publicStreamVideo.play().catch(e => console.log('Bot stream play failed:', e));
     }
     return;
   }
 
-  if (publicStreamVideo && !isStreaming) publicStreamVideo.muted = false;
+  if (publicStreamVideo && !isStreaming) publicStreamVideo.muted = isStreamMuted;
 
   // Create viewer peer connection (receive only) for real streamers
   publicStreamViewerPC = new RTCPeerConnection(ICE_SERVERS);
@@ -2124,6 +2149,9 @@ if (nextStreamerBtn) {
 // ── Hide stream button ──
 const muteStreamBtn = document.getElementById('muteStreamBtn');
 if (muteStreamBtn) {
+  // Sync icon to persisted mute state on load
+  muteStreamBtn.textContent = isStreamMuted ? '🔇' : '🔊';
+  muteStreamBtn.title = isStreamMuted ? 'Unmute stream' : 'Mute stream';
   muteStreamBtn.addEventListener('click', () => {
     if (!publicStreamVideo) return;
     isStreamMuted = !isStreamMuted;
