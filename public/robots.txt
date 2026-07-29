@@ -1,0 +1,6 @@
+User-agent: *
+Disallow: /admin.html
+Disallow: /support-admin.html
+Allow: /
+
+Sitemap: https://app.palpair.lol/sitemap.xml
