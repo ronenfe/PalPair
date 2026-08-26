@@ -369,9 +369,11 @@ function initVirtualBots() {
   }
 }
 
-// ── Partner Room: Marlet (default/first slot) ──
-// Marlet always appears as the FIRST stream slot (index 0), playing marlet.mp4.
+// ── Marlet and Suki: recorded bots in the random-match pool ──
+// No dedicated public-stream room; they're matched like any other virtual bot,
+// showing their recorded video (marlet.mp4 / suki.mp4) once paired.
 const MARLET_BOT_ID = 'partner-marlet';
+const SUKI_BOT_ID = 'partner-suki';
 
 function initMarletSlot() {
   bots.add(MARLET_BOT_ID);
@@ -383,26 +385,16 @@ function initMarletSlot() {
     country: 'US',
     countryName: 'United States',
     botVideoUrl: '/videos/marlet.mp4',
-    isMarletSlot: true,
     style: 'Warm, bubbly and loves to chat. Always upbeat and curious about people.'
   });
   userProfiles.set(MARLET_BOT_ID, {
     profile: { name: 'Marlet', age: 25, gender: 'female', country: 'US' },
     filters: { minAge: 18, maxAge: 100, gender: 'any', country: 'any' }
   });
-  // Insert at position 0 so Marlet is always the first (default) stream
-  if (!publicStreamers.includes(MARLET_BOT_ID)) {
-    publicStreamers.unshift(MARLET_BOT_ID);
-  }
-  // Add to random chat pool
   if (!virtualBotIds.includes(MARLET_BOT_ID)) virtualBotIds.push(MARLET_BOT_ID);
   searching.add(MARLET_BOT_ID);
-  console.log('>>> Marlet partner slot initialised (showing marlet.mp4)');
+  console.log('>>> Marlet added to random chat pool (showing marlet.mp4)');
 }
-
-// ── Partner Room: Suki ──
-// Suki always appears at index 1, playing suki.mp4.
-const SUKI_BOT_ID = 'partner-suki';
 
 function initSukiSlot() {
   bots.add(SUKI_BOT_ID);
@@ -413,22 +405,15 @@ function initSukiSlot() {
     gender: 'female',
     country: 'CN',
     countryName: 'China',
-    botVideoUrl: '/videos/suki.mp4',
-    isSukiSlot: true
+    botVideoUrl: '/videos/suki.mp4'
   });
   userProfiles.set(SUKI_BOT_ID, {
     profile: { name: 'Suki', age: 28, gender: 'female', country: 'CN' },
     filters: { minAge: 18, maxAge: 100, gender: 'any', country: 'any' }
   });
-  // Insert at position 1 (after Marlet) so Suki is always the second stream
-  if (!publicStreamers.includes(SUKI_BOT_ID)) {
-    const marletIdx = publicStreamers.indexOf(MARLET_BOT_ID);
-    publicStreamers.splice(marletIdx + 1, 0, SUKI_BOT_ID);
-  }
-  // Add to random chat pool
   if (!virtualBotIds.includes(SUKI_BOT_ID)) virtualBotIds.push(SUKI_BOT_ID);
   searching.add(SUKI_BOT_ID);
-  console.log('>>> Suki partner slot initialised (showing suki.mp4)');
+  console.log('>>> Suki added to random chat pool (showing suki.mp4)');
 }
 
 function getPersonaByBotId(botId) {
@@ -1165,7 +1150,8 @@ function tryMatchWaitingUsers(botId) {
 function triggerAllBotStreams() {
   let added = 0;
   for (const botId of virtualBotIds) {
-    if (!publicStreamers.includes(botId)) {
+    // Marlet/Suki are random-match-only bots, never public-stream rooms
+    if (botId !== MARLET_BOT_ID && botId !== SUKI_BOT_ID && !publicStreamers.includes(botId)) {
       publicStreamers.push(botId);
       console.log(`>>> Virtual bot ${botId} (${getSocketDisplayName(botId)}) started streaming`);
       added++;
@@ -1182,16 +1168,12 @@ function triggerAllBotStreams() {
 }
 
 function hasRealStreamers() {
-  // Partner offline bot slots don't count as "real" streamers
-  return publicStreamers.some(id => !botProfiles.has(id) && id !== SUKI_BOT_ID && id !== MARLET_BOT_ID);
+  return publicStreamers.some(id => !botProfiles.has(id));
 }
 
 function removeBotStreams() {
   const before = publicStreamers.length;
   for (let i = publicStreamers.length - 1; i >= 0; i--) {
-    // Never remove partner offline slots
-    if (publicStreamers[i] === MARLET_BOT_ID) continue;
-    if (publicStreamers[i] === SUKI_BOT_ID) continue;
     if (botProfiles.has(publicStreamers[i])) publicStreamers.splice(i, 1);
   }
   if (publicStreamers.length !== before) {
@@ -1225,7 +1207,7 @@ function consolidateBotsToStreamer(realStreamerId) {
   // Collect bot indexes before we splice anything
   const botIndexes = new Set();
   for (let i = 0; i < publicStreamers.length; i++) {
-    if (publicStreamers[i] !== SUKI_BOT_ID && publicStreamers[i] !== MARLET_BOT_ID && botProfiles.has(publicStreamers[i])) {
+    if (botProfiles.has(publicStreamers[i])) {
       botIndexes.add(i);
     }
   }
@@ -1251,9 +1233,9 @@ function consolidateBotsToStreamer(realStreamerId) {
     if (streamerSocket) streamerSocket.emit('public-stream-viewer-joined', { viewerId });
   }
 
-  // Remove virtual bot slots from publicStreamers (partner slots always stay)
+  // Remove virtual bot slots from publicStreamers
   for (let i = publicStreamers.length - 1; i >= 0; i--) {
-    if (publicStreamers[i] !== SUKI_BOT_ID && publicStreamers[i] !== MARLET_BOT_ID && botProfiles.has(publicStreamers[i])) {
+    if (botProfiles.has(publicStreamers[i])) {
       publicStreamers.splice(i, 1);
     }
   }
