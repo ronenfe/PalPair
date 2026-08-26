@@ -2904,6 +2904,7 @@ body.stream-fake-fullscreen-active {
   width: 100%;
   height: 100%;
   object-fit: cover;
+  object-position: center top;
   pointer-events: none;
   display: block;
 }
@@ -3256,6 +3257,7 @@ body.tt-mode .chat-input-wrap {
   width: 100%;
   height: 100%;
   object-fit: cover;
+  object-position: center top;
   pointer-events: none;
   transform: scaleX(-1); /* mirror self-view like a selfie camera */
 }
@@ -3268,6 +3270,7 @@ body.tt-mode .chat-input-wrap {
   width: 100%;
   height: 100%;
   object-fit: cover;
+  object-position: center top;
   pointer-events: none;
   transition: opacity 0.32s ease;
 }
