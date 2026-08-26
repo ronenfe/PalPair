@@ -370,17 +370,8 @@ function initVirtualBots() {
 }
 
 // ── Partner Room: Marlet (default/first slot) ──
-// Marlet always appears as the FIRST stream slot (index 0).
-// When offline the slot plays marlet.mp4 (bot).
-// When she logs in with name "Marlet Bringquiz" and goes live the real socket takes the slot.
+// Marlet always appears as the FIRST stream slot (index 0), playing marlet.mp4.
 const MARLET_BOT_ID = 'partner-marlet';
-let marletLiveSocketId = null;
-
-function isMarletSocket(socket) {
-  const p = userProfiles.get(socket.id)?.profile || {};
-  const name = String(p.name || '').toLowerCase().trim();
-  return name === 'marlet' || name === 'marlet bringquiz';
-}
 
 function initMarletSlot() {
   bots.add(MARLET_BOT_ID);
@@ -403,102 +394,15 @@ function initMarletSlot() {
   if (!publicStreamers.includes(MARLET_BOT_ID)) {
     publicStreamers.unshift(MARLET_BOT_ID);
   }
+  // Add to random chat pool
+  if (!virtualBotIds.includes(MARLET_BOT_ID)) virtualBotIds.push(MARLET_BOT_ID);
+  searching.add(MARLET_BOT_ID);
   console.log('>>> Marlet partner slot initialised (showing marlet.mp4)');
 }
 
-function marletGoLive(socketId) {
-  if (marletLiveSocketId === socketId) return;
-  marletLiveSocketId = socketId;
-  const marletSocket = io.sockets.sockets.get(socketId);
-
-  if (marletSocket) {
-    leaveAllStreamRooms(marletSocket);
-    viewerStreamIndex.delete(socketId);
-  }
-
-  if (marletSocket) {
-    marletSocket.join(getStreamChatRoom(MARLET_BOT_ID));
-    marletSocket.emit('public-stream-ready', {
-      streamerId: socketId,
-      streamerName: 'Marlet',
-      streamerIndex: 0,
-      botVideoUrl: null,
-      viewerCount: 0,
-      isSelf: true
-    });
-  }
-
-  const roomSockets = io.sockets.adapter.rooms.get(getStreamChatRoom(MARLET_BOT_ID));
-  if (roomSockets) {
-    const viewerCount = roomSockets.size;
-    for (const viewerId of roomSockets) {
-      if (viewerId === socketId) continue;
-      const viewerSocket = io.sockets.sockets.get(viewerId);
-      if (!viewerSocket) continue;
-      viewerSocket.emit('public-stream-ready', {
-        streamerId: socketId,
-        streamerName: 'Marlet',
-        streamerIndex: 0,
-        botVideoUrl: null,
-        viewerCount
-      });
-      if (marletSocket) marletSocket.emit('public-stream-viewer-joined', { viewerId });
-    }
-  }
-
-  io.emit('public-stream-update', { streamers: getPublicStreamersList() });
-  recordStreamStart(socketId);
-  emitAdminOnlineUsers();
-  console.log(`>>> Marlet is now LIVE (${socketId})`);
-}
-
-function marletGoOffline() {
-  if (!marletLiveSocketId) return;
-  const prevLiveId = marletLiveSocketId;
-  marletLiveSocketId = null;
-
-  const roomSockets = io.sockets.adapter.rooms.get(getStreamChatRoom(MARLET_BOT_ID));
-  if (roomSockets) {
-    const viewerCount = roomSockets.size;
-    for (const viewerId of roomSockets) {
-      const viewerSocket = io.sockets.sockets.get(viewerId);
-      if (!viewerSocket) continue;
-      viewerSocket.emit('public-stream-ready', {
-        streamerId: MARLET_BOT_ID,
-        streamerName: 'Marlet',
-        streamerIndex: 0,
-        botVideoUrl: '/videos/marlet.mp4',
-        viewerCount
-      });
-    }
-  }
-
-  streamChatEvents.delete(prevLiveId);
-  streamerThumbnails.delete(prevLiveId);
-
-  recordStreamEnd(prevLiveId);
-  io.emit('public-stream-update', { streamers: getPublicStreamersList() });
-  emitAdminOnlineUsers();
-  console.log('>>> Marlet went offline — restoring marlet.mp4 slot');
-}
-
 // ── Partner Room: Suki ──
-// Suki always appears at index 1.  When she is offline the slot
-// plays suki.mp4 (bot).  When she logs in and goes live the bot slot is hidden
-// and her real socket takes that position instead.
+// Suki always appears at index 1, playing suki.mp4.
 const SUKI_BOT_ID = 'partner-suki';
-const SUKI_CREDENTIALS = { name: 'suki', age: 28, gender: 'female', country: 'CN' };
-let sukiLiveSocketId = null; // set while Suki is broadcasting live
-
-function isSukiSocket(socket) {
-  const p = userProfiles.get(socket.id)?.profile || {};
-  return (
-    String(p.name || '').toLowerCase().trim() === 'suki' &&
-    (Number(p.age) === 28) &&
-    String(p.gender || '').toLowerCase() === 'female' &&
-    String(p.country || '').toUpperCase() === 'CN'
-  );
-}
 
 function initSukiSlot() {
   bots.add(SUKI_BOT_ID);
@@ -521,87 +425,10 @@ function initSukiSlot() {
     const marletIdx = publicStreamers.indexOf(MARLET_BOT_ID);
     publicStreamers.splice(marletIdx + 1, 0, SUKI_BOT_ID);
   }
+  // Add to random chat pool
+  if (!virtualBotIds.includes(SUKI_BOT_ID)) virtualBotIds.push(SUKI_BOT_ID);
+  searching.add(SUKI_BOT_ID);
   console.log('>>> Suki partner slot initialised (showing suki.mp4)');
-}
-
-function sukiGoLive(socketId) {
-  if (sukiLiveSocketId === socketId) return;
-  sukiLiveSocketId = socketId;
-  const sukiSocket = io.sockets.sockets.get(socketId);
-
-  // If Suki was watching another streamer as a viewer, pull her out of that room first
-  if (sukiSocket) {
-    leaveAllStreamRooms(sukiSocket);
-    viewerStreamIndex.delete(socketId);
-  }
-
-  // SUKI_BOT_ID stays at index 0 in publicStreamers — we never swap it out.
-  // Suki's real socket joins the partner room so she receives chat.
-  if (sukiSocket) {
-    sukiSocket.join(getStreamChatRoom(SUKI_BOT_ID));
-    // Tell Suki's client to navigate to her own slot (index 0)
-    sukiSocket.emit('public-stream-ready', {
-      streamerId: socketId,
-      streamerName: 'Suki',
-      streamerIndex: 0,
-      botVideoUrl: null,
-      viewerCount: 0,
-      isSelf: true
-    });
-  }
-
-  // Notify all viewers already in the room to switch to live WebRTC
-  const roomSockets = io.sockets.adapter.rooms.get(getStreamChatRoom(SUKI_BOT_ID));
-  if (roomSockets) {
-    const viewerCount = roomSockets.size; // includes Suki herself now
-    for (const viewerId of roomSockets) {
-      if (viewerId === socketId) continue; // skip Suki herself
-      const viewerSocket = io.sockets.sockets.get(viewerId);
-      if (!viewerSocket) continue;
-      viewerSocket.emit('public-stream-ready', {
-        streamerId: socketId,
-        streamerName: 'Suki',
-        streamerIndex: 0,
-        botVideoUrl: null,
-        viewerCount
-      });
-      if (sukiSocket) sukiSocket.emit('public-stream-viewer-joined', { viewerId });
-    }
-  }
-
-  io.emit('public-stream-update', { streamers: getPublicStreamersList() });
-  console.log(`>>> Suki is now LIVE (${socketId})`);
-}
-
-function sukiGoOffline() {
-  if (!sukiLiveSocketId) return;
-  const prevLiveId = sukiLiveSocketId;
-  sukiLiveSocketId = null;
-  // SUKI_BOT_ID was never removed, so no need to restore it.
-
-  // Notify all viewers currently in the room to switch back to bot video
-  const roomSockets = io.sockets.adapter.rooms.get(getStreamChatRoom(SUKI_BOT_ID));
-  if (roomSockets) {
-    const viewerCount = roomSockets.size;
-    for (const viewerId of roomSockets) {
-      const viewerSocket = io.sockets.sockets.get(viewerId);
-      if (!viewerSocket) continue;
-      viewerSocket.emit('public-stream-ready', {
-        streamerId: SUKI_BOT_ID,
-        streamerName: 'Suki',
-        streamerIndex: 0,
-        botVideoUrl: '/videos/suki.mp4',
-        viewerCount
-      });
-    }
-  }
-
-  // Clean up chat history/thumbnail from the live session
-  streamChatEvents.delete(prevLiveId);
-  streamerThumbnails.delete(prevLiveId);
-
-  io.emit('public-stream-update', { streamers: getPublicStreamersList() });
-  console.log('>>> Suki went offline — restoring suki.mp4 slot');
 }
 
 function getPersonaByBotId(botId) {
@@ -1236,15 +1063,12 @@ function getViewerCount(streamerId) {
 function getPublicStreamersList() {
   return publicStreamers.map((id) => {
     const bp = botProfiles.get(id);
-    const isLiveMarlet = id === MARLET_BOT_ID && marletLiveSocketId;
-    const isLiveSuki = id === SUKI_BOT_ID && sukiLiveSocketId;
-    const effectiveId = isLiveMarlet ? marletLiveSocketId : isLiveSuki ? sukiLiveSocketId : id;
     return {
       socketId: id,
       name: getSocketDisplayName(id),
-      viewerCount: getViewerCount(effectiveId),
-      botVideoUrl: (isLiveMarlet || isLiveSuki) ? null : (bp ? bp.botVideoUrl : null),
-      thumbnail: streamerThumbnails.get(effectiveId) || null
+      viewerCount: getViewerCount(id),
+      botVideoUrl: bp ? bp.botVideoUrl : null,
+      thumbnail: streamerThumbnails.get(id) || null
     };
   });
 }
@@ -1346,6 +1170,10 @@ function triggerAllBotStreams() {
       console.log(`>>> Virtual bot ${botId} (${getSocketDisplayName(botId)}) started streaming`);
       added++;
     }
+    // Re-add to random chat pool (was removed when consolidating to live streamer)
+    if (!pairs.has(botId)) {
+      searching.add(botId);
+    }
   }
   if (added > 0) {
     io.emit('public-stream-update', { streamers: getPublicStreamersList() });
@@ -1380,6 +1208,19 @@ function consolidateBotsToStreamer(realStreamerId) {
   const realStreamerIdx = publicStreamers.indexOf(realStreamerId);
   if (realStreamerIdx === -1) return;
   const streamerName = getSocketDisplayName(realStreamerId);
+
+  // Disconnect all virtual bots from random chat and redirect their users to the live stream
+  for (const botId of virtualBotIds) {
+    const pairedUser = pairs.get(botId);
+    if (pairedUser) {
+      pairs.delete(botId);
+      pairs.delete(pairedUser);
+      const pairedSocket = io.sockets.sockets.get(pairedUser);
+      if (pairedSocket) pairedSocket.emit('go-watch-live', { streamerIndex: realStreamerIdx });
+      console.log(`>>> Bot ${botId} random chat freed — redirecting ${pairedUser} to live stream`);
+    }
+    searching.delete(botId);
+  }
 
   // Collect bot indexes before we splice anything
   const botIndexes = new Set();
@@ -1576,10 +1417,9 @@ function getStreamRoomUsers(streamerId) {
   const socketsInRoom = io.sockets.adapter.rooms.get(room);
   const users = [];
   // Exclude the streamer's own socket — they're the host, not a viewer
-  const streamerSocketId = (streamerId === SUKI_BOT_ID) ? sukiLiveSocketId : streamerId;
   if (socketsInRoom) {
     for (const sid of socketsInRoom) {
-      if (streamerSocketId && sid === streamerSocketId) continue;
+      if (sid === streamerId) continue;
       const isViewerBot = bots.has(sid);
       if (isViewerBot) {
         // Include bots so users can DM them
@@ -1597,8 +1437,8 @@ function getStreamRoomUsers(streamerId) {
       });
     }
   }
-  // Also add the streamer if it's a bot (but not Suki's slot — she's a real girl)
-  if (bots.has(streamerId) && streamerId !== SUKI_BOT_ID) {
+  // Also add the streamer if it's a bot
+  if (bots.has(streamerId)) {
     const bp = botProfiles.get(streamerId);
     if (bp) {
       users.unshift({
@@ -2502,26 +2342,11 @@ io.on('connection', (socket) => {
   socket.on('start-public-stream', () => {
     if (publicStreamers.includes(socket.id)) return; // already streaming
 
-    // If this is Marlet going live, use the dedicated partner-room logic
-    if (isMarletSocket(socket)) {
-      marletGoLive(socket.id);
-      emitPublicOnlineUsers();
-      return;
-    }
-
-    // If this is Suki going live, use the dedicated partner-room logic
-    if (isSukiSocket(socket)) {
-      sukiGoLive(socket.id);
-      emitPublicOnlineUsers();
-      return;
-    }
-
     // If this user was watching another stream as a viewer, cleanly pull them out first
     const oldViewerIdx = viewerStreamIndex.get(socket.id);
     if (oldViewerIdx != null && oldViewerIdx >= 0 && oldViewerIdx < publicStreamers.length) {
       const oldStreamerId = publicStreamers[oldViewerIdx];
-      const oldEffective = (oldStreamerId === SUKI_BOT_ID && sukiLiveSocketId) ? sukiLiveSocketId : oldStreamerId;
-      const oldStreamerSocket = io.sockets.sockets.get(oldEffective);
+      const oldStreamerSocket = io.sockets.sockets.get(oldStreamerId);
       if (oldStreamerSocket) oldStreamerSocket.emit('public-stream-viewer-left', { viewerId: socket.id });
     }
     leaveAllStreamRooms(socket);           // leave previous viewer room (no-op if not watching)
@@ -2553,31 +2378,13 @@ io.on('connection', (socket) => {
   // ── Streamer sends a thumbnail capture of their webcam ──
   socket.on('stream-thumbnail', ({ data } = {}) => {
     if (!data || typeof data !== 'string') return;
-    // Allow partner live sockets even though they're not in publicStreamers
-    if (!publicStreamers.includes(socket.id) && socket.id !== sukiLiveSocketId && socket.id !== marletLiveSocketId) return;
+    if (!publicStreamers.includes(socket.id)) return;
     // Limit size (~100KB max base64)
     if (data.length > 150000) return;
     streamerThumbnails.set(socket.id, data);
   });
 
   socket.on('stop-public-stream', () => {
-    // If Marlet stops broadcasting, restore her offline slot
-    if (socket.id === marletLiveSocketId) {
-      marletGoOffline();
-      streamChatEvents.delete(socket.id);
-      streamerThumbnails.delete(socket.id);
-      emitPublicOnlineUsers();
-      return;
-    }
-    // If Suki stops broadcasting, restore her offline slot
-    if (socket.id === sukiLiveSocketId) {
-      sukiGoOffline();
-      streamChatEvents.delete(socket.id);
-      streamerThumbnails.delete(socket.id);
-      emitPublicOnlineUsers();
-      return;
-    }
-
     const idx = publicStreamers.indexOf(socket.id);
     if (idx === -1) return;
     recordStreamEnd(socket.id);
@@ -2633,19 +2440,16 @@ io.on('connection', (socket) => {
     viewerStreamIndex.set(socket.id, idx);
     const streamerName = getSocketDisplayName(streamerId);
     const bp = botProfiles.get(streamerId);
-    // For Suki's slot: use her live socket ID while she's on air
-    const effectiveStreamerId = (streamerId === SUKI_BOT_ID && sukiLiveSocketId) ? sukiLiveSocketId : streamerId;
-    const botVideoUrl = (effectiveStreamerId !== streamerId) ? null : (bp ? bp.botVideoUrl : null);
-    const viewerCount = getViewerCount(effectiveStreamerId);
-    // Join this streamer's chat room (always stream:partner-suki for Suki's slot)
+    const botVideoUrl = bp ? bp.botVideoUrl : null;
+    const viewerCount = getViewerCount(streamerId);
     joinStreamRoom(socket, streamerId);
     // Tell the viewer to connect to this streamer
-    socket.emit('public-stream-ready', { streamerId: effectiveStreamerId, streamerName, streamerIndex: idx, botVideoUrl, viewerCount });
+    socket.emit('public-stream-ready', { streamerId, streamerName, streamerIndex: idx, botVideoUrl, viewerCount });
     // Broadcast updated viewer counts
     io.emit('public-stream-update', { streamers: getPublicStreamersList() });
     // If real streamer, tell them to send an offer to this viewer
     if (!botVideoUrl) {
-      const streamerSocket = io.sockets.sockets.get(effectiveStreamerId);
+      const streamerSocket = io.sockets.sockets.get(streamerId);
       if (streamerSocket) {
         streamerSocket.emit('public-stream-viewer-joined', { viewerId: socket.id });
       }
@@ -2656,25 +2460,19 @@ io.on('connection', (socket) => {
   socket.on('watch-public-stream-by-id', ({ streamerId } = {}) => {
     if (!userProfiles.has(socket.id)) return; // must have set profile first
     if (!streamerId) { socket.emit('public-stream-ended'); return; }
-    // Resolve SUKI_BOT_ID alias in case the grid sends the bot ID while she's live
-    const resolvedId = (streamerId === SUKI_BOT_ID && sukiLiveSocketId) ? sukiLiveSocketId : streamerId;
-    // Find the slot index using SUKI_BOT_ID (since that always stays in publicStreamers)
-    const lookupId = (streamerId === SUKI_BOT_ID || resolvedId === sukiLiveSocketId) ? SUKI_BOT_ID : streamerId;
-    const idx = publicStreamers.indexOf(lookupId);
+    const idx = publicStreamers.indexOf(streamerId);
     if (idx === -1) { socket.emit('public-stream-ended'); return; }
-    if (resolvedId === socket.id) { socket.emit('public-stream-ended'); return; }
+    if (streamerId === socket.id) { socket.emit('public-stream-ended'); return; }
     viewerStreamIndex.set(socket.id, idx);
-    const streamerName = getSocketDisplayName(lookupId);
-    const bp = botProfiles.get(lookupId);
-    const effectiveStreamerId = (lookupId === SUKI_BOT_ID && sukiLiveSocketId) ? sukiLiveSocketId : lookupId;
-    const botVideoUrl = (effectiveStreamerId !== lookupId) ? null : (bp ? bp.botVideoUrl : null);
-    const viewerCount = getViewerCount(effectiveStreamerId);
-    // Join the canonical room for this slot (always stream:partner-suki for Suki)
-    joinStreamRoom(socket, lookupId);
-    socket.emit('public-stream-ready', { streamerId: effectiveStreamerId, streamerName, streamerIndex: idx, botVideoUrl, viewerCount });
+    const streamerName = getSocketDisplayName(streamerId);
+    const bp = botProfiles.get(streamerId);
+    const botVideoUrl = bp ? bp.botVideoUrl : null;
+    const viewerCount = getViewerCount(streamerId);
+    joinStreamRoom(socket, streamerId);
+    socket.emit('public-stream-ready', { streamerId, streamerName, streamerIndex: idx, botVideoUrl, viewerCount });
     io.emit('public-stream-update', { streamers: getPublicStreamersList() });
     if (!botVideoUrl) {
-      const streamerSocket = io.sockets.sockets.get(effectiveStreamerId);
+      const streamerSocket = io.sockets.sockets.get(streamerId);
       if (streamerSocket) {
         streamerSocket.emit('public-stream-viewer-joined', { viewerId: socket.id });
       }
@@ -2699,9 +2497,7 @@ io.on('connection', (socket) => {
     // Disconnect from current streamer
     if (currentIdx >= 0 && currentIdx < publicStreamers.length) {
       const oldStreamerId = publicStreamers[currentIdx];
-      // For Suki's slot, notify her live socket if on air
-      const oldEffective = (oldStreamerId === SUKI_BOT_ID && sukiLiveSocketId) ? sukiLiveSocketId : oldStreamerId;
-      const oldStreamerSocket = io.sockets.sockets.get(oldEffective);
+      const oldStreamerSocket = io.sockets.sockets.get(oldStreamerId);
       if (oldStreamerSocket) {
         oldStreamerSocket.emit('public-stream-viewer-left', { viewerId: socket.id });
       }
@@ -2710,16 +2506,13 @@ io.on('connection', (socket) => {
     const streamerId = publicStreamers[nextIdx];
     const streamerName = getSocketDisplayName(streamerId);
     const bp = botProfiles.get(streamerId);
-    // For Suki's slot: use her live socket ID while she's on air
-    const effectiveStreamerId = (streamerId === SUKI_BOT_ID && sukiLiveSocketId) ? sukiLiveSocketId : streamerId;
-    const botVideoUrl = (effectiveStreamerId !== streamerId) ? null : (bp ? bp.botVideoUrl : null);
-    const viewerCount = getViewerCount(effectiveStreamerId);
-    // Join new streamer's chat room (always stream:partner-suki for Suki's slot)
+    const botVideoUrl = bp ? bp.botVideoUrl : null;
+    const viewerCount = getViewerCount(streamerId);
     joinStreamRoom(socket, streamerId);
-    socket.emit('public-stream-ready', { streamerId: effectiveStreamerId, streamerName, streamerIndex: nextIdx, botVideoUrl, viewerCount });
+    socket.emit('public-stream-ready', { streamerId, streamerName, streamerIndex: nextIdx, botVideoUrl, viewerCount });
     io.emit('public-stream-update', { streamers: getPublicStreamersList() });
     if (!botVideoUrl) {
-      const streamerSocket = io.sockets.sockets.get(effectiveStreamerId);
+      const streamerSocket = io.sockets.sockets.get(streamerId);
       if (streamerSocket) {
         streamerSocket.emit('public-stream-viewer-joined', { viewerId: socket.id });
       }
@@ -2735,8 +2528,7 @@ io.on('connection', (socket) => {
   // Viewer asks streamer to restart ICE (transient disconnected state)
   socket.on('public-stream-ice-restart', ({ streamerId } = {}) => {
     if (!streamerId) return;
-    const effectiveId = (streamerId === SUKI_BOT_ID && sukiLiveSocketId) ? sukiLiveSocketId : streamerId;
-    const streamerSocket = io.sockets.sockets.get(effectiveId);
+    const streamerSocket = io.sockets.sockets.get(streamerId);
     if (streamerSocket) streamerSocket.emit('public-stream-ice-restart-request', { viewerId: socket.id });
   });
 
@@ -2744,9 +2536,7 @@ io.on('connection', (socket) => {
     const idx = viewerStreamIndex.get(socket.id);
     if (idx != null && idx >= 0 && idx < publicStreamers.length) {
       const streamerId = publicStreamers[idx];
-      // For Suki's slot, notify her live socket if she's on air
-      const effectiveStreamerId = (streamerId === SUKI_BOT_ID && sukiLiveSocketId) ? sukiLiveSocketId : streamerId;
-      const streamerSocket = io.sockets.sockets.get(effectiveStreamerId);
+      const streamerSocket = io.sockets.sockets.get(streamerId);
       if (streamerSocket) {
         streamerSocket.emit('public-stream-viewer-left', { viewerId: socket.id });
       }
@@ -2772,16 +2562,6 @@ io.on('connection', (socket) => {
       return;
     }
 
-    // Partner broadcasters do not enter random chat while they are live
-    if (marletLiveSocketId === socket.id) {
-      console.log('>>> Marlet socket blocked from random chat find (is live)');
-      return;
-    }
-    if (sukiLiveSocketId === socket.id) {
-      console.log('>>> Suki socket blocked from random chat find (is live)');
-      return;
-    }
-    
     // Mark as bot if specified
     if (isBot) {
       socket.data.isBot = true;
@@ -3157,19 +2937,6 @@ io.on('connection', (socket) => {
 
     // Clean up public stream state
     leaveAllStreamRooms(socket);
-
-    // If Marlet disconnects while live, restore her offline bot slot
-    if (socket.id === marletLiveSocketId) {
-      marletGoOffline();
-      streamChatEvents.delete(socket.id);
-      streamerThumbnails.delete(socket.id);
-    }
-    // If Suki disconnects while live, restore her offline bot slot
-    if (socket.id === sukiLiveSocketId) {
-      sukiGoOffline();
-      streamChatEvents.delete(socket.id);
-      streamerThumbnails.delete(socket.id);
-    }
 
     const streamerIdx = publicStreamers.indexOf(socket.id);
     if (streamerIdx !== -1) {
