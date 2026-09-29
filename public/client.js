@@ -420,19 +420,6 @@ saveProfileBtn.addEventListener('click', () => {
   chatInterface.style.display = 'flex';
   document.body.classList.add('chat-active');
 
-  // Show hire streamers popup once per session
-  if (!sessionStorage.getItem('hirePopupShown')) {
-    sessionStorage.setItem('hirePopupShown', '1');
-    const hirePopup = document.getElementById('hirePopup');
-    if (hirePopup) {
-      hirePopup.style.display = 'flex';
-      const closePopup = () => { hirePopup.style.display = 'none'; };
-      document.getElementById('closeHirePopup').addEventListener('click', closePopup);
-      document.getElementById('closeHirePopup2').addEventListener('click', closePopup);
-      hirePopup.addEventListener('click', e => { if (e.target === hirePopup) closePopup(); });
-    }
-  }
-
   setRandomMode(false);
   enterTtMode();
   chatInput.disabled = false;
