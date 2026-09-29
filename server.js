@@ -453,7 +453,7 @@ function normalizeBotReply(text) {
 }
 
 // Groq helper function with strict no-fallback behavior
-async function getGroqResponse(userMessage, profile) {
+async function getGroqResponse(userMessage, profile, history = []) {
   if (!GROQ_API_KEY) {
     throw new Error('GROQ_API_KEY is not set');
   }
@@ -476,7 +476,9 @@ Rules:
 - Answer questions about yourself using your character info
 - If asked if you're real/AI/bot, be honest but casual about it
 - If asked what model you are, state the exact model as ${GROQ_MODEL}
-- Match the vibe - if they're casual, be casual; if friendly, be friendly`;
+- Match the vibe - if they're casual, be casual; if friendly, be friendly
+- Stay consistent with the conversation so far - don't repeat a question you already asked, and reply to what they actually said instead of a generic acknowledgement
+- Talk like you're texting a real person, never like a customer-service assistant - never say things like "Got it", "Sure thing", or "How can I help you"`;
 
   const runAttempt = async () => {
     const controller = new AbortController();
@@ -493,10 +495,12 @@ Rules:
           model: GROQ_MODEL,
           messages: [
             { role: 'system', content: systemPrompt },
+            ...history,
             { role: 'user', content: userMessage }
           ],
             temperature: 0.45,
-          max_tokens: 120
+          max_tokens: 120,
+          reasoning_effort: 'low'
         }),
         signal: controller.signal
       });
@@ -1864,6 +1868,17 @@ function endChatSessionForSocket(socketId, reason) {
   });
 }
 
+function getRecentChatHistory(socketIdA, socketIdB, limit = 12) {
+  const chatId = socketToChatSession.get(socketIdA) || socketToChatSession.get(socketIdB);
+  if (!chatId) return [];
+  const session = activeChatSessions.get(chatId);
+  if (!session) return [];
+  return session.messages.slice(-limit).map((m) => ({
+    role: m.fromSocketId === socketIdB ? 'assistant' : 'user',
+    content: m.text
+  }));
+}
+
 function recordChatMessage(fromSocketId, toSocketId, text) {
   const chatId = socketToChatSession.get(fromSocketId) || socketToChatSession.get(toSocketId);
   if (!chatId) return;
@@ -2767,12 +2782,13 @@ io.on('connection', (socket) => {
     if (!to || !text) return;
     // If the recipient is a virtual bot, handle AI response server-side
     if (bots.has(to)) {
+      const history = getRecentChatHistory(socket.id, to);
       recordChatMessage(socket.id, to, text);
       const profile = botProfiles.get(to);
       if (!profile) return;
       setTimeout(async () => {
         try {
-          const response = await getGroqResponse(text, profile);
+          const response = await getGroqResponse(text, profile, history);
           if (response) {
             socket.emit('chat-message', { from: to, text: response });
             recordChatMessage(to, socket.id, response);
