@@ -424,12 +424,12 @@ function getPersonaByBotId(botId) {
   return botPersonas[0];
 }
 
-async function getPublicRoomBotReply(userMessage, botProfile) {
+async function getPublicRoomBotReply(userMessage, botProfile, history = []) {
   const msg = String(userMessage || '').trim();
   if (!msg) {
     throw new Error('public room message is empty');
   }
-  return getGroqResponse(msg, botProfile);
+  return getGroqResponse(msg, botProfile, history);
 }
 
 function normalizeBotReply(text) {
@@ -940,6 +940,19 @@ const completedLoginSessions = []; // recent ended login sessions
 const activeStreamTimes = new Map(); // socketId → startedAt ms
 const completedStreamSessions = []; // {name, socketId, startedAt, endedAt, durationSeconds}
 const streamChatEvents = new Map(); // streamerId → [{id, type, text, ...}] per-streamer chat history
+const botConversationHistory = new Map(); // `${humanSocketId}:${botId}` → [{role, content}] recent turns
+
+function getBotHistory(humanId, botId) {
+  return botConversationHistory.get(`${humanId}:${botId}`) || [];
+}
+
+function pushBotHistory(humanId, botId, userText, botText) {
+  const key = `${humanId}:${botId}`;
+  const arr = botConversationHistory.get(key) || [];
+  arr.push({ role: 'user', content: userText }, { role: 'assistant', content: botText });
+  while (arr.length > 20) arr.shift();
+  botConversationHistory.set(key, arr);
+}
 const pendingLeaveTimers = new Map(); // `${userId}:${streamerId}` → { timer, displayName }
 
 // ── Public Stream ──
@@ -1788,17 +1801,17 @@ function maybeEmitBotReplyToHumanStreamMessage(fromSocketId, streamerId, text) {
   const isVirtualBotStreamer = bots.has(streamerId);
   if (!isVirtualBotStreamer) return;
 
-  const humanName = getSocketDisplayName(fromSocketId);
   const botProfile = botProfiles.get(streamerId) || userProfiles.get(streamerId)?.profile || {};
   const speakerName = botProfile.name || getSocketDisplayName(streamerId);
 
   setTimeout(async () => {
     try {
-      const replyBody = await getPublicRoomBotReply(text, botProfile);
-      const replyText = `${humanName}, ${replyBody}`;
+      const history = getBotHistory(fromSocketId, streamerId);
+      const replyBody = await getPublicRoomBotReply(text, botProfile, history);
+      pushBotHistory(fromSocketId, streamerId, text, replyBody);
       pushStreamChatEvent(streamerId, buildChatEvent({
         type: 'message',
-        text: replyText,
+        text: replyBody,
         socketId: streamerId,
         name: speakerName
       }));
@@ -2319,7 +2332,9 @@ io.on('connection', (socket) => {
       const botName = getSocketDisplayName(to);
       setTimeout(async () => {
         try {
-          const replyBody = await getPublicRoomBotReply(safeText, botProfile);
+          const history = getBotHistory(socket.id, to);
+          const replyBody = await getPublicRoomBotReply(safeText, botProfile, history);
+          pushBotHistory(socket.id, to, safeText, replyBody);
           const botMsg = {
             from: to,
             fromName: botName,
