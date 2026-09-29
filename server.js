@@ -458,8 +458,8 @@ const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 // to the reply's length, capped so long replies don't feel like a stall.
 function computeTypingDelay(text) {
   const len = String(text || '').length;
-  const readPause = 400 + Math.random() * 500;
-  const typingTime = Math.min(len * (18 + Math.random() * 12), 4000);
+  const readPause = 900 + Math.random() * 900;
+  const typingTime = Math.min(len * (35 + Math.random() * 25), 6000);
   return Math.round(readPause + typingTime);
 }
 
