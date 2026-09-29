@@ -452,6 +452,17 @@ function normalizeBotReply(text) {
   return mapped.replace(/\s{2,}/g, ' ').trim();
 }
 
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+// Simulate human typing speed: a short "read it" pause plus time proportional
+// to the reply's length, capped so long replies don't feel like a stall.
+function computeTypingDelay(text) {
+  const len = String(text || '').length;
+  const readPause = 400 + Math.random() * 500;
+  const typingTime = Math.min(len * (18 + Math.random() * 12), 4000);
+  return Math.round(readPause + typingTime);
+}
+
 // Groq helper function with strict no-fallback behavior
 async function getGroqResponse(userMessage, profile, history = []) {
   if (!GROQ_API_KEY) {
@@ -1804,11 +1815,12 @@ function maybeEmitBotReplyToHumanStreamMessage(fromSocketId, streamerId, text) {
   const botProfile = botProfiles.get(streamerId) || userProfiles.get(streamerId)?.profile || {};
   const speakerName = botProfile.name || getSocketDisplayName(streamerId);
 
-  setTimeout(async () => {
+  (async () => {
     try {
       const history = getBotHistory(fromSocketId, streamerId);
       const replyBody = await getPublicRoomBotReply(text, botProfile, history);
       pushBotHistory(fromSocketId, streamerId, text, replyBody);
+      await sleep(computeTypingDelay(replyBody));
       pushStreamChatEvent(streamerId, buildChatEvent({
         type: 'message',
         text: replyBody,
@@ -1818,7 +1830,7 @@ function maybeEmitBotReplyToHumanStreamMessage(fromSocketId, streamerId, text) {
     } catch (error) {
       console.warn('Skipping bot reply:', error.message);
     }
-  }, 900);
+  })();
 }
 
 
@@ -2330,11 +2342,12 @@ io.on('connection', (socket) => {
     if (isBotRecipient) {
       const botProfile = botProfiles.get(to) || {};
       const botName = getSocketDisplayName(to);
-      setTimeout(async () => {
+      (async () => {
         try {
           const history = getBotHistory(socket.id, to);
           const replyBody = await getPublicRoomBotReply(safeText, botProfile, history);
           pushBotHistory(socket.id, to, safeText, replyBody);
+          await sleep(computeTypingDelay(replyBody));
           const botMsg = {
             from: to,
             fromName: botName,
@@ -2346,7 +2359,7 @@ io.on('connection', (socket) => {
         } catch (e) {
           console.warn('Bot DM reply error:', e.message);
         }
-      }, 800 + Math.random() * 1200);
+      })();
     }
   });
 
@@ -2801,17 +2814,18 @@ io.on('connection', (socket) => {
       recordChatMessage(socket.id, to, text);
       const profile = botProfiles.get(to);
       if (!profile) return;
-      setTimeout(async () => {
+      (async () => {
         try {
           const response = await getGroqResponse(text, profile, history);
           if (response) {
+            await sleep(computeTypingDelay(response));
             socket.emit('chat-message', { from: to, text: response });
             recordChatMessage(to, socket.id, response);
           }
         } catch (err) {
           console.warn('Bot chat response error:', err.message);
         }
-      }, 500 + Math.random() * 1500);
+      })();
       return;
     }
     const dest = io.sockets.sockets.get(to);
